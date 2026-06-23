@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reflect &amp; Commit — reflect on your day, commit to one real move</title>
+<meta name="description" content="Reflect & Commit is a tiny daily ritual: write what stood out about today, then commit to one thing you'll actually do.">
+<style>
+  :root{
+    --bg:#0b0c0e; --card:#15161a; --text:#f2f2f0; --muted:#9a9a9f;
+    --accent:#e7e3da; --line:rgba(255,255,255,.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;}
+  body{line-height:1.5;}
+  a{color:inherit;text-decoration:none;}
+  .wrap{max-width:920px;margin:0 auto;padding:0 24px;}
+
+  header{display:flex;align-items:center;justify-content:space-between;padding:28px 0;}
+  .brand{font-weight:600;font-size:18px;letter-spacing:.2px;}
+  .nav-cta{border:1px solid var(--line);padding:9px 16px;border-radius:8px;font-size:14px;color:var(--text);transition:border-color .15s;}
+  .nav-cta:hover{border-color:rgba(255,255,255,.25);}
+
+  .hero{padding:64px 0 40px;text-align:center;}
+  .hero h1{font-size:clamp(32px,5vw,52px);font-weight:650;letter-spacing:-0.02em;line-height:1.08;}
+  .hero p.sub{margin-top:18px;font-size:19px;color:var(--muted);max-width:560px;margin-left:auto;margin-right:auto;}
+  .cta-row{margin-top:32px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;}
+  .btn{display:inline-block;padding:14px 26px;border-radius:9px;font-size:15.5px;font-weight:600;}
+  .btn-primary{background:var(--text);color:#0b0c0e;}
+  .btn-primary:hover{opacity:.9;}
+  .btn-secondary{border:1px solid var(--line);color:var(--text);}
+  .btn-secondary:hover{border-color:rgba(255,255,255,.25);}
+
+  .video-wrap{margin:48px auto 0;max-width:760px;}
+  .video-frame{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:14px;overflow:hidden;border:1px solid var(--line);box-shadow:0 30px 80px -20px rgba(0,0,0,.6);}
+  .video-frame video,.video-frame iframe{width:100%;height:100%;display:block;border:0;}
+  .video-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--muted);background:linear-gradient(180deg,#141519,#0e0f12);}
+  .play-dot{width:56px;height:56px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;}
+  .play-dot:after{content:"";border-left:16px solid var(--text);border-top:9px solid transparent;border-bottom:9px solid transparent;margin-left:3px;}
+
+  section.feat{padding:80px 0 20px;}
+  .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;}
+  .feat-card{padding:22px 4px;}
+  .feat-card h3{font-size:16px;font-weight:600;margin-bottom:8px;}
+  .feat-card p{font-size:14.5px;color:var(--muted);}
+
+  section.pricing{padding:64px 0 90px;}
+  .price-card{max-width:380px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:36px 30px;text-align:center;}
+  .price-amt{font-size:40px;font-weight:650;letter-spacing:-0.02em;}
+  .price-note{color:var(--muted);font-size:14px;margin-top:4px;}
+  .price-card .btn{width:100%;margin-top:24px;}
+  .price-list{margin-top:22px;text-align:left;font-size:14.5px;color:var(--muted);display:flex;flex-direction:column;gap:8px;}
+
+  footer{border-top:1px solid var(--line);padding:28px 0 50px;text-align:center;color:var(--muted);font-size:13px;}
+
+  @media (max-width:680px){
+    .feat-grid{grid-template-columns:1fr;gap:10px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="brand">Reflect &amp; Commit</div>
+    <a class="nav-cta" href="/app/">Open the app →</a>
+  </header>
+
+  <section class="hero">
+    <h1>Reflect on your day.<br>Commit to one real move.</h1>
+    <p class="sub">A two-minute nightly ritual: write down what stood out — then commit to one thing you'll actually do. The day after, a clean yes or no.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="/app/">Start reflecting — $29 lifetime</a>
+      <a class="btn btn-secondary" href="#how-it-works">See how it works</a>
+    </div>
+
+    <div class="video-wrap">
+      <div class="video-frame">
+        <!-- Replace this placeholder with your real pitch video. See README note below. -->
+        <div class="video-placeholder" id="videoPlaceholder">
+          <div class="play-dot"></div>
+          <span>Pitch video coming soon</span>
+        </div>
+        <!--
+        <video controls poster="video-poster.jpg">
+          <source src="pitch.mp4" type="video/mp4">
+        </video>
+        -->
+      </div>
+    </div>
+  </section>
+
+  <section class="feat" id="how-it-works">
+    <div class="feat-grid">
+      <div class="feat-card">
+        <h3>Write it down</h3>
+        <p>A short, guided prompt each night. What stood out about today?</p>
+      </div>
+      <div class="feat-card">
+        <h3>Commit to one move</h3>
+        <p>One real thing you'll do — with a date attached, not a vague intention.</p>
+      </div>
+      <div class="feat-card">
+        <h3>The day after</h3>
+        <p>A simple yes/no check-in. No streaks to game, just honesty with yourself.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="pricing">
+    <div class="price-card">
+      <div class="price-amt">$29</div>
+      <div class="price-note">one-time · lifetime access</div>
+      <div class="price-list">
+        <span>✓ Unlimited reflections &amp; commitments</span>
+        <span>✓ Synced across your devices</span>
+        <span>✓ Daily reminder notifications</span>
+        <span>✓ All future updates included</span>
+      </div>
+      <a class="btn btn-primary" href="/app/">Sign in &amp; unlock</a>
+    </div>
+  </section>
+
+  <footer>
+    Reflect &amp; Commit — built by Franklin
+  </footer>
+</div>
+
+</body>
+</html>

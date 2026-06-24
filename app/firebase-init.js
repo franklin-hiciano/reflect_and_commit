@@ -65,7 +65,7 @@ document.getElementById("btnSignIn").addEventListener("click", window.doSignIn);
 // add a Firestore rule so the client can't set 'paid' itself. Ask me for that code.
 const PAY = {
   enabled: true,
-  link: "https://buy.stripe.com/REPLACE_WITH_YOUR_PAYMENT_LINK",
+  link: "https://buy.stripe.com/28E14g3ntcCt15dcRtRC01",
   price: "$29 · lifetime",
   blurb: "Unlock unlimited reflections and commitments.",
 };
@@ -137,6 +137,11 @@ onAuthStateChanged(auth, async (user) => {
     await migrateIfNeeded();
     window._uid = uid;
     subscribe();
+    // NOTE: the "why reflections compound" teaching card used to fire right here —
+    // immediately after sign-in, before a first-time user has seen the editor, written
+    // a tree, or run anything. It's moved to fire after someone finishes their first
+    // commitment instead (see endCommit() in run-engine.js), where the message about
+    // applying + editing your tree actually has something to refer back to.
   } else {
     uid = null;
     window._uid = null;
@@ -174,8 +179,23 @@ async function migrateIfNeeded() {
 }
 
 // single-framework model: if the user has no framework at all, seed a valid starter
-// (one prompt that ends at the commitment node) so reflect works immediately.
-const STARTER_SRC = "What stood out about today?\n  >> done";
+// (a small live tree — one branch, a recall, every path ending at the commitment node)
+// so reflect works immediately and they can see what a real tree looks like.
+const STARTER_SRC = [
+  "What did you actually do with today? Hours, not vibes.",
+  "  >> Did you move the thing that matters most right now?",
+  "",
+  "Did you move the thing that matters most right now?",
+  "  yes >> What made today work? Name it so tomorrow can copy it.",
+  "  no >> What did you avoid, and what were you afraid would happen?",
+  "",
+  "What made today work? Name it so tomorrow can copy it.",
+  "  >> done",
+  "",
+  "What did you avoid, and what were you afraid would happen?",
+  "  @[What did you avoid, and what were you afraid would happen?] [1,7d]",
+  "  >> done",
+].join("\n");
 async function ensureDefaultFramework() {
   try {
     await setDoc(

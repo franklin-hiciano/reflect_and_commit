@@ -2420,3 +2420,156 @@ body.has-banner .top-bar {
 .reflect-go {
     font-family: var(--fh);
 }
+
+/* ── first-run: why reflections compound ─────────────────────────────────────────── */
+.compound-card {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    background: rgba(0, 0, 0, 0.86);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+}
+.compound-card.on {
+    display: flex;
+}
+.cc-inner {
+    width: 100%;
+    max-width: 430px;
+    background: var(--surf);
+    border: 1px solid var(--border2);
+    border-radius: 16px;
+    padding: 26px 24px 22px;
+    text-align: center;
+    box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.7);
+}
+.cc-kicker {
+    font-family: var(--fmono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent-h);
+    margin-bottom: 8px;
+}
+.cc-title {
+    font-family: var(--fh);
+    font-weight: 800;
+    font-size: 20px;
+    line-height: 1.2;
+    color: var(--text);
+}
+.cc-graph {
+    width: 100%;
+    max-width: 320px;
+    height: auto;
+    margin: 18px auto 4px;
+    display: block;
+}
+.cc-axis {
+    stroke: var(--border3);
+    stroke-width: 1;
+}
+.cc-flat {
+    stroke: var(--muted2);
+    stroke-width: 1.5;
+    stroke-dasharray: 3 4;
+    fill: none;
+}
+.cc-flatlbl {
+    fill: var(--muted2);
+    font-family: var(--fmono);
+    font-size: 8px;
+}
+.cc-curve {
+    stroke: var(--accent-h);
+    stroke-width: 2.5;
+    fill: none;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 5px rgba(244, 255, 94, 0.35));
+}
+.cc-dot {
+    fill: var(--accent-h);
+    filter: drop-shadow(0 0 5px rgba(244, 255, 94, 0.85));
+}
+.cc-fork-dot {
+    fill: var(--text);
+}
+.cc-ylbl,
+.cc-xlbl {
+    fill: var(--muted2);
+    font-family: var(--fmono);
+    font-size: 8px;
+}
+.cc-body {
+    font-family: var(--fserif);
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: var(--muted3);
+    margin-top: 6px;
+}
+.cc-body b {
+    color: var(--text);
+    font-weight: 600;
+}
+.cc-rule {
+    margin-top: 14px;
+    padding: 10px 12px;
+    background: var(--accent-bg);
+    border: 1px solid var(--accent-dim);
+    border-radius: 9px;
+    font-family: var(--fsans);
+    font-size: 12.5px;
+    color: var(--accent-h);
+    line-height: 1.4;
+}
+.cc-rule i {
+    font-style: normal;
+    color: #fff;
+}
+.cc-iff {
+    font-family: var(--fmono);
+    font-weight: 500;
+}
+.cc-go {
+    margin-top: 18px;
+    width: 100%;
+    padding: 13px;
+    border: none;
+    border-radius: 9px;
+    background: var(--accent-h);
+    color: #0a0a0a;
+    font-family: var(--fh);
+    font-weight: 800;
+    font-size: 14px;
+    cursor: pointer;
+}
+.cc-go:hover {
+    filter: brightness(1.06);
+}
+
+/* ── richer empty-state cheatsheet (the canvas safety net) ───────────────────────── */
+.c-empty-eg {
+    text-align: left;
+    font-family: var(--fmono);
+    font-size: 10.5px;
+    line-height: 1.7;
+    background: var(--surf);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 4px 0 2px;
+    color: var(--muted3);
+    white-space: pre;
+    overflow-x: auto;
+    max-width: 90vw;
+}
+.c-empty-eg .eg-q { color: var(--text); }
+.c-empty-eg .eg-a { color: var(--accent-h); }
+.c-empty-eg .eg-o { color: var(--ref); }
+.c-empty-eg .eg-r { color: #c89bf0; }
+.c-empty-eg .eg-c { color: var(--muted); }
+.c-empty-s b { color: var(--accent-h); font-weight: 600; }

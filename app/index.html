@@ -69,7 +69,21 @@
     </div>
     <div class="edit-canvas-wrap" id="editCanvasWrap">
       <svg id="editCanvas" xmlns="http://www.w3.org/2000/svg"><g id="editVp"></g></svg>
-      <div class="c-empty" id="cem"><div class="c-empty-t">empty framework</div><div class="c-empty-s">write a prompt — end every path with “&gt;&gt; done”</div></div>
+      <div class="c-empty" id="cem">
+        <div class="c-empty-t">empty framework</div>
+        <div class="c-empty-s">a node is a line. indent its answers under it. every path must end with <b>&gt;&gt; done</b>.</div>
+<pre class="c-empty-eg"><span class="eg-q">What stood out about today?</span>
+  <span class="eg-a">&gt;&gt; done</span>                  <span class="eg-c"># free response → the commitment</span>
+
+<span class="eg-q">Did you do the work?</span>
+  <span class="eg-o">yes &gt;&gt; What made it work?</span>     <span class="eg-c"># a choice needs 2+ routed options</span>
+  <span class="eg-o">no  &gt;&gt; What got in the way?</span>
+
+<span class="eg-q">What made it work?</span>
+  <span class="eg-r">@[Did you do the work?] [1,7d]</span>  <span class="eg-c"># recall your past answers, 1–7d back</span>
+  <span class="eg-a">&gt;&gt; done</span></pre>
+        <div class="c-empty-s">then press <b>reflect ▶</b> (top right) to run it.</div>
+      </div>
       <div class="zoom-ctrls">
         <button class="zoom-btn" onclick="editZoom(1.2)" title="zoom in">+</button>
         <button class="zoom-btn" onclick="editZoom(0.8)" title="zoom out">−</button>
@@ -144,11 +158,45 @@
   </div>
 </div>
 
+<!-- FIRST-RUN: WHAT THIS APP IS ACTUALLY FOR (shown once) -->
+<div class="compound-card" id="compoundCard">
+  <div class="cc-inner">
+    <div class="cc-kicker">how this works</div>
+    <div class="cc-title">Most forks don't matter. A few change everything.</div>
+    <svg class="cc-graph" viewBox="0 0 320 200" aria-hidden="true">
+      <line x1="20" y1="18" x2="20" y2="180" class="cc-axis"/>
+      <line x1="20" y1="180" x2="306" y2="180" class="cc-axis"/>
+      <!-- the path you've walked so far -->
+      <path d="M20,178 L130,108" class="cc-axis" stroke-width="2"/>
+      <circle cx="130" cy="108" r="3.5" class="cc-fork-dot"/>
+      <text x="130" y="98" text-anchor="middle" class="cc-flatlbl">today</text>
+      <!-- forks that barely move you -->
+      <path d="M130,108 L300,120" class="cc-flat"/>
+      <path d="M130,108 L300,108" class="cc-flat"/>
+      <path d="M130,108 L300,96" class="cc-flat"/>
+      <text x="298" y="136" text-anchor="end" class="cc-flatlbl">forks that barely move you</text>
+      <!-- the fork that changes everything -->
+      <path id="ccCurve" d="M130,108 C200,104 250,76 300,22" class="cc-curve"/>
+      <circle r="5" class="cc-dot">
+        <animateMotion dur="3.4s" repeatCount="indefinite" keyPoints="0;1" keyTimes="0;1"
+          calcMode="spline" keySplines="0.45 0 1 1">
+          <mpath href="#ccCurve"/>
+        </animateMotion>
+      </circle>
+      <text x="300" y="16" text-anchor="end" class="cc-ylbl">changes everything</text>
+    </svg>
+    <div class="cc-body">Every night you're choosing what to spend the question on. Most calls — which task first, whether to skip the gym — barely move you; do them a hundred different ways and you land in roughly the same place. A few — quitting something, starting the hard thing, telling someone the truth — send you somewhere completely different. The tree's job is to help you tell those two apart, on the night they're actually in front of you.</div>
+    <div class="cc-rule"><span class="cc-iff">the bet&nbsp;⟺</span> make more of the forks that change everything, fewer of the ones that don't</div>
+    <button class="cc-go" onclick="window._dismissCompoundCard()">got it</button>
+  </div>
+</div>
+
 <!-- FIREBASE -->
 <script type="module" src="firebase-init.js"></script>
 <script src="js/screens.js"></script>
 <script src="js/editor-canvas.js"></script>
 <script src="js/run-engine.js"></script>
 <script src="js/outcomes-settings.js"></script>
+<script src="js/onboarding.js"></script>
 </body>
 </html>

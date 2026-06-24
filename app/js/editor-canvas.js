@@ -23,8 +23,14 @@ function parse(src){
     nodes[cur]={title:cur,type:t,opts,def,refs,bad};
   };
   (src||'').split('\n').forEach((raw,i)=>{
-    const tr=raw.trim();
+    let tr=raw.trim();
     if(!tr||tr.startsWith('#'))return;
+    // strip a trailing "  # comment" — lets people paste examples that annotate a line
+    // inline instead of only on its own line, without the comment text corrupting a
+    // destination/title (e.g. ">> done   # explanation" used to make "done" not exist).
+    const cm=tr.search(/\s+#/);
+    if(cm>-1)tr=tr.slice(0,cm).trim();
+    if(!tr)return;
     const ind=/^\s/.test(raw);
     if(!ind){flush();cur=tr;opts=[];def=null;refs=[];bad=[];nl[cur]={s:i,e:i};}
     else{
@@ -201,7 +207,10 @@ function fitEditView(){
   let panning=false,px=0,py=0;
   wrap.addEventListener('pointerdown',e=>{
     if(_dragFrom)return;
-    if(e.target.closest('[data-id]')||e.target.closest('.plus-handle'))return;
+    // never start a canvas pan from inside the empty-state card — that's where the
+    // copyable example tree lives, and capturing the pointer here was silently
+    // breaking native text selection (drag-to-select looked like drag-to-pan).
+    if(e.target.closest('[data-id]')||e.target.closest('.plus-handle')||e.target.closest('#cem'))return;
     panning=true;px=e.clientX-eTx;py=e.clientY-eTy;_editPanned=true;wrap.setPointerCapture?.(e.pointerId);
   });
   wrap.addEventListener('pointermove',e=>{if(!panning)return;eTx=e.clientX-px;eTy=e.clientY-py;applyEditTransform();});

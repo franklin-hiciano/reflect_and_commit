@@ -154,6 +154,9 @@ function endCommit(){
   if(!text||!_commitDateVal)return;
   if(window._addCommitment)window._addCommitment(text,_commitDateVal);
   exitReflection();
+  // teach "reflections compound" right after someone lands their first real commitment —
+  // not before they've used the app at all. _maybeShowCompoundCard no-ops after night one.
+  if(window._maybeShowCompoundCard)window._maybeShowCompoundCard();
 }
 function endToggleNotes(){
   const en=document.getElementById('endNotes');if(!en)return;

@@ -1,130 +1,943 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Reflect &amp; Commit — reflect on your day, commit to one real move</title>
-<meta name="description" content="Reflect & Commit is a tiny daily ritual: write what stood out about today, then commit to one thing you'll actually do.">
-<style>
-  :root{
-    --bg:#0b0c0e; --card:#15161a; --text:#f2f2f0; --muted:#9a9a9f;
-    --accent:#e7e3da; --line:rgba(255,255,255,.08);
-  }
-  *{box-sizing:border-box;margin:0;padding:0;}
-  html,body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;}
-  body{line-height:1.5;}
-  a{color:inherit;text-decoration:none;}
-  .wrap{max-width:920px;margin:0 auto;padding:0 24px;}
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>
+            Reflect &amp; Commit — build a machine that prompts you with your
+            own principles
+        </title>
+        <meta
+            name="description"
+            content="Reflect & Commit isn't journaling. You design a tree of prompts that pull the truth out of you each night, then commit to one real move. The day after, a clean yes or no."
+        />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Cabin:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            :root {
+                --bg: #000000;
+                --surf: #130f0a;
+                --surf2: #18130c;
+                --border: #2a1f12;
+                --border2: #352818;
+                --text: #f0e3cf;
+                --muted: #9c8a6e;
+                --muted2: #c4b291;
+                --faint: #6b5c47;
+                --acc: #e0793f;
+                --acc-bg: #2a1709;
+                --acc-dim: #a85a2c;
+                --ref: #9b86a8;
+                --rec: #9b86a8;
+                --good: #7fae6f;
+                --fh: "Syne", sans-serif;
+                --fs: "Cabin", Georgia, serif;
+                --fm: "DM Mono", ui-monospace, monospace;
+            }
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+            html {
+                scroll-behavior: smooth;
+            }
+            body {
+                background: var(--bg);
+                color: var(--text);
+                font-family: var(--fs);
+                line-height: 1.6;
+                font-size: 16px;
+                -webkit-font-smoothing: antialiased;
+            }
+            a {
+                color: inherit;
+                text-decoration: none;
+            }
+            .wrap {
+                max-width: 1000px;
+                margin: 0 auto;
+                padding: 0 24px;
+            }
+            .mono {
+                font-family: var(--fm);
+            }
 
-  header{display:flex;align-items:center;justify-content:space-between;padding:28px 0;}
-  .brand{font-weight:600;font-size:18px;letter-spacing:.2px;}
-  .nav-cta{border:1px solid var(--line);padding:9px 16px;border-radius:8px;font-size:14px;color:var(--text);transition:border-color .15s;}
-  .nav-cta:hover{border-color:rgba(255,255,255,.25);}
+            /* header */
+            header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 24px 0;
+            }
+            .brand {
+                font-family: var(--fh);
+                font-weight: 800;
+                font-size: 18px;
+                letter-spacing: 0.2px;
+            }
+            .brand b {
+                color: var(--acc);
+            }
+            .nav-cta {
+                border: 1px solid var(--border2);
+                padding: 9px 16px;
+                border-radius: 8px;
+                font-family: var(--fh);
+                font-weight: 700;
+                font-size: 13px;
+                transition: 0.15s;
+            }
+            .nav-cta:hover {
+                border-color: var(--acc-dim);
+                color: var(--acc);
+            }
 
-  .hero{padding:64px 0 40px;text-align:center;}
-  .hero h1{font-size:clamp(32px,5vw,52px);font-weight:650;letter-spacing:-0.02em;line-height:1.08;}
-  .hero p.sub{margin-top:18px;font-size:19px;color:var(--muted);max-width:560px;margin-left:auto;margin-right:auto;}
-  .cta-row{margin-top:32px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;}
-  .btn{display:inline-block;padding:14px 26px;border-radius:9px;font-size:15.5px;font-weight:600;}
-  .btn-primary{background:var(--text);color:#0b0c0e;}
-  .btn-primary:hover{opacity:.9;}
-  .btn-secondary{border:1px solid var(--line);color:var(--text);}
-  .btn-secondary:hover{border-color:rgba(255,255,255,.25);}
+            /* hero */
+            .hero {
+                padding: 60px 0 36px;
+                text-align: center;
+            }
+            .kicker {
+                font-family: var(--fm);
+                font-size: 12px;
+                letter-spacing: 0.22em;
+                text-transform: uppercase;
+                color: var(--acc);
+            }
+            .hero h1 {
+                font-family: var(--fh);
+                font-weight: 800;
+                font-size: clamp(32px, 5.4vw, 56px);
+                line-height: 1.04;
+                letter-spacing: -0.02em;
+                margin: 18px auto 0;
+                max-width: 880px;
+            }
+            .hero h1 em {
+                font-style: normal;
+                color: var(--acc);
+            }
+            .hero .sub {
+                margin: 22px auto 0;
+                font-size: 19px;
+                color: var(--muted2);
+                max-width: 600px;
+            }
+            .cta-row {
+                margin-top: 30px;
+                display: flex;
+                gap: 13px;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            .btn {
+                display: inline-block;
+                padding: 14px 24px;
+                border-radius: 9px;
+                font-family: var(--fh);
+                font-weight: 800;
+                font-size: 15px;
+                transition: 0.15s;
+            }
+            .btn-primary {
+                background: var(--acc);
+                color: #1a0d05;
+            }
+            .btn-primary:hover {
+                filter: brightness(1.07);
+            }
+            .btn-ghost {
+                border: 1px solid var(--border2);
+                color: var(--text);
+            }
+            .btn-ghost:hover {
+                border-color: var(--acc-dim);
+                color: var(--acc);
+            }
+            .micro {
+                margin-top: 14px;
+                font-family: var(--fm);
+                font-size: 12px;
+                color: var(--faint);
+            }
 
-  .video-wrap{margin:48px auto 0;max-width:760px;}
-  .video-frame{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:14px;overflow:hidden;border:1px solid var(--line);box-shadow:0 30px 80px -20px rgba(0,0,0,.6);}
-  .video-frame video,.video-frame iframe{width:100%;height:100%;display:block;border:0;}
-  .video-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--muted);background:linear-gradient(180deg,#141519,#0e0f12);}
-  .play-dot{width:56px;height:56px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;}
-  .play-dot:after{content:"";border-left:16px solid var(--text);border-top:9px solid transparent;border-bottom:9px solid transparent;margin-left:3px;}
+            /* video */
+            .video-wrap {
+                margin: 46px auto 0;
+                max-width: 780px;
+            }
+            .video-frame {
+                position: relative;
+                width: 100%;
+                aspect-ratio: 16/9;
+                background: #000;
+                border-radius: 14px;
+                overflow: hidden;
+                border: 1px solid var(--border2);
+                box-shadow: 0 30px 80px -24px rgba(0, 0, 0, 0.7);
+            }
+            .video-frame video,
+            .video-frame iframe {
+                width: 100%;
+                height: 100%;
+                display: block;
+                border: 0;
+            }
+            .video-ph {
+                position: absolute;
+                inset: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-direction: column;
+                gap: 12px;
+                color: var(--muted);
+                background: radial-gradient(
+                    120% 120% at 50% 0,
+                    #16180c,
+                    #0c0d10
+                );
+            }
+            .play-dot {
+                width: 60px;
+                height: 60px;
+                border-radius: 50%;
+                border: 1px solid var(--acc-dim);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .play-dot:after {
+                content: "";
+                border-left: 17px solid var(--acc);
+                border-top: 10px solid transparent;
+                border-bottom: 10px solid transparent;
+                margin-left: 4px;
+            }
+            .video-ph span {
+                font-family: var(--fm);
+                font-size: 12px;
+                letter-spacing: 0.04em;
+            }
 
-  section.feat{padding:80px 0 20px;}
-  .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;}
-  .feat-card{padding:22px 4px;}
-  .feat-card h3{font-size:16px;font-weight:600;margin-bottom:8px;}
-  .feat-card p{font-size:14.5px;color:var(--muted);}
+            /* section scaffolding */
+            section {
+                padding: 70px 0;
+            }
+            .sec-tag {
+                font-family: var(--fm);
+                font-size: 12px;
+                letter-spacing: 0.18em;
+                text-transform: uppercase;
+                color: var(--acc-dim);
+            }
+            .sec-h {
+                font-family: var(--fh);
+                font-weight: 800;
+                font-size: clamp(26px, 3.6vw, 38px);
+                line-height: 1.1;
+                letter-spacing: -0.01em;
+                margin-top: 10px;
+            }
+            .sec-lead {
+                margin-top: 16px;
+                font-size: 18px;
+                color: var(--muted2);
+                max-width: 620px;
+            }
 
-  section.pricing{padding:64px 0 90px;}
-  .price-card{max-width:380px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:36px 30px;text-align:center;}
-  .price-amt{font-size:40px;font-weight:650;letter-spacing:-0.02em;}
-  .price-note{color:var(--muted);font-size:14px;margin-top:4px;}
-  .price-card .btn{width:100%;margin-top:24px;}
-  .price-list{margin-top:22px;text-align:left;font-size:14.5px;color:var(--muted);display:flex;flex-direction:column;gap:8px;}
+            /* mechanism */
+            .mech {
+                display: grid;
+                grid-template-columns: 1.05fr 0.95fr;
+                gap: 36px;
+                align-items: start;
+                margin-top: 38px;
+            }
+            .codecard {
+                background: #0d0a07;
+                border: 1px solid var(--border2);
+                border-radius: 14px;
+                padding: 20px 18px;
+                font-family: var(--fm);
+                font-size: 13.5px;
+                line-height: 1.85;
+                overflow-x: auto;
+                box-shadow: inset 0 0 0 1px rgba(235, 255, 0, 0.03);
+                white-space: pre;
+                display: block;
+            }
+            .codecard .c-title {
+                color: var(--text);
+            }
+            .codecard .c-arrow {
+                color: var(--acc);
+            }
+            .codecard .c-dest {
+                color: var(--muted2);
+            }
+            .codecard .c-opt {
+                color: var(--ref);
+            }
+            .codecard .c-rec {
+                color: var(--rec);
+            }
+            .codecard .c-cmt {
+                color: var(--faint);
+            }
+            .codecard .c-done {
+                color: var(--acc);
+            }
+            .legend {
+                display: flex;
+                flex-direction: column;
+                gap: 18px;
+            }
+            .leg {
+                display: flex;
+                gap: 14px;
+                align-items: flex-start;
+            }
+            .leg .dot {
+                flex: none;
+                width: 10px;
+                height: 10px;
+                border-radius: 3px;
+                margin-top: 7px;
+            }
+            .leg h4 {
+                font-family: var(--fh);
+                font-weight: 700;
+                font-size: 15px;
+            }
+            .leg p {
+                color: var(--muted);
+                font-size: 14.5px;
+                margin-top: 2px;
+            }
 
-  footer{border-top:1px solid var(--line);padding:28px 0 50px;text-align:center;color:var(--muted);font-size:13px;}
+            /* contrast */
+            .twocol {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 22px;
+                margin-top: 38px;
+            }
+            .col {
+                border: 1px solid var(--border);
+                border-radius: 14px;
+                padding: 26px 24px;
+            }
+            .col.without {
+                background: var(--surf);
+            }
+            .col.with {
+                background: linear-gradient(180deg, #1c130b, #100b07);
+                border-color: var(--acc-dim);
+            }
+            .col .col-tag {
+                font-family: var(--fm);
+                font-size: 12px;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+            }
+            .without .col-tag {
+                color: var(--muted);
+            }
+            .with .col-tag {
+                color: var(--acc);
+            }
+            .col p {
+                margin-top: 14px;
+                font-size: 16px;
+                color: var(--muted2);
+            }
+            .with p {
+                color: var(--text);
+            }
 
-  @media (max-width:680px){
-    .feat-grid{grid-template-columns:1fr;gap:10px;}
-  }
-</style>
-</head>
-<body>
+            /* cascade */
+            .cascade {
+                margin-top: 34px;
+                border-left: 2px solid var(--acc-dim);
+                padding: 6px 0 6px 24px;
+            }
+            .cascade .lead-in {
+                font-family: var(--fm);
+                font-size: 12px;
+                letter-spacing: 0.14em;
+                text-transform: uppercase;
+                color: var(--acc-dim);
+            }
+            .cascade p {
+                margin-top: 12px;
+                font-size: 19px;
+                line-height: 1.6;
+            }
+            .cascade .arw {
+                color: var(--acc);
+                font-family: var(--fm);
+            }
 
-<div class="wrap">
-  <header>
-    <div class="brand">Reflect &amp; Commit</div>
-    <a class="nav-cta" href="/app/">Open the app →</a>
-  </header>
+            /* forks */
+            .forkwrap {
+                margin-top: 30px;
+            }
+            .forksvg {
+                width: 100%;
+                max-width: 640px;
+                height: auto;
+                display: block;
+                margin: 0 auto;
+            }
+            .fk-axis {
+                stroke: var(--border2);
+                stroke-width: 1;
+            }
+            .fk-past {
+                stroke: #4d3c24;
+                stroke-width: 2;
+                fill: none;
+            }
+            .fk-minor {
+                stroke: var(--muted);
+                stroke-width: 1.4;
+                stroke-dasharray: 3 4;
+                fill: none;
+            }
+            .fk-major {
+                stroke: var(--acc);
+                stroke-width: 2.6;
+                fill: none;
+                stroke-linecap: round;
+                filter: drop-shadow(0 0 6px rgba(235, 255, 0, 0.4));
+            }
+            .fk-today {
+                fill: var(--text);
+            }
+            .fk-lbl {
+                font-family: var(--fm);
+                font-size: 11px;
+                fill: var(--muted);
+            }
+            .fk-acc {
+                fill: var(--acc);
+            }
 
-  <section class="hero">
-    <h1>Reflect on your day.<br>Commit to one real move.</h1>
-    <p class="sub">A two-minute nightly ritual: write down what stood out — then commit to one thing you'll actually do. The day after, a clean yes or no.</p>
-    <div class="cta-row">
-      <a class="btn btn-primary" href="/app/">Start reflecting — $29 lifetime</a>
-      <a class="btn btn-secondary" href="#how-it-works">See how it works</a>
-    </div>
+            /* steps */
+            .steps {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 22px;
+                margin-top: 38px;
+            }
+            .step {
+                padding: 4px 2px;
+            }
+            .step .n {
+                font-family: var(--fm);
+                font-size: 13px;
+                color: var(--acc);
+            }
+            .step h4 {
+                font-family: var(--fh);
+                font-weight: 700;
+                font-size: 17px;
+                margin-top: 8px;
+            }
+            .step p {
+                color: var(--muted);
+                font-size: 15px;
+                margin-top: 7px;
+            }
+            .effort {
+                margin-top: 34px;
+                background: var(--acc-bg);
+                border: 1px solid var(--acc-dim);
+                border-radius: 12px;
+                padding: 18px 20px;
+                font-size: 16px;
+                color: var(--text);
+            }
+            .effort b {
+                color: var(--acc);
+            }
 
-    <div class="video-wrap">
-      <div class="video-frame">
-        <!-- Replace this placeholder with your real pitch video. See README note below. -->
-        <div class="video-placeholder" id="videoPlaceholder">
-          <div class="play-dot"></div>
-          <span>Pitch video coming soon</span>
+            /* proof */
+            .proof {
+                border: 1px solid var(--border2);
+                border-radius: 16px;
+                padding: 34px 30px;
+                background: var(--surf);
+                max-width: 760px;
+                margin: 38px auto 0;
+            }
+            .proof p {
+                font-size: 18px;
+                line-height: 1.62;
+                color: var(--text);
+            }
+            .proof p + p {
+                margin-top: 16px;
+            }
+            .proof .who {
+                margin-top: 20px;
+                font-family: var(--fm);
+                font-size: 13px;
+                color: var(--muted);
+            }
+            .proof b {
+                color: var(--acc);
+                font-weight: 600;
+            }
+
+            /* pricing */
+            .pricing {
+                text-align: center;
+            }
+            .price-card {
+                max-width: 400px;
+                margin: 38px auto 0;
+                background: var(--surf);
+                border: 1px solid var(--border2);
+                border-radius: 18px;
+                padding: 38px 32px;
+                text-align: center;
+            }
+            .price-amt {
+                font-family: var(--fh);
+                font-weight: 800;
+                font-size: 46px;
+                letter-spacing: -0.02em;
+            }
+            .price-amt small {
+                font-size: 18px;
+                color: var(--muted);
+                font-weight: 600;
+            }
+            .price-note {
+                color: var(--muted);
+                font-family: var(--fm);
+                font-size: 13px;
+                margin-top: 6px;
+            }
+            .price-list {
+                margin-top: 24px;
+                text-align: left;
+                display: flex;
+                flex-direction: column;
+                gap: 11px;
+                color: var(--muted2);
+                font-size: 15px;
+            }
+            .price-list span:before {
+                content: "✓";
+                color: var(--acc);
+                margin-right: 10px;
+                font-weight: 700;
+            }
+            .price-card .btn {
+                width: 100%;
+                margin-top: 26px;
+            }
+
+            footer {
+                border-top: 1px solid var(--border);
+                padding: 30px 0 54px;
+                text-align: center;
+                color: var(--faint);
+                font-family: var(--fm);
+                font-size: 12.5px;
+            }
+
+            @media (max-width: 720px) {
+                .mech {
+                    grid-template-columns: 1fr;
+                    gap: 26px;
+                }
+                .twocol {
+                    grid-template-columns: 1fr;
+                }
+                .steps {
+                    grid-template-columns: 1fr;
+                    gap: 18px;
+                }
+                .hero .sub {
+                    font-size: 17px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="wrap">
+            <header>
+                <div class="brand">Reflect <b>&amp;</b> Commit</div>
+                <a class="nav-cta" href="/app/">Open the app →</a>
+            </header>
+
+            <!-- HERO -->
+            <section class="hero" style="padding-top: 48px">
+                <div class="kicker">Reflect &amp; Commit</div>
+                <h1>
+                    Build a machine that asks you the questions
+                    <em>you'd never ask yourself.</em>
+                </h1>
+                <p class="sub">
+                    It isn't journaling. You design a tree of prompts that pull
+                    the truth out of you each night — then commit to one real
+                    move. The day after, a clean yes or no.
+                </p>
+                <div class="cta-row">
+                    <a class="btn btn-primary" href="/app/">Start reflecting</a>
+                    <a class="btn btn-ghost" href="#demo">Watch the demo</a>
+                </div>
+                <div class="micro">$29 · one-time · lifetime access</div>
+
+                <div class="video-wrap" id="demo">
+                    <div class="video-frame">
+                        <video id="pitch-video" controls poster="video-poster.jpg">
+                            <source src="pitch.mp4" type="video/mp4" />
+                        </video>
+                    </div>
+                </div>
+                <script>
+                    (function () {
+                        var v = document.getElementById("pitch-video");
+                        if (!v) return;
+                        var SPEED = 1.2;
+                        v.defaultPlaybackRate = SPEED;
+                        v.playbackRate = SPEED;
+                        v.addEventListener("loadedmetadata", function () {
+                            v.playbackRate = SPEED;
+                        });
+                        v.addEventListener("play", function () {
+                            v.playbackRate = SPEED;
+                        });
+                    })();
+                </script>
+            </section>
+
+            <!-- MECHANISM -->
+            <section id="how">
+                <div class="sec-tag">The part no other app does</div>
+                <h2 class="sec-h">
+                    You write the questions. The app runs you through them.
+                </h2>
+                <p class="sec-lead">
+                    Most reflection apps hand you a blank page and a cursor.
+                    This one is different: you encode your own principles once,
+                    as a tree, and every night it interrogates your future self
+                    with them.
+                </p>
+
+                <div class="mech">
+                    <pre
+                        class="codecard"
+                    ><span class="c-title">What did you avoid today?</span>
+  <span class="c-arrow">&gt;&gt;</span> <span class="c-done">done</span>
+
+<span class="c-title">Did you do the work?</span>
+  <span class="c-opt">yes</span> <span class="c-arrow">&gt;&gt;</span> <span class="c-dest">What made it click?</span>
+  <span class="c-opt">no</span>&nbsp; <span class="c-arrow">&gt;&gt;</span> <span class="c-dest">What got in the way?</span>
+
+<span class="c-title">What made it click?</span>
+  <span class="c-rec">@[Did you do the work?] [1,7d]</span>
+  <span class="c-arrow">&gt;&gt;</span> <span class="c-done">done</span>
+</pre>
+                    <div class="legend">
+                        <div class="leg">
+                            <span
+                                class="dot"
+                                style="background: var(--text)"
+                            ></span>
+                            <div>
+                                <h4>A node is a question</h4>
+                                <p>
+                                    Each line is a prompt that forces a
+                                    specific, true answer — the kind you'd
+                                    rather skip.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="leg">
+                            <span
+                                class="dot"
+                                style="background: var(--ref)"
+                            ></span>
+                            <div>
+                                <h4>Branches follow your answer</h4>
+                                <p>
+                                    Say yes or no and the tree routes you
+                                    somewhere different. Your reflection adapts
+                                    to your day.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="leg">
+                            <span
+                                class="dot"
+                                style="background: var(--rec)"
+                            ></span>
+                            <div>
+                                <h4>Recall surfaces your patterns</h4>
+                                <p>
+                                    <span class="mono" style="color: var(--rec)"
+                                        >@[…] [1,7d]</span
+                                    >
+                                    pulls what you said over the last week, so
+                                    you stop arguing with a blank page and start
+                                    beating your own excuses.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="leg">
+                            <span
+                                class="dot"
+                                style="background: var(--acc)"
+                            ></span>
+                            <div>
+                                <h4>Every path ends in a commitment</h4>
+                                <p>
+                                    One move, with a date. The day after, the
+                                    app asks one thing: did you do it?
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CONTRAST -->
+            <section>
+                <div class="sec-tag">Why it matters</div>
+                <h2 class="sec-h">Two versions of tomorrow.</h2>
+                <div class="twocol">
+                    <div class="col without">
+                        <div class="col-tag">A typical night a month ago</div>
+                        <p>
+                            Go to bed with plans to lock-in on homework
+                            tomorrow. I wake up a bit late, eat brunch and
+                            shower, then do some. After an hour, I'm unfocused
+                            and go outside with my mom, for two, then three
+                            (because why not). I get home and, tired, lie down
+                            and listen to music. In the evening I get some more
+                            work done, but lose focus again. I go watch some
+                            YouTube and go to bed having done little. Really
+                            frustrated, I hope to finish it tomorrow.
+                        </p>
+                    </div>
+                    <div class="col with">
+                        <div class="col-tag">
+                            An actual night from my own tree — real
+                        </div>
+                        <p>
+                            Knowing I have trouble focusing once I'm out and
+                            about, I step out of bed and sit down to work. To
+                            fund ads for this app, I'd sold my monitor on eBay —
+                            the payout was sitting in a multi-week hold, so
+                            instead of waiting I worked the buyer directly until
+                            they released it early. A coding session that
+                            should've ended at midnight ran to sunrise and
+                            turned into a script that automated part of my
+                            product sourcing. None of it happens without the
+                            reflection that made tomorrow feel urgent.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="cascade">
+                    <div class="lead-in">
+                        That same night, traced forward — also real, not a
+                        hypothetical
+                    </div>
+                    <p>
+                        A deadline I'd been avoiding came into focus
+                        <span class="arw">→</span> so I worked a session that
+                        ran past sunrise <span class="arw">→</span> which became
+                        a script that automated part of my sourcing
+                        <span class="arw">→</span> which paid for the AI tools I
+                        used to build faster <span class="arw">→</span> which
+                        tripled my output <span class="arw">→</span> which is
+                        the reason this app exists as a working beta and not
+                        still an idea. One night of honest questions, traced all
+                        the way to the product you're looking at right now.
+                    </p>
+                </div>
+            </section>
+
+            <!-- FORKS -->
+            <section>
+                <div class="sec-tag">What it's actually for</div>
+                <h2 class="sec-h">
+                    Most decisions don't matter. A few change everything.
+                </h2>
+                <p class="sec-lead">
+                    Every day hands you choices — what to focus on, who to
+                    dedicate your attention to, etc. Almost all of them distract
+                    you from explicitly working on one thing you care about,
+                    that would make all the difference. The tree's job is to
+                    help you see those decisions the night before, not years
+                    later.
+                </p>
+                <div class="forkwrap">
+                    <svg
+                        class="forksvg"
+                        viewBox="0 0 600 260"
+                        aria-hidden="true"
+                    >
+                        <line
+                            x1="20"
+                            y1="40"
+                            x2="20"
+                            y2="220"
+                            class="fk-axis"
+                        />
+                        <path
+                            d="M20,220 C120,202 220,182 300,150"
+                            class="fk-past"
+                        />
+                        <text x="22" y="234" class="fk-lbl">
+                            life paths already closed to you
+                        </text>
+                        <circle cx="300" cy="150" r="4" class="fk-today" />
+                        <text
+                            x="300"
+                            y="138"
+                            text-anchor="middle"
+                            class="fk-lbl fk-acc"
+                        >
+                            today
+                        </text>
+                        <path d="M300,150 L580,168" class="fk-minor" />
+                        <path d="M300,150 L580,156" class="fk-minor" />
+                        <path d="M300,150 L580,144" class="fk-minor" />
+                        <text x="580" y="186" text-anchor="end" class="fk-lbl">
+                            forks that don't matter much
+                        </text>
+                        <path
+                            d="M300,150 C400,140 480,90 580,30"
+                            class="fk-major"
+                        />
+                        <text
+                            x="578"
+                            y="20"
+                            text-anchor="end"
+                            class="fk-lbl fk-acc"
+                        >
+                            the fork that takes you somewhere completely
+                            different
+                        </text>
+                    </svg>
+                </div>
+            </section>
+
+            <!-- STEPS -->
+            <section>
+                <div class="sec-tag">How a night actually goes</div>
+                <h2 class="sec-h">Three steps. The hard one is the point.</h2>
+                <div class="steps">
+                    <div class="step">
+                        <div class="n">01</div>
+                        <h4>Design your tree</h4>
+                        <p>
+                            Write the questions that extract the truth from you.
+                            Start from the one we hand you, then make it yours,
+                            one line at a time.
+                        </p>
+                    </div>
+                    <div class="step">
+                        <div class="n">02</div>
+                        <h4>Reflect</h4>
+                        <p>
+                            Press reflect and answer one card at a time. The
+                            tree branches on your answers and shows you last
+                            week's patterns as you go.
+                        </p>
+                    </div>
+                    <div class="step">
+                        <div class="n">03</div>
+                        <h4>The day after</h4>
+                        <p>
+                            One commitment, one date. The next day, a clean yes
+                            or no — no streaks to game, just honesty with
+                            yourself.
+                        </p>
+                    </div>
+                </div>
+                <div class="effort">
+                    This isn't a two-minute streak app. A real reflection runs
+                    <b>10–40 minutes</b> and asks you things you'd rather skip.
+                    That's the design — the discomfort is where tomorrow gets
+                    decided. You won't be staring at a blank page, but you will
+                    have to be honest.
+                </div>
+            </section>
+
+            <!-- PROOF -->
+            <section>
+                <div class="sec-tag" style="text-align: center">
+                    Why I built it
+                </div>
+                <h2 class="sec-h" style="text-align: center">
+                    I'm the first user, and the proof.
+                </h2>
+                <div class="proof">
+                    <p>
+                        I've run this every night since the day I built it —
+                        somewhere north of <b>45 extra hours of deep work</b> I
+                        would never have found otherwise. It's the reason I
+                        decided not to go to college while everyone around me
+                        said to go.
+                    </p>
+                    <p>
+                        I'm not going to promise it does the same for you. Your
+                        tree is yours to build, and that's the whole point — I'm
+                        not selling you my principles, I'm selling you the
+                        machine that enforces your own. So judge it for
+                        yourself.
+                    </p>
+                    <div class="who">
+                        — Franklin · five friends are starting this week
+                    </div>
+                </div>
+            </section>
+
+            <!-- PRICING -->
+            <section class="pricing">
+                <div class="sec-tag">Get it</div>
+                <h2 class="sec-h">One price. Yours for good.</h2>
+                <div class="price-card">
+                    <div class="price-amt">$29 <small>lifetime</small></div>
+                    <div class="price-note">
+                        one-time payment · no subscription
+                    </div>
+                    <div class="price-list">
+                        <span>Unlimited reflections &amp; commitments</span>
+                        <span
+                            >A starter tree so you never face a blank page</span
+                        >
+                        <span>Recall that surfaces your own patterns</span>
+                        <span
+                            >Synced across your devices, with daily
+                            reminders</span
+                        >
+                        <span>Every future update included</span>
+                    </div>
+                    <a class="btn btn-primary" href="/app/"
+                        >Start reflecting →</a
+                    >
+                </div>
+            </section>
+
+            <footer>
+                Reflect &amp; Commit — built by Franklin · build the questions,
+                beat your own patterns.
+            </footer>
         </div>
-        <!--
-        <video controls poster="video-poster.jpg">
-          <source src="pitch.mp4" type="video/mp4">
-        </video>
-        -->
-      </div>
-    </div>
-  </section>
-
-  <section class="feat" id="how-it-works">
-    <div class="feat-grid">
-      <div class="feat-card">
-        <h3>Write it down</h3>
-        <p>A short, guided prompt each night. What stood out about today?</p>
-      </div>
-      <div class="feat-card">
-        <h3>Commit to one move</h3>
-        <p>One real thing you'll do — with a date attached, not a vague intention.</p>
-      </div>
-      <div class="feat-card">
-        <h3>The day after</h3>
-        <p>A simple yes/no check-in. No streaks to game, just honesty with yourself.</p>
-      </div>
-    </div>
-  </section>
-
-  <section class="pricing">
-    <div class="price-card">
-      <div class="price-amt">$29</div>
-      <div class="price-note">one-time · lifetime access</div>
-      <div class="price-list">
-        <span>✓ Unlimited reflections &amp; commitments</span>
-        <span>✓ Synced across your devices</span>
-        <span>✓ Daily reminder notifications</span>
-        <span>✓ All future updates included</span>
-      </div>
-      <a class="btn btn-primary" href="/app/">Sign in &amp; unlock</a>
-    </div>
-  </section>
-
-  <footer>
-    Reflect &amp; Commit — built by Franklin
-  </footer>
-</div>
-
-</body>
+    </body>
 </html>

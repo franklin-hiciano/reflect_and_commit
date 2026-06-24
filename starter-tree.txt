@@ -1,0 +1,18 @@
+# ── starter tree ──────────────────────────────────────────────
+# a node is a line. its answers are indented under it.
+# end every path with ">> done". press reflect (top right) to run it.
+# rewrite any line to fit your life — this is scaffolding, not scripture.
+
+What did you actually do with today? Hours, not vibes.
+  >> Did you move the thing that matters most right now?
+
+Did you move the thing that matters most right now?
+  yes >> What made today work? Name it so tomorrow can copy it.
+  no >> What did you avoid, and what were you afraid would happen?
+
+What made today work? Name it so tomorrow can copy it.
+  >> done
+
+What did you avoid, and what were you afraid would happen?
+  @[What did you avoid, and what were you afraid would happen?] [1,7d]
+  >> done

@@ -137,11 +137,9 @@ onAuthStateChanged(auth, async (user) => {
     await migrateIfNeeded();
     window._uid = uid;
     subscribe();
-    // NOTE: the "why reflections compound" teaching card used to fire right here —
-    // immediately after sign-in, before a first-time user has seen the editor, written
-    // a tree, or run anything. It's moved to fire after someone finishes their first
-    // commitment instead (see endCommit() in run-engine.js), where the message about
-    // applying + editing your tree actually has something to refer back to.
+    // show intro video on first entry (teaches how to design a question);
+    // after dismissal it chains to the compound card.
+    window._maybeShowIntroVideo && window._maybeShowIntroVideo();
   } else {
     uid = null;
     window._uid = null;

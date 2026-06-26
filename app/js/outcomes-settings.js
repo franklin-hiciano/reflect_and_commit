@@ -9,6 +9,24 @@ function notifTime(){return localStorage.getItem('notif_time')||'20:00';}
 function setNotifTime(t){if(t)localStorage.setItem('notif_time',t);}
 function notifConfirmed(){return localStorage.getItem('notif_confirmed')==='1';}
 
+// ── loud notifications (vibration + requireInteraction) ──
+function loudEnabled(){return localStorage.getItem('notif_loud')==='1';}
+function toggleLoudNotif(){
+  const on=!loudEnabled();
+  localStorage.setItem('notif_loud',on?'1':'0');
+  const btn=document.getElementById('notiBannerLoud');
+  if(btn){btn.classList.toggle('on',on);btn.title=on?'loud on (vibration + persistent)':'loud off';}
+  // try to vibrate on toggle so they feel it
+  if(on&&navigator.vibrate){navigator.vibrate([100,50,100]);}
+}
+function initLoudBtn(){
+  const btn=document.getElementById('notiBannerLoud');
+  if(!btn)return;
+  const on=loudEnabled();
+  btn.classList.toggle('on',on);
+  btn.title=on?'loud on (vibration + persistent)':'loud (tap to enable vibration)';
+}
+
 function scheduleNotif(){
   if(!_hasNotif||Notification.permission!=='granted')return;
   const time=notifTime();clearTimeout(_notifTimer);
@@ -31,6 +49,11 @@ if('serviceWorker'in navigator){
 // available, otherwise a plain clickable notification as a fallback.
 async function showNotif(title,opts){
   if(!_hasNotif||Notification.permission!=='granted')return false;
+  // loud mode: vibrate + requireInteraction
+  if(loudEnabled()){
+    opts={...opts,requireInteraction:true,vibrate:[200,100,200,100,200]};
+    if(navigator.vibrate)navigator.vibrate([200,100,200,100,200]);
+  }
   try{
     if(_swReg&&_swReg.showNotification){await _swReg.showNotification(title,opts);return true;}
   }catch(e){}
@@ -131,6 +154,7 @@ function refreshNotifUI(){renderNotifPop();checkNotiBanner();}
 // ── init ──
 (function init(){
   initSW();
+  initLoudBtn();
   if(typeof bindEditorEvents==='function')bindEditorEvents();
   if(typeof bindHolds==='function')bindHolds();
   if(typeof setPane==='function')setPane(0);

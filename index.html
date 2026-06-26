@@ -496,6 +496,175 @@
                 font-weight: 600;
             }
 
+            /* demo runner */
+            .demo-runner {
+                max-width: 520px;
+                margin: 38px auto 0;
+            }
+            .dr-card,
+            .dr-end {
+                background: #0d0a07;
+                border: 1px solid var(--border2);
+                border-radius: 16px;
+                padding: 32px 34px;
+            }
+            .dr-meta {
+                font-family: var(--fm);
+                font-size: 11px;
+                letter-spacing: 0.14em;
+                color: var(--muted);
+                margin-bottom: 16px;
+            }
+            .dr-prompt {
+                font-family: var(--fh);
+                font-weight: 700;
+                font-size: 22px;
+                line-height: 1.35;
+                color: var(--text);
+                margin-bottom: 22px;
+            }
+            .dr-input-wrap {
+                position: relative;
+                margin-bottom: 6px;
+            }
+            .dr-input {
+                width: 100%;
+                background: transparent;
+                border: none;
+                border-bottom: 1px solid var(--border2);
+                color: var(--text);
+                font-family: var(--fm);
+                font-size: 17px;
+                padding: 10px 2px;
+                outline: none;
+            }
+            .dr-input:focus + .dr-input-line {
+                transform: scaleX(1);
+            }
+            .dr-input-line {
+                position: absolute;
+                left: 0;
+                bottom: 0;
+                height: 2px;
+                width: 100%;
+                background: var(--acc);
+                transform: scaleX(0);
+                transform-origin: left;
+                transition: transform 0.25s ease;
+                pointer-events: none;
+            }
+            .dr-choices {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+            .dr-choice {
+                text-align: left;
+                background: rgba(255, 255, 255, 0.04);
+                border: 1px solid var(--border2);
+                color: var(--text);
+                font-family: var(--fs);
+                font-size: 16px;
+                padding: 12px 16px;
+                border-radius: 9px;
+                cursor: pointer;
+                transition: all 0.12s;
+                width: 100%;
+            }
+            .dr-choice:hover {
+                border-color: var(--acc-dim);
+                color: var(--acc);
+            }
+            .dr-nav {
+                display: flex;
+                align-items: center;
+                justify-content: flex-end;
+                margin-top: 18px;
+            }
+            .dr-next {
+                font-family: var(--fh);
+                font-weight: 700;
+                font-size: 13px;
+                background: var(--acc);
+                color: #1a0d05;
+                border: none;
+                border-radius: 9px;
+                padding: 10px 20px;
+                cursor: pointer;
+                transition: 0.15s;
+            }
+            .dr-next:hover {
+                filter: brightness(1.07);
+            }
+            .dr-end-h {
+                font-family: var(--fh);
+                font-weight: 800;
+                font-size: 22px;
+                color: var(--text);
+                margin-bottom: 8px;
+            }
+            .dr-end-sub {
+                font-size: 14px;
+                color: var(--muted2);
+                margin-bottom: 20px;
+            }
+            /* editor demo */
+            .editor-demo {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                margin-top: 38px;
+                align-items: start;
+            }
+            .editor-demo-pane {
+                background: #0d0a07;
+                border: 1px solid var(--border2);
+                border-radius: 14px;
+                overflow: hidden;
+            }
+            .editor-demo-ta {
+                width: 100%;
+                min-height: 220px;
+                background: transparent;
+                border: none;
+                color: var(--text);
+                font-family: var(--fm);
+                font-size: 12px;
+                line-height: 1.8;
+                padding: 18px;
+                outline: none;
+                resize: vertical;
+            }
+            .editor-demo-run {
+                display: flex;
+                flex-direction: column;
+            }
+            .edr-card {
+                background: #0d0a07;
+                border: 1px solid var(--border2);
+                border-radius: 14px;
+                padding: 22px 24px;
+                min-height: 140px;
+            }
+            .edr-prompt {
+                font-family: var(--fh);
+                font-weight: 700;
+                font-size: 17px;
+                line-height: 1.35;
+                color: var(--text);
+                margin-bottom: 16px;
+            }
+            .edr-choices {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            @media (max-width: 720px) {
+                .editor-demo {
+                    grid-template-columns: 1fr;
+                }
+            }
+
             /* pricing */
             .pricing {
                 text-align: center;
@@ -589,11 +758,15 @@
                 </h1>
                 <p class="sub">
                     It isn't journaling. You design a tree of prompts that pull
-                    the truth out of you each night — then commit to one real
-                    move. The day after, a clean yes or no.
+                    the truth out of you each night — then commit to something small.
+                    And we'll make sure you do it.
                 </p>
                 <div class="cta-row">
-                    <a class="btn btn-primary" href="https://buy.stripe.com/28E14g3ntcCt15dcRt1RC01">Start reflecting</a>
+                    <a
+                        class="btn btn-primary"
+                        href="https://buy.stripe.com/28E14g3ntcCt15dcRt1RC01"
+                        >Start reflecting</a
+                    >
                     <a class="btn btn-ghost" href="#demo">Watch the demo</a>
                 </div>
                 <div class="micro">$29 · one-time · lifetime access</div>
@@ -625,168 +798,158 @@
                 </script>
             </section>
 
-            <!-- MECHANISM -->
-            <section id="how">
-                <div class="sec-tag">The part no other app does</div>
-                <h2 class="sec-h">
-                    You write the questions. The app runs you through them.
-                </h2>
+
+            <!-- TRY MY TREE -->
+            <section id="try-tree">
+                <div class="sec-tag">How I use it</div>
+                <h2 class="sec-h">Try my actual tree.</h2>
                 <p class="sec-lead">
-                    Most reflection apps hand you a blank page and a cursor.
-                    This one is different: you encode your own principles once,
-                    as a tree, and every night it interrogates your future self
-                    with them.
+                    Run through the questions I use every night. Answer for real
+                    — notice where it makes you stop.
                 </p>
-
-                <div class="mech">
-                    <pre
-                        class="codecard"
-                    ><span class="c-title">What did you avoid today?</span>
-  <span class="c-arrow">&gt;&gt;</span> <span class="c-done">done</span>
-
-<span class="c-title">Did you do the work?</span>
-  <span class="c-opt">yes</span> <span class="c-arrow">&gt;&gt;</span> <span class="c-dest">What made it click?</span>
-  <span class="c-opt">no</span>&nbsp; <span class="c-arrow">&gt;&gt;</span> <span class="c-dest">What got in the way?</span>
-
-<span class="c-title">What made it click?</span>
-  <span class="c-rec">@[Did you do the work?] [1,7d]</span>
-  <span class="c-arrow">&gt;&gt;</span> <span class="c-done">done</span>
-</pre>
-                    <div class="legend">
-                        <div class="leg">
-                            <span
-                                class="dot"
-                                style="background: var(--text)"
-                            ></span>
-                            <div>
-                                <h4>A node is a question</h4>
-                                <p>
-                                    Each line is a prompt that forces a
-                                    specific, true answer — the kind you'd
-                                    rather skip.
-                                </p>
-                            </div>
+                <div class="demo-runner">
+                    <div class="dr-card" id="drCard">
+                        <div class="dr-meta" id="drMeta">TEXT RESPONSE</div>
+                        <div class="dr-prompt" id="drPrompt"></div>
+                        <div class="dr-input-wrap" id="drInputWrap">
+                            <input
+                                class="dr-input"
+                                id="drInput"
+                                type="text"
+                                placeholder="type your response…"
+                                autocomplete="off"
+                            />
+                            <div class="dr-input-line"></div>
                         </div>
-                        <div class="leg">
-                            <span
-                                class="dot"
-                                style="background: var(--ref)"
-                            ></span>
-                            <div>
-                                <h4>Branches follow your answer</h4>
-                                <p>
-                                    Say yes or no and the tree routes you
-                                    somewhere different. Your reflection adapts
-                                    to your day.
-                                </p>
-                            </div>
+                        <div class="dr-choices" id="drChoices"></div>
+                        <div class="dr-nav">
+                            <button
+                                class="dr-next"
+                                id="drNext"
+                                onclick="demoNext()"
+                            >
+                                next →
+                            </button>
                         </div>
-                        <div class="leg">
-                            <span
-                                class="dot"
-                                style="background: var(--rec)"
-                            ></span>
-                            <div>
-                                <h4>Recall surfaces your patterns</h4>
-                                <p>
-                                    <span class="mono" style="color: var(--rec)"
-                                        >@[…] [1,7d]</span
-                                    >
-                                    pulls what you said over the last week, so
-                                    you stop arguing with a blank page and start
-                                    beating your own excuses.
-                                </p>
-                            </div>
+                    </div>
+                    <div class="dr-end" id="drEnd" style="display: none">
+                        <div class="dr-meta">COMMITMENT</div>
+                        <div class="dr-end-h">commit to one move</div>
+                        <div class="dr-end-sub">
+                            One thing you'll make real. The day after, a clean
+                            yes or no.
                         </div>
-                        <div class="leg">
-                            <span
-                                class="dot"
-                                style="background: var(--acc)"
-                            ></span>
-                            <div>
-                                <h4>Every path ends in a commitment</h4>
-                                <p>
-                                    One move, with a date. The day after, the
-                                    app asks one thing: did you do it?
-                                </p>
-                            </div>
+                        <div class="dr-input-wrap">
+                            <input
+                                class="dr-input"
+                                id="drCommit"
+                                type="text"
+                                placeholder="I will…"
+                                autocomplete="off"
+                            />
+                            <div class="dr-input-line"></div>
+                        </div>
+                        <div style="margin-top: 20px">
+                            <a
+                                class="btn btn-primary"
+                                href="https://buy.stripe.com/28E14g3ntcCt15dcRt1RC01"
+                                >get the real thing →</a
+                            >
                         </div>
                     </div>
                 </div>
             </section>
 
-            <!-- CONTRAST -->
-            <section>
-                <div class="sec-tag">Why it matters</div>
-                <h2 class="sec-h">Two versions of tomorrow.</h2>
-                <div class="twocol">
-                    <div class="col without">
-                        <div class="col-tag">A typical night a month ago</div>
-                        <p>
-                            Go to bed with plans to lock-in on homework
-                            tomorrow. I wake up a bit late, eat brunch and
-                            shower, then do some. After an hour, I'm unfocused
-                            and go outside with my mom, for two, then three
-                            (because why not). I get home and, tired, lie down
-                            and listen to music. In the evening I get some more
-                            work done, but lose focus again. I go watch some
-                            YouTube and go to bed having done little. Really
-                            frustrated, I hope to finish it tomorrow.
-                        </p>
-                    </div>
-                    <div class="col with">
-                        <div class="col-tag">
-                            An actual night from my own tree — real
-                        </div>
-                        <p>
-                            Knowing I have trouble focusing once I'm out and
-                            about, I step out of bed and sit down to work. To
-                            fund ads for this app, I'd sold my monitor on eBay —
-                            the payout was sitting in a multi-week hold, so
-                            instead of waiting I worked the buyer directly until
-                            they released it early. A coding session that
-                            should've ended at midnight ran to sunrise and
-                            turned into a script that automated part of my
-                            product sourcing. None of it happens without the
-                            reflection that made tomorrow feel urgent.
-                        </p>
-                    </div>
-                </div>
+            <!-- BUILD YOUR OWN -->
+            <section id="editor-try">
+                <div class="sec-tag">Build your own</div>
+                <h2 class="sec-h">Write a tree. Run it.</h2>
+                <p class="sec-lead">
+                    Edit the starter or write from scratch. Press run to walk
+                    through it card by card.
+                </p>
+                <div class="editor-demo">
+                    <div class="editor-demo-pane">
+                        <textarea
+                            class="editor-demo-ta"
+                            id="editorDemoTa"
+                            spellcheck="false"
+                        >
+What is the highest leverage thing you can do right now
+  >> What do you see yourself having achieved a week from now? What would it take to get there
 
-                <div class="cascade">
-                    <div class="lead-in">
-                        That same night, traced forward — also real, not a
-                        hypothetical
+What do you see yourself having achieved a week from now? What would it take to get there
+  >> done
+
+done
+</textarea
+                        >
                     </div>
-                    <p>
-                        A deadline I'd been avoiding came into focus
-                        <span class="arw">→</span> so I worked a session that
-                        ran past sunrise <span class="arw">→</span> which became
-                        a script that automated part of my sourcing
-                        <span class="arw">→</span> which paid for the AI tools I
-                        used to build faster <span class="arw">→</span> which
-                        tripled my output <span class="arw">→</span> which is
-                        the reason this app exists as a working beta and not
-                        still an idea. One night of honest questions, traced all
-                        the way to the product you're looking at right now.
-                    </p>
+                    <div class="editor-demo-run">
+                        <div class="edr-card">
+                            <div class="edr-prompt" id="edrPrompt">
+                                Press "run ▶" to walk through your tree.
+                            </div>
+                            <div
+                                class="dr-input-wrap"
+                                id="edrInputWrap"
+                                style="display: none"
+                            >
+                                <input
+                                    class="dr-input"
+                                    id="edrInput"
+                                    type="text"
+                                    placeholder="type…"
+                                    autocomplete="off"
+                                    onkeydown="edrKey(event)"
+                                />
+                                <div class="dr-input-line"></div>
+                            </div>
+                            <div class="edr-choices" id="edrChoices"></div>
+                            <div
+                                id="edrEnd"
+                                style="display: none; margin-top: 16px"
+                            >
+                                <div
+                                    style="
+                                        font-family: var(--fm);
+                                        font-size: 12px;
+                                        color: var(--acc);
+                                        margin-bottom: 14px;
+                                    "
+                                >
+                                    ↳ ready to commit to one move
+                                </div>
+                                <a
+                                    class="btn btn-primary"
+                                    href="https://buy.stripe.com/28E14g3ntcCt15dcRt1RC01"
+                                    >get the full app →</a
+                                >
+                            </div>
+                        </div>
+                        <button
+                            class="btn btn-primary"
+                            onclick="runEditorDemo()"
+                            style="
+                                margin-top: 12px;
+                                width: 100%;
+                                text-align: center;
+                            "
+                        >
+                            run ▶
+                        </button>
+                    </div>
                 </div>
             </section>
 
             <!-- FORKS -->
             <section>
-                <div class="sec-tag">What it's actually for</div>
+                <div class="sec-tag">Purpose: minimize regret</div>
                 <h2 class="sec-h">
-                    Most decisions don't matter. A few change everything.
+                    Ever imagined how much farther you'd be if you'd taken more
+                    risks?
                 </h2>
-                <p class="sec-lead">
-                    Every day hands you choices — what to focus on, who to
-                    dedicate your attention to, etc. Almost all of them distract
-                    you from explicitly working on one thing you care about,
-                    that would make all the difference. The tree's job is to
-                    help you see those decisions the night before, not years
-                    later.
-                </p>
+
                 <div class="forkwrap">
                     <svg
                         class="forksvg"
@@ -839,47 +1002,82 @@
                 </div>
             </section>
 
-            <!-- STEPS -->
+            <!-- CONTRAST -->
             <section>
-                <div class="sec-tag">How a night actually goes</div>
-                <h2 class="sec-h">Three steps. The hard one is the point.</h2>
-                <div class="steps">
-                    <div class="step">
-                        <div class="n">01</div>
-                        <h4>Design your tree</h4>
+                <div class="sec-tag">Why it matters</div>
+                <h2 class="sec-h">Two versions of tomorrow.</h2>
+                <div class="twocol">
+                    <div class="col without">
+                        <div class="col-tag">My typical night a month ago</div>
                         <p>
-                            Write the questions that extract the truth from you.
-                            Start from the one we hand you, then make it yours,
-                            one line at a time.
+                            Go to bed with plans to lock-in on homework
+                            tomorrow. Wake up a bit late, eat lunch and shower.
+                            Do some homework, unfocused after an hour. Go outside
+                            with mom, stay an extra hour (because why not).
+                            Get home. Wait till later to get some work done, lose focus again.
+                            Watch TV, go to bed. Say I'll finish the work tomorrow.
                         </p>
                     </div>
-                    <div class="step">
-                        <div class="n">02</div>
-                        <h4>Reflect</h4>
+                    <div class="col with">
+                        <div class="col-tag">
+                            An actual day after 2-3 weeks of self-observation
+                        </div>
                         <p>
-                            Press reflect and answer one card at a time. The
-                            tree branches on your answers and shows you last
-                            week's patterns as you go.
-                        </p>
-                    </div>
-                    <div class="step">
-                        <div class="n">03</div>
-                        <h4>The day after</h4>
-                        <p>
-                            One commitment, one date. The next day, a clean yes
-                            or no — no streaks to game, just honesty with
-                            yourself.
+                            Make a plan for tomorrow, make hard decisions, go to sleep.
+                            Step out of bed and start work instantly, knowing
+                            I'd get distracted otherwise. Fix a situation with
+                            a customer for my ebay business. Get
+                            hungry but go run before eating (knowing I'd get too
+                            lethargic to run). Difficult conversation with my parents
+                            about skipping college (decided the night
+                            before). Keep coding this app and
+                            run some ads. Reflect again, go to bed.
                         </p>
                     </div>
                 </div>
-                <div class="effort">
-                    This isn't a two-minute streak app. A real reflection runs
-                    <b>10–40 minutes</b> and asks you things you'd rather skip.
-                    That's the design — the discomfort is where tomorrow gets
-                    decided. You won't be staring at a blank page, but you will
-                    have to be honest.
+
+                <div class="cascade">
+                    <div class="lead-in">That same day, traced forward</div>
+                    <p>
+                        Those ads ban me from TikTok
+                        <span class="arw">→</span> struggle to find a new
+                        product <span class="arw">→</span> reflecting, realize I
+                        can also sell this app <span class="arw">→</span> pull
+                        an all nighter to polish my prototype
+                        <span class="arw">→</span> sales during my graduation
+                        rehearsal <span class="arw">→</span>
+                        launch this product page and video tutorials
+                        <span class="arw">→</span> show my extended family
+                        <span class="arw">→</span> they think I'm "legit"
+                        <span class="arw">→</span> they agree to support me and
+                        fund my dream of making it without college
+                    </p>
                 </div>
             </section>
+
+            <!-- TUTORIAL VIDEO -->
+            <section id="tutorial">
+                <div class="sec-tag">Tutorial</div>
+                <h2 class="sec-h">
+                    How to design your tree
+                </h2>
+                <p class="sec-lead">
+                    A short guide on designing prompts that pull the truth out
+                    of you — not just surface-level reflection.
+                </p>
+                <div class="video-wrap" style="margin-top: 32px">
+                    <div class="video-frame">
+                        <!-- replace this placeholder with your Vimeo iframe when ready:
+                        <iframe src="https://player.vimeo.com/video/YOUR_ID?title=0&byline=0&portrait=0&color=e0793f" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+                        -->
+                        <div class="video-ph">
+                            <div class="play-dot"></div>
+                            <span>coming soon</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
 
             <!-- PROOF -->
             <section>
@@ -892,23 +1090,23 @@
                 <div class="proof">
                     <p>
                         I've run this every night since the day I built it —
-                        somewhere north of <b>45 extra hours of deep work</b> I
-                        would never have found otherwise. It's the reason I
-                        decided not to go to college while everyone around me
-                        said to go.
+                        it's allocated somewhere north of<b>.</b>60-80 extra
+                        hours of deep work to my business, and I wouldn't trade
+                        my focus for anything. It's the reason I decided not to
+                        go to college while everyone around me said to go.
                     </p>
                     <p>
-                        I'm not going to promise it does the same for you. Your
-                        tree is yours to build, and that's the whole point — I'm
-                        not selling you my principles, I'm selling you the
-                        machine that enforces your own. So judge it for
-                        yourself.
+                        I'm not selling you my principles or my results. You may
+                        value different things, ask yourself different
+                        questions, and that's the whole point — I'm selling you
+                        the machine to enforce your own personal ambitions.
                     </p>
                     <div class="who">
                         — Franklin · five friends are starting this week
                     </div>
                 </div>
             </section>
+
 
             <!-- PRICING -->
             <section class="pricing">
@@ -920,18 +1118,22 @@
                         one-time payment · no subscription
                     </div>
                     <div class="price-list">
-                        <span>Unlimited reflections &amp; commitments</span>
+                        <span>Your own self-interrogation system</span>
                         <span
-                            >A starter tree so you never face a blank page</span
+                            ></span
                         >
-                        <span>Recall that surfaces your own patterns</span>
+                        <span>Daily reminder to reflect</span>
                         <span
-                            >Synced across your devices, with daily
-                            reminders</span
+                            >Never stare at a blank page/span
                         >
-                        <span>Every future update included</span>
+                        <span
+                            >Appreciate a list of your kept commitments
+                                </span
+                        >
                     </div>
-                    <a class="btn btn-primary" href="https://buy.stripe.com/28E14g3ntcCt15dcRt1RC01"
+                    <a
+                        class="btn btn-primary"
+                        href="https://buy.stripe.com/28E14g3ntcCt15dcRt1RC01"
                         >Start reflecting →</a
                     >
                 </div>
@@ -942,5 +1144,195 @@
                 beat your own patterns.
             </footer>
         </div>
+        <script>
+            // ── Landing page interactive demos ───────────────────────────────────────────
+            // Mini tree parser: handles >> dest, opt >> dest, >> done
+            function mpParse(src) {
+                var nodes = {},
+                    order = [],
+                    cur = null;
+                src.split("\n").forEach(function (raw) {
+                    var line = raw.replace(/#.*/, "").trimEnd();
+                    if (!line.trim()) return;
+                    var indent = line.match(/^(\s*)/)[1].length,
+                        t = line.trim();
+                    if (indent === 0) {
+                        cur = t;
+                        if (!nodes[cur]) {
+                            nodes[cur] = {
+                                type: "text",
+                                title: cur,
+                                opts: [],
+                                next: null,
+                            };
+                            order.push(cur);
+                        }
+                    } else if (cur) {
+                        if (t.startsWith(">>")) {
+                            var dest = t.slice(2).trim();
+                            nodes[cur].next =
+                                dest === "done" ? "__done__" : dest;
+                        } else if (
+                            t.indexOf(" >> ") !== -1 &&
+                            !t.startsWith("@")
+                        ) {
+                            var parts = t.split(" >> ");
+                            var lbl = parts[0].trim(),
+                                d = parts[1] ? parts[1].trim() : "";
+                            nodes[cur].opts.push({
+                                l: lbl,
+                                next: d === "done" ? "__done__" : d,
+                            });
+                            nodes[cur].type = "choice";
+                        }
+                    }
+                });
+                return { nodes: nodes, first: order[0] || null };
+            }
+
+            // ── fixed demo (my tree) ──
+            var demoState = null;
+            var DEMO_SRC =
+                "What did you actually do with today? Hours, not vibes.\n  >> Did you move the thing that matters most right now?\n\nDid you move the thing that matters most right now?\n  yes >> What made today work? Name it so tomorrow can copy it.\n  no  >> What did you avoid, and what were you afraid would happen?\n\nWhat made today work? Name it so tomorrow can copy it.\n  >> done\n\nWhat did you avoid, and what were you afraid would happen?\n  >> done";
+            function initDemo() {
+                demoState = mpParse(DEMO_SRC);
+                demoState.cur = demoState.first;
+                demoRender();
+            }
+            function demoRender() {
+                var s = demoState,
+                    card = document.getElementById("drCard"),
+                    end = document.getElementById("drEnd");
+                if (!s.cur || s.cur === "__done__") {
+                    card.style.display = "none";
+                    end.style.display = "";
+                    return;
+                }
+                card.style.display = "";
+                end.style.display = "none";
+                var node = s.nodes[s.cur];
+                document.getElementById("drMeta").textContent =
+                    node.type === "text" ? "TEXT RESPONSE" : "CHOICE";
+                document.getElementById("drPrompt").textContent = node.title;
+                var iw = document.getElementById("drInputWrap"),
+                    ch = document.getElementById("drChoices"),
+                    nx = document.getElementById("drNext");
+                if (node.type === "text") {
+                    iw.style.display = "";
+                    ch.innerHTML = "";
+                    nx.style.display = "";
+                    var inp = document.getElementById("drInput");
+                    inp.value = "";
+                    setTimeout(function () {
+                        inp.focus();
+                    }, 60);
+                    inp.onkeydown = function (e) {
+                        if (e.key === "Enter") demoNext();
+                    };
+                } else {
+                    iw.style.display = "none";
+                    nx.style.display = "none";
+                    ch.innerHTML = node.opts
+                        .map(function (o) {
+                            return (
+                                '<button class="dr-choice" onclick="demoChoose(\'' +
+                                o.next.replace(/'/g, "\\'") +
+                                "'\">" +
+                                o.l +
+                                "</button>"
+                            );
+                        })
+                        .join("");
+                }
+            }
+            function demoNext() {
+                if (
+                    !demoState ||
+                    !demoState.cur ||
+                    demoState.cur === "__done__"
+                )
+                    return;
+                var node = demoState.nodes[demoState.cur];
+                demoState.cur = node.next || "__done__";
+                demoRender();
+            }
+            function demoChoose(next) {
+                demoState.cur = next;
+                demoRender();
+            }
+            initDemo();
+
+            // ── editor demo ──
+            var edrState = null;
+            function runEditorDemo() {
+                var src = document.getElementById("editorDemoTa").value;
+                edrState = mpParse(src);
+                if (!edrState.first) {
+                    alert("Nothing to run — check your tree syntax.");
+                    return;
+                }
+                edrState.cur = edrState.first;
+                edrRender();
+            }
+            function edrRender() {
+                var s = edrState;
+                var ep = document.getElementById("edrPrompt"),
+                    iw = document.getElementById("edrInputWrap"),
+                    ch = document.getElementById("edrChoices"),
+                    end = document.getElementById("edrEnd");
+                if (!s || !s.cur || s.cur === "__done__") {
+                    if (ep) ep.textContent = "done.";
+                    if (iw) iw.style.display = "none";
+                    if (ch) ch.innerHTML = "";
+                    if (end) end.style.display = "";
+                    return;
+                }
+                if (end) end.style.display = "none";
+                var node = s.nodes[s.cur];
+                if (!node) {
+                    edrState.cur = "__done__";
+                    edrRender();
+                    return;
+                }
+                if (ep) ep.textContent = node.title;
+                if (node.type === "text") {
+                    if (iw) iw.style.display = "";
+                    if (ch) ch.innerHTML = "";
+                    var inp = document.getElementById("edrInput");
+                    if (inp) {
+                        inp.value = "";
+                        setTimeout(function () {
+                            inp.focus();
+                        }, 60);
+                    }
+                } else {
+                    if (iw) iw.style.display = "none";
+                    if (ch)
+                        ch.innerHTML = node.opts
+                            .map(function (o) {
+                                return (
+                                    '<button class="dr-choice" onclick="edrChoose(\'' +
+                                    o.next.replace(/'/g, "\\'") +
+                                    "'\">" +
+                                    o.l +
+                                    "</button>"
+                                );
+                            })
+                            .join("");
+                }
+            }
+            function edrKey(e) {
+                if (e.key === "Enter" && edrState) {
+                    var node = edrState.nodes[edrState.cur];
+                    edrState.cur = (node && node.next) || "__done__";
+                    edrRender();
+                }
+            }
+            function edrChoose(next) {
+                if (!edrState) return;
+                edrState.cur = next;
+                edrRender();
+            }
+        </script>
     </body>
 </html>

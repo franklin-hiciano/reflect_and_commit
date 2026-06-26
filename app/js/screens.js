@@ -68,6 +68,73 @@ function bindHolds(){
   });
 }
 function onHoldComplete(action){
-  if(action==='yes'){window._resolveCommitment(_activeCmtId,'done');shatter(document.getElementById('checkinOv'));_activeCmtId=null;}
+  if(action==='yes'){
+    // grab text before resolving so we can show it in the minted animation
+    const cmt=(window._commitments||[]).find(c=>c.id===_activeCmtId);
+    window._resolveCommitment(_activeCmtId,'done');
+    shatter(document.getElementById('checkinOv'));
+    playMinted(cmt?cmt.text:'');
+    _activeCmtId=null;
+  }
   else if(action==='no'){window._resolveCommitment(_activeCmtId,'missed');shatter(document.getElementById('checkinOv'));_activeCmtId=null;}
+}
+
+// ── minted animation ──
+function playMinted(text){
+  const ov=document.getElementById('mintedOv');
+  const txt=document.getElementById('mintedText');
+  if(!ov)return;
+  if(txt)txt.textContent=text||'done.';
+  ov.classList.add('on');
+  setTimeout(()=>ov.classList.remove('on'),1500);
+}
+
+// ── milestones screen ──
+function openMilestones(){
+  renderMilestones();
+  const ov=document.getElementById('milestonesOv');
+  if(ov)ov.classList.add('on');
+}
+function closeMilestones(){
+  const ov=document.getElementById('milestonesOv');
+  if(ov)ov.classList.remove('on');
+}
+function renderMilestones(){
+  const body=document.getElementById('milestonesBody');
+  if(!body)return;
+  const all=window._commitments||[];
+  // sort by date descending (future dates first, then recent past, then no-date last)
+  const sorted=[...all].sort((a,b)=>{
+    const da=a.date||'';const db2=b.date||'';
+    if(!da&&!db2)return 0;if(!da)return 1;if(!db2)return -1;
+    return da<db2?1:-1;
+  });
+  const completed=sorted.filter(c=>c.status==='done');
+  const active=sorted.filter(c=>c.status==='active');
+  let html='';
+  if(!completed.length&&!active.length){
+    html='<div class="ms-empty">no commitments yet — finish a reflection and commit to one move.</div>';
+  }else{
+    if(active.length){
+      html+='<div class="ms-section-label">current</div>';
+      active.forEach(c=>{
+        const dateStr=c.date?new Date(c.date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'no date';
+        html+=`<div class="ms-item active"><div class="ms-item-text">${esc(c.text)}</div><div class="ms-item-date">${dateStr}</div></div>`;
+      });
+    }
+    if(completed.length){
+      if(active.length)html+='<div class="ms-section-label" style="margin-top:8px">completed</div>';
+      else html+='<div class="ms-section-label">completed</div>';
+      completed.forEach(c=>{
+        const dateStr=c.date?new Date(c.date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+        html+=`<div class="ms-item"><div class="ms-item-text">${esc(c.text)}</div>${dateStr?'<div class="ms-item-date">'+dateStr+'</div>':''}`;
+        html+='</div>';
+      });
+    }
+  }
+  body.innerHTML=html;
+  // size each card to its text width
+  body.querySelectorAll('.ms-item').forEach(el=>{
+    el.style.width='fit-content';
+  });
 }

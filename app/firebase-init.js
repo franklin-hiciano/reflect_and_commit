@@ -136,8 +136,6 @@ onAuthStateChanged(auth, async (user) => {
     await migrateIfNeeded();
     window._uid = uid;
     subscribe();
-    // show intro video on first entry (teaches how to design a question);
-    // after dismissal it chains to the compound card.
     window._maybeShowIntroVideo && window._maybeShowIntroVideo();
   } else {
     uid = null;

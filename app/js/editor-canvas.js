@@ -22,10 +22,13 @@ function esc(s) {
 }
 
 // ── Parser ─���────────────────────────────────────────────────────────────────────────
+// ── Parser ───────────────────────────────────────────────────────────────────────────
 function parseIndented(src) {
   const rawLines = (src || "").split("\n");
   const lineItems = []; // { text, level, rawLine }
+  const globalNodes = new Set();
 
+  // 1. Populate lineItems first
   rawLines.forEach((raw, i) => {
     const tr = raw.trim();
     if (!tr || tr.startsWith("#")) return;
@@ -34,6 +37,13 @@ function parseIndented(src) {
   });
 
   if (!lineItems.length) return { nodes: {}, lineTypes: {} };
+
+  // 2. Now collect global root nodes (safe because lineItems now contains data!)
+  lineItems.forEach((item) => {
+    if (item.level === 0) {
+      globalNodes.add(item.text);
+    }
+  });
 
   // Build parent→children arrays using a stack
   const childList = lineItems.map(() => []);
@@ -50,12 +60,15 @@ function parseIndented(src) {
 
   function processQuestion(idx) {
     const item = lineItems[idx];
+    if (item.level > 0 && globalNodes.has(item.text)) {
+      return item.text;
+    }
+
     let id = item.text,
       n = 2;
     while (id in nodes) id = item.text + " (" + n++ + ")";
-    nodes[id] = null; // reserve slot to detect duplicates
+    nodes[id] = null;
     lineTypes[item.rawLine] = "question";
-
     const ch = childList[idx];
     let nodeData;
 
@@ -83,18 +96,27 @@ function parseIndented(src) {
       // Multiple children → option labels (multiple choice)
       const opts = [];
       for (const ci of ch) {
-        lineTypes[lineItems[ci].rawLine] = "option";
-        const oc = childList[ci];
+        const optChildren = childList[ci];
         let nextId;
-        if (oc.length === 0) nextId = "done";
-        else if (oc.length === 1) nextId = processQuestion(oc[0]);
-        else nextId = processQuestion(ci); // option itself becomes a question
+
+        if (optChildren.length === 0) {
+          nextId = "done";
+          lineTypes[lineItems[ci].rawLine] = "option";
+        } else if (optChildren.length === 1) {
+          nextId = processQuestion(optChildren[0]);
+          lineTypes[lineItems[ci].rawLine] = "option";
+        } else {
+          nextId = processQuestion(ci);
+          lineTypes[lineItems[ci].rawLine] = "option";
+        }
+
         opts.push({
           l: lineItems[ci].text,
           n: nextId,
           rawLine: lineItems[ci].rawLine,
         });
       }
+
       nodeData = {
         title: item.text,
         type: "single",
@@ -105,6 +127,7 @@ function parseIndented(src) {
     }
 
     nodes[id] = nodeData;
+    console.log(nodes);
     return id;
   }
 

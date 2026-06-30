@@ -7,10 +7,23 @@
             content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"
         />
         <title>Reflect &amp; Commit</title>
+        <link rel="manifest" href="manifest.json" />
+        <meta name="theme-color" content="#0a0a0a" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta
+            name="apple-mobile-web-app-status-bar-style"
+            content="black-translucent"
+        />
+        <meta name="apple-mobile-web-app-title" content="Reflect" />
+        <link rel="apple-touch-icon" href="icon-192.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&family=DM+Mono:wght@400;500&display=swap" />
-        <link rel="stylesheet" href="style.css" />
+        <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&family=DM+Mono:wght@400;500&display=swap"
+        />
+        <link rel="stylesheet" href="style.css?v=3" />
     </head>
     <body>
         <!-- AUTH -->
@@ -22,15 +35,28 @@
                 </div>
                 <button class="btn-google" id="btnSignIn">
                     <svg width="16" height="16" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.47 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                        <path
+                            fill="#4285F4"
+                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        />
+                        <path
+                            fill="#34A853"
+                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        />
+                        <path
+                            fill="#FBBC05"
+                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+                        />
+                        <path
+                            fill="#EA4335"
+                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.47 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                        />
                     </svg>
                     Continue with Google
                 </button>
                 <div class="auth-note">
-                    Your reflections and commitments are private. Synced across your devices.
+                    Your reflections and commitments are private. Synced across
+                    your devices.
                 </div>
             </div>
         </div>
@@ -40,9 +66,15 @@
             <div class="auth-box">
                 <div class="auth-logo">Reflect &amp; Commit</div>
                 <div class="pay-price" id="payPrice">$29 · lifetime</div>
-                <div class="auth-sub" id="payBlurb">Unlock unlimited reflections and commitments.</div>
-                <button class="btn-google pay-btn" id="payBtn">Unlock with card</button>
-                <button class="pay-alt" onclick="doSignOut()">use a different account</button>
+                <div class="auth-sub" id="payBlurb">
+                    Unlock unlimited reflections and commitments.
+                </div>
+                <button class="btn-google pay-btn" id="payBtn">
+                    Unlock with card
+                </button>
+                <button class="pay-alt" onclick="doSignOut()">
+                    use a different account
+                </button>
                 <div class="auth-note">Secure checkout powered by Stripe.</div>
             </div>
         </div>
@@ -50,34 +82,151 @@
         <!-- NOTIFICATION BANNER -->
         <div class="noti-banner" id="notiBanner">
             <!-- phase 1: message + action -->
-            <span class="noti-banner-txt" id="notiBannerStatus">Get a daily nudge to reflect.</span>
-            <button class="noti-banner-loud" id="notiBannerLoud" onclick="toggleLoudNotif()" title="loud (vibration + critical alert)">🔔</button>
-            <button class="noti-banner-btn" id="notiBannerBtn" onclick="sendTestNotif()">turn on</button>
-            <button class="noti-banner-x" id="notiBannerDismiss" onclick="dismissNotiBanner()">don't ask again</button>
+            <span class="noti-banner-txt" id="notiBannerStatus"
+                >Get a daily nudge to reflect.</span
+            >
+            <button
+                class="noti-banner-loud"
+                id="notiBannerLoud"
+                onclick="toggleLoudNotif()"
+                title="loud (vibration + critical alert)"
+            >
+                🔔
+            </button>
+            <button
+                class="noti-banner-btn"
+                id="notiBannerBtn"
+                onclick="sendTestNotif()"
+            >
+                turn on
+            </button>
+            <button
+                class="noti-banner-x"
+                id="notiBannerDismiss"
+                onclick="dismissNotiBanner()"
+            >
+                don't ask again
+            </button>
             <!-- phase 2: time picker (shown after notification confirmed) -->
-            <input type="time" class="noti-banner-time" id="notiBannerTime" value="20:00" style="display:none" onchange="onBannerTimeChange()" />
-            <button class="noti-banner-btn" id="notiBannerDone" style="display:none" onclick="onBannerDone()">done</button>
+            <input
+                type="time"
+                class="noti-banner-time"
+                id="notiBannerTime"
+                value="20:00"
+                style="display: none"
+                onchange="onBannerTimeChange()"
+            />
+            <button
+                class="noti-banner-btn"
+                id="notiBannerDone"
+                style="display: none"
+                onclick="onBannerDone()"
+            >
+                done
+            </button>
         </div>
 
         <!-- EDITOR (home / default screen) -->
         <div class="editor" id="editor">
             <div class="top-bar">
                 <div class="brand">Reflect &amp; Commit</div>
-                <span style="flex:1"></span>
-                <button class="reflect-btn" onclick="attemptReflect()" title="reflect">reflect ▶</button>
+                <div class="help-icon-wrap">
+                    <button
+                        class="help-icon-btn"
+                        id="helpIconBtn"
+                        aria-label="Help"
+                    >
+                        ?
+                    </button>
+                    <div class="help-tooltip">
+                        Just get started — click here if you need help
+                    </div>
+                </div>
+                <span style="flex: 1"></span>
+                <button
+                    class="reflect-btn"
+                    onclick="attemptReflect()"
+                    title="reflect"
+                >
+                    reflect ▶
+                </button>
+
+                <!-- STREAK WIDGET -->
+                <div
+                    class="streak-pill streak-dead"
+                    id="streakPill"
+                    title="daily reflection streak"
+                >
+                    <span class="streak-flame-wrap" id="streakFlameWrap">
+                        <!-- Duolingo-style flame SVG -->
+                        <svg
+                            class="streak-flame-svg"
+                            id="streakFlameSvg"
+                            viewBox="0 0 32 40"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                            aria-hidden="true"
+                        >
+                            <!-- outer flame -->
+                            <path
+                                d="M16 1C16 1 5 13 5 23C5 30.18 9.93 36 16 36C22.07 36 27 30.18 27 23C27 13 16 1 16 1Z"
+                                class="streak-flame-outer"
+                            />
+                            <!-- inner glow -->
+                            <path
+                                d="M16 14C16 14 11 19.5 11 24C11 27.31 13.24 30 16 30C18.76 30 21 27.31 21 24C21 19.5 16 14 16 14Z"
+                                class="streak-flame-inner"
+                            />
+                        </svg>
+                        <!-- done-today checkmark badge -->
+                        <span
+                            class="streak-check"
+                            id="streakCheck"
+                            style="display: none"
+                            aria-hidden="true"
+                        >
+                            <svg
+                                viewBox="0 0 10 10"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                            >
+                                <circle cx="5" cy="5" r="5" fill="#58CC02" />
+                                <path
+                                    d="M2.5 5L4.2 6.8L7.5 3.5"
+                                    stroke="white"
+                                    stroke-width="1.4"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                />
+                            </svg>
+                        </span>
+                    </span>
+                    <span class="streak-num" id="streakNum">0</span>
+                </div>
+
                 <div class="account">
                     <img class="auth-avatar" id="userAvatar" src="" alt="" />
                     <span class="user-name" id="userName"></span>
                 </div>
-                <button class="sb-mini" onclick="doSignOut()" title="sign out">out</button>
+                <button class="sb-mini" onclick="doSignOut()" title="sign out">
+                    out
+                </button>
             </div>
             <div class="edit-workspace" id="editWorkspace">
                 <div class="edit-text" id="editText">
                     <div class="editor-body" id="editorBody">
                         <div class="lnums" id="lnums">1</div>
                         <div class="editor-inner">
-                            <div class="line-hl" id="lhl" style="display:none"></div>
-                            <div class="hl-layer" id="hll" aria-hidden="true"></div>
+                            <div
+                                class="line-hl"
+                                id="lhl"
+                                style="display: none"
+                            ></div>
+                            <div
+                                class="hl-layer"
+                                id="hll"
+                                aria-hidden="true"
+                            ></div>
                             <textarea
                                 id="src-ta"
                                 spellcheck="false"
@@ -87,7 +236,10 @@
     Yes — it did
     No — not quite"
                             ></textarea>
-                            <div class="hover-btns-layer" id="hoverBtnsLayer"></div>
+                            <div
+                                class="hover-btns-layer"
+                                id="hoverBtnsLayer"
+                            ></div>
                         </div>
                     </div>
                     <span class="pstatus" id="pst"></span>
@@ -97,8 +249,12 @@
 
         <!-- BOTTOM-LEFT CLUSTER: undo / redo / history -->
         <div class="bottom-left-cluster">
-            <button id="btn-undo" onclick="olUndo()" title="undo (⌘Z)">↶</button>
-            <button id="btn-redo" onclick="olRedo()" title="redo (⇧⌘Z)">↷</button>
+            <button id="btn-undo" onclick="olUndo()" title="undo (⌘Z)">
+                ↶
+            </button>
+            <button id="btn-redo" onclick="olRedo()" title="redo (⇧⌘Z)">
+                ↷
+            </button>
             <button onclick="openHistory()" title="version history">⟲</button>
         </div>
 
@@ -107,8 +263,10 @@
             <div class="reflect-top">
                 <span class="brand">Reflect &amp; Commit</span>
                 <span class="reflect-go">▶ reflect</span>
-                <span style="flex:1"></span>
-                <button class="reflect-return" onclick="finishReflection()">return</button>
+                <span style="flex: 1"></span>
+                <button class="reflect-return" onclick="finishReflection()">
+                    return
+                </button>
             </div>
             <div class="reflect-body">
                 <div class="rcard" id="rcard">
@@ -128,17 +286,32 @@
                         </div>
                         <div class="rcard-choices" id="rcardChoices"></div>
                         <div class="rcard-nav">
-                            <button class="rnav-back" id="rBack" onclick="runBack()">‹ back</button>
-                            <span style="flex:1"></span>
-                            <button class="rnav-next" id="rNext" onclick="submitCard()">next →</button>
+                            <button
+                                class="rnav-back"
+                                id="rBack"
+                                onclick="runBack()"
+                            >
+                                ‹ back
+                            </button>
+                            <span style="flex: 1"></span>
+                            <button
+                                class="rnav-next"
+                                id="rNext"
+                                onclick="submitCard()"
+                            >
+                                next →
+                            </button>
                         </div>
                     </div>
-                    <div class="rcard-end" id="rcardEnd" style="display:none">
+                    <div class="rcard-end" id="rcardEnd" style="display: none">
                         <div class="rcard-meta">
                             <span class="rcard-type">COMMITMENT</span>
                         </div>
                         <div class="end-h">commit to one move</div>
-                        <div class="end-sub">One thing you'll make real. The day after, a clean yes or no.</div>
+                        <div class="end-sub">
+                            One thing you'll make real. The day after, a clean
+                            yes or no.
+                        </div>
                         <div class="rfield">
                             <input
                                 id="commitText"
@@ -154,34 +327,90 @@
                                 onclick="toggleCommitNodePop()"
                                 title="which question led you here?"
                             >
-                                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    width="17"
+                                    height="17"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="1.6"
+                                    stroke-linecap="round"
+                                >
                                     <circle cx="12" cy="5" r="2.4"></circle>
                                     <circle cx="6" cy="18" r="2.4"></circle>
                                     <circle cx="18" cy="18" r="2.4"></circle>
-                                    <path d="M12 7.4V11M12 11l-5 4.6M12 11l5 4.6"></path>
+                                    <path
+                                        d="M12 7.4V11M12 11l-5 4.6M12 11l5 4.6"
+                                    ></path>
                                 </svg>
                             </button>
                             <span class="rfield-line"></span>
                         </div>
-                        <div class="commit-node-pop" id="commitNodePop" style="display:none"></div>
+                        <div
+                            class="commit-node-pop"
+                            id="commitNodePop"
+                            style="display: none"
+                        ></div>
                         <button
                             class="ritual-date-btn"
                             id="commitDateBtn"
-                            onclick="document.getElementById('commitDate').showPicker?document.getElementById('commitDate').showPicker():document.getElementById('commitDate').focus()"
+                            onclick="
+                                document.getElementById('commitDate').showPicker
+                                    ? document
+                                          .getElementById('commitDate')
+                                          .showPicker()
+                                    : document
+                                          .getElementById('commitDate')
+                                          .focus()
+                            "
                         >
                             <span id="commitDateLabel">add a date</span>
                         </button>
-                        <input type="date" id="commitDate" class="ritual-date-input" onchange="onDatePicked()" />
+                        <input
+                            type="date"
+                            id="commitDate"
+                            class="ritual-date-input"
+                            onchange="onDatePicked()"
+                        />
                         <div class="end-actions">
-                            <button class="rnav-back" onclick="endToggleNotes()">just take a note</button>
-                            <span style="flex:1"></span>
-                            <button class="reflect-btn" id="endCommitGo" onclick="endCommit()" disabled>commit</button>
+                            <button
+                                class="rnav-back"
+                                onclick="endToggleNotes()"
+                            >
+                                just take a note
+                            </button>
+                            <span style="flex: 1"></span>
+                            <button
+                                class="reflect-btn"
+                                id="endCommitGo"
+                                onclick="endCommit()"
+                                disabled
+                            >
+                                commit
+                            </button>
                         </div>
-                        <div class="end-notes" id="endNotes" style="display:none">
-                            <div class="end-notes-label">notes — you don't have to commit to anything.</div>
-                            <textarea id="endNotesText" class="cmt-notes" placeholder="free notes — anything." oninput="endNotesInput()"></textarea>
+                        <div
+                            class="end-notes"
+                            id="endNotes"
+                            style="display: none"
+                        >
+                            <div class="end-notes-label">
+                                notes — you don't have to commit to anything.
+                            </div>
+                            <textarea
+                                id="endNotesText"
+                                class="cmt-notes"
+                                placeholder="free notes — anything."
+                                oninput="endNotesInput()"
+                            ></textarea>
                         </div>
-                        <button class="end-finish" id="rBackEnd" onclick="finishReflection()">finish without committing</button>
+                        <button
+                            class="end-finish"
+                            id="rBackEnd"
+                            onclick="finishReflection()"
+                        >
+                            finish without committing
+                        </button>
                     </div>
                 </div>
             </div>
@@ -191,7 +420,9 @@
         <div class="milestones-ov" id="milestonesOv">
             <div class="milestones-top">
                 <div class="milestones-title">commitments</div>
-                <button class="milestones-close" onclick="closeMilestones()">✕</button>
+                <button class="milestones-close" onclick="closeMilestones()">
+                    ✕
+                </button>
             </div>
             <div class="milestones-body" id="milestonesBody"></div>
         </div>
@@ -211,8 +442,14 @@
                 <div class="ritual-sub">the day after</div>
                 <div class="ritual-enact-text" id="checkinText"></div>
                 <div class="ritual-actions col">
-                    <button class="hold-btn ok" data-action="yes"><span class="hold-fill"></span><span class="hold-label">hold · yes</span></button>
-                    <button class="hold-btn bad" data-action="no"><span class="hold-fill"></span><span class="hold-label">hold · no</span></button>
+                    <button class="hold-btn ok" data-action="yes">
+                        <span class="hold-fill"></span
+                        ><span class="hold-label">hold · yes</span>
+                    </button>
+                    <button class="hold-btn bad" data-action="no">
+                        <span class="hold-fill"></span
+                        ><span class="hold-label">hold · no</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -221,70 +458,161 @@
         <div class="intro-video-ov" id="introVideoOv">
             <div class="intro-video-inner">
                 <div class="intro-video-label">before you start</div>
-                <div class="intro-video-title">How to design a question that works.</div>
+                <div class="intro-video-title">
+                    How to write a good questions for yourself that increase the
+                    amount of work you do.
+                </div>
                 <div class="intro-video-frame">
                     <div class="intro-video-ph" id="introVideoPh">
                         <div class="intro-play-dot"></div>
                         <span>video coming soon</span>
                     </div>
-                    <iframe id="introVideoFrame" class="intro-video-iframe" src="" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen style="display:none"></iframe>
+                    <iframe
+                        id="introVideoFrame"
+                        class="intro-video-iframe"
+                        src=""
+                        allow="autoplay; fullscreen; picture-in-picture"
+                        allowfullscreen
+                        style="display: none"
+                    ></iframe>
                 </div>
-                <button class="intro-video-skip" onclick="window._dismissIntroVideo()">skip for now →</button>
+                <button
+                    class="intro-video-skip"
+                    onclick="window._dismissIntroVideo()"
+                    aria-label="close"
+                >
+                    ✕
+                </button>
             </div>
         </div>
 
         <!-- VERSION HISTORY PANEL -->
-        <div class="history-panel" id="historyPanel" style="display:none">
+        <div class="history-panel" id="historyPanel" style="display: none">
             <div class="history-header">
                 <span>version history</span>
-                <button class="history-close" onclick="closeHistory()">✕</button>
+                <button class="history-close" onclick="closeHistory()">
+                    ✕
+                </button>
             </div>
             <div class="history-list" id="historyList"></div>
-        </div>
-
-        <!-- FIRST-RUN COMPOUND CARD -->
-        <div class="compound-card" id="compoundCard">
-            <div class="cc-inner">
-                <div class="cc-kicker">how this works</div>
-                <div class="cc-title">Most forks don't matter. A few change everything.</div>
-                <svg class="cc-graph" viewBox="0 0 320 200" aria-hidden="true">
-                    <line x1="20" y1="18" x2="20" y2="180" class="cc-axis"/>
-                    <line x1="20" y1="180" x2="306" y2="180" class="cc-axis"/>
-                    <path d="M20,178 L130,108" class="cc-axis" stroke-width="2"/>
-                    <circle cx="130" cy="108" r="3.5" class="cc-fork-dot"/>
-                    <text x="130" y="98" text-anchor="middle" class="cc-flatlbl">today</text>
-                    <path d="M130,108 L300,120" class="cc-flat"/>
-                    <path d="M130,108 L300,108" class="cc-flat"/>
-                    <path d="M130,108 L300,96" class="cc-flat"/>
-                    <text x="298" y="136" text-anchor="end" class="cc-flatlbl">forks that barely move you</text>
-                    <path id="ccCurve" d="M130,108 C200,104 250,76 300,22" class="cc-curve"/>
-                    <circle r="5" class="cc-dot">
-                        <animateMotion dur="3.4s" repeatCount="indefinite" keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines="0.45 0 1 1">
-                            <mpath href="#ccCurve"/>
-                        </animateMotion>
-                    </circle>
-                    <text x="300" y="16" text-anchor="end" class="cc-ylbl">changes everything</text>
-                </svg>
-                <div class="cc-body">
-                    Every night you're choosing what to spend the question on. Most calls — which task first, whether to skip the gym — barely move you; do them a hundred different ways and you land in roughly the same place. A few — quitting something, starting the hard thing, telling someone the truth — send you somewhere completely different. The tree's job is to help you tell those two apart, on the night they're actually in front of you.
-                </div>
-                <div class="cc-rule">
-                    <span class="cc-iff">the bet&nbsp;⟺</span> make more of the forks that change everything, fewer of the ones that don't
-                </div>
-                <button class="cc-go" onclick="window._dismissCompoundCard()">got it</button>
-            </div>
         </div>
 
         <!-- UPGRADE OVERLAY -->
         <div class="upgrade-ov" id="upgradeOv">
             <div class="auth-box">
                 <div class="auth-logo">Reflect &amp; Commit</div>
-                <div class="pay-price">$99 <small style="font-size:16px;font-weight:600;color:var(--muted2)">/yr</small></div>
-                <div class="auth-sub">You've made 10 commitments — unlock unlimited to keep going.</div>
-                <button class="btn-google pay-btn" onclick="window.open(window._upgradeUrl,'_blank')">Upgrade to continue</button>
-                <button class="pay-alt" onclick="document.getElementById('upgradeOv').classList.remove('on')">maybe later</button>
+                <div class="pay-price">
+                    $99
+                    <small
+                        style="
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: var(--muted2);
+                        "
+                        >/yr</small
+                    >
+                </div>
+                <div class="auth-sub">
+                    You've made 10 commitments — unlock unlimited to keep going.
+                </div>
+                <button
+                    class="btn-google pay-btn"
+                    onclick="window.open(window._upgradeUrl, '_blank')"
+                >
+                    Upgrade to continue
+                </button>
+                <button
+                    class="pay-alt"
+                    onclick="
+                        document
+                            .getElementById('upgradeOv')
+                            .classList.remove('on')
+                    "
+                >
+                    maybe later
+                </button>
             </div>
         </div>
+
+        <!-- PWA INSTALL PROMPT -->
+        <div class="pwa-sheet" id="pwaSheet" style="display:none">
+            <div class="pwa-sheet-inner">
+
+                <!-- Desktop Chrome/Edge: installable as desktop app -->
+                <div id="pwaDesktopInstall" style="display:none">
+                    <div class="pwa-flame">🔥</div>
+                    <div class="pwa-title">Make it a habit</div>
+                    <div class="pwa-sub">Install the app — lives in your dock &amp; taskbar, 1 click to reflect.</div>
+                    <button class="pwa-btn" onclick="triggerPwaInstall()">Install app</button>
+                    <div class="pwa-skip-row">
+                        <button class="pwa-skip" onclick="closePwaSheet()">not now</button>
+                        <button class="pwa-skip pwa-skip-perm" onclick="dismissPwaSheet()">don't ask again</button>
+                    </div>
+                </div>
+
+                <!-- Desktop Safari/Firefox: QR code only -->
+                <div id="pwaDesktopQR" style="display:none">
+                    <div class="pwa-flame">🔥</div>
+                    <div class="pwa-title">Make it a habit</div>
+                    <div class="pwa-sub">Scan with your phone camera to install, or open in Chrome/Edge to install on desktop.</div>
+                    <div class="pwa-qr">
+                        <img id="pwaQrImg" src="" alt="QR code" width="160" height="160" style="display:block;border-radius:8px;" />
+                    </div>
+                    <div class="pwa-url" id="pwaUrl"></div>
+                    <div class="pwa-skip-row">
+                        <button class="pwa-skip" onclick="closePwaSheet()">not now</button>
+                        <button class="pwa-skip pwa-skip-perm" onclick="dismissPwaSheet()">don't ask again</button>
+                    </div>
+                </div>
+
+                <!-- Mobile Android Chrome: one-button install -->
+                <div id="pwaAndroid" style="display:none">
+                    <div class="pwa-flame">🔥</div>
+                    <div class="pwa-title">Make it a habit</div>
+                    <div class="pwa-sub">Add to your home screen — 1 tap to reflect, no App Store needed.</div>
+                    <button class="pwa-btn" onclick="triggerPwaInstall()">Add to Home Screen</button>
+                    <div class="pwa-skip-row">
+                        <button class="pwa-skip" onclick="closePwaSheet()">not now</button>
+                        <button class="pwa-skip pwa-skip-perm" onclick="dismissPwaSheet()">don't ask again</button>
+                    </div>
+                </div>
+
+                <!-- Mobile iOS Safari: step-by-step -->
+                <div id="pwaIOS" style="display:none">
+                    <div class="pwa-flame">🔥</div>
+                    <div class="pwa-title">Make it a habit</div>
+                    <div class="pwa-sub">Add to your home screen for 1-tap access.</div>
+                    <div class="pwa-ios-steps">
+                        <div class="pwa-ios-step">
+                            <span class="pwa-ios-n">1</span>
+                            <span>Tap <strong>Share</strong> <span class="pwa-share-icon">⬆</span> at the bottom of Safari</span>
+                        </div>
+                        <div class="pwa-ios-step">
+                            <span class="pwa-ios-n">2</span>
+                            <span>Tap <strong>Add to Home Screen</strong></span>
+                        </div>
+                        <div class="pwa-ios-step">
+                            <span class="pwa-ios-n">3</span>
+                            <span>Tap <strong>Add</strong></span>
+                        </div>
+                    </div>
+                    <div class="pwa-ios-arrow">↓ tap Share below ↓</div>
+                    <div class="pwa-skip-row">
+                        <button class="pwa-skip" onclick="closePwaSheet()">got it</button>
+                        <button class="pwa-skip pwa-skip-perm" onclick="dismissPwaSheet()">don't ask again</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- FAB: always-visible app install button -->
+        <button class="pwa-fab" id="pwaFab" onclick="openPwaSheet()" aria-label="Get the app" title="Get the app" style="display:none">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+                <rect x="5" y="2" width="14" height="20" rx="3" stroke="currentColor" stroke-width="1.8"/>
+                <circle cx="12" cy="18" r="1.2" fill="currentColor"/>
+            </svg>
+        </button>
 
         <!-- FIREBASE -->
         <script type="module" src="firebase-init.js"></script>
@@ -292,6 +620,29 @@
         <script src="js/editor-canvas.js"></script>
         <script src="js/run-engine.js"></script>
         <script src="js/outcomes-settings.js"></script>
-        <script src="js/onboarding.js"></script>
+        <script src="js/onboarding.js?v=2"></script>
+        <script src="js/streak.js"></script>
+        <script src="js/pwa-install.js"></script>
+        <script>
+            // Wire help icon — defined inline so it's never blocked by script load/cache
+            (function () {
+                var LOOM_EMBED =
+                    "https://www.loom.com/embed/7c87f4d8f6c7458d9e5896017e509e9a";
+                document
+                    .getElementById("helpIconBtn")
+                    .addEventListener("click", function () {
+                        var ov = document.getElementById("introVideoOv");
+                        if (!ov) return;
+                        var ph = document.getElementById("introVideoPh");
+                        var fr = document.getElementById("introVideoFrame");
+                        if (ph) ph.style.display = "none";
+                        if (fr) {
+                            fr.src = LOOM_EMBED;
+                            fr.style.display = "";
+                        }
+                        ov.classList.add("on");
+                    });
+            })();
+        </script>
     </body>
 </html>

@@ -700,6 +700,65 @@ body.has-banner .top-bar {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+/* ── Duolingo-style streak widget ─────────────────────────── */
+.streak-pill {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: default;
+    user-select: none;
+    flex-shrink: 0;
+}
+.streak-flame-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 26px;
+}
+.streak-flame-svg {
+    width: 22px;
+    height: 26px;
+    transition: transform 0.15s;
+}
+.streak-pill:hover .streak-flame-svg {
+    transform: scale(1.1);
+}
+/* Active (orange) state */
+.streak-active .streak-flame-outer { fill: #FF9600; }
+.streak-active .streak-flame-inner { fill: #FFC800; }
+.streak-active .streak-num         { color: #FF9600; }
+/* Dead (gray) state */
+.streak-dead .streak-flame-outer   { fill: #3a3a3a; }
+.streak-dead .streak-flame-inner   { fill: #4a4a4a; }
+.streak-dead .streak-num           { color: var(--muted); }
+
+.streak-num {
+    font-family: var(--fh);
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1;
+    min-width: 14px;
+    transition: color 0.2s;
+}
+/* Done-today checkmark badge */
+.streak-check {
+    position: absolute;
+    bottom: -2px;
+    right: -4px;
+    width: 12px;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.streak-check svg {
+    width: 12px;
+    height: 12px;
+}
+/* ─────────────────────────────────────────────────────────── */
 .auth-avatar {
     width: 26px;
     height: 26px;
@@ -1240,7 +1299,88 @@ body.has-banner .top-bar {
     font-family: var(--fh);
 }
 
-/* ── intro video overlay (shown once on first entry) ─────────────────────────────── */
+/* ── help icon (? button next to logo) ───────────────────────────────────────────── */
+.help-icon-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    margin-left: 6px;
+}
+.help-icon-btn {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid var(--muted2, #888);
+    background: transparent;
+    color: var(--muted2, #888);
+    font-size: 11px;
+    font-family: var(--fh, sans-serif);
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: border-color 0.15s, color 0.15s;
+    outline: none;
+}
+.help-icon-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.help-tooltip {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surf2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 7px 11px;
+    font-family: var(--fh);
+    font-size: 12px;
+    color: var(--muted3);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+}
+.help-tooltip::before {
+    content: "";
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-bottom-color: var(--border2);
+}
+.help-tooltip::after {
+    content: "";
+    position: absolute;
+    bottom: calc(100% - 1px);
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-bottom-color: var(--surf2);
+}
+.help-icon-wrap:hover .help-tooltip,
+.help-icon-wrap.tooltip-show .help-tooltip {
+    display: block;
+}
+.help-icon-wrap.tooltip-show .help-tooltip {
+    animation: tooltip-pulse 0.3s ease both;
+}
+@keyframes tooltip-pulse {
+    from { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── intro video overlay (opened via help icon) ───────────────────────────────────── */
 .intro-video-ov {
     position: fixed;
     inset: 0;
@@ -1256,6 +1396,7 @@ body.has-banner .top-bar {
     display: flex;
 }
 .intro-video-inner {
+    position: relative;
     width: 100%;
     max-width: 580px;
     display: flex;
@@ -1325,149 +1466,21 @@ body.has-banner .top-bar {
     border: 0;
 }
 .intro-video-skip {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
     background: none;
     border: none;
-    color: var(--muted);
-    font-family: var(--fh);
-    font-weight: 700;
-    font-size: 12px;
+    color: var(--danger);
+    font-size: 22px;
+    line-height: 1;
     cursor: pointer;
-    padding: 8px 4px;
-    letter-spacing: 0.04em;
+    padding: 6px;
+    z-index: 10000;
 }
 .intro-video-skip:hover {
-    color: var(--muted3);
+    opacity: 0.75;
 }
-/* ── first-run: why reflections compound ─────────────────────────────────────────── */
-.compound-card {
-    position: fixed;
-    inset: 0;
-    z-index: 500;
-    background: rgba(0, 0, 0, 0.86);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    -webkit-backdrop-filter: blur(2px);
-    backdrop-filter: blur(2px);
-}
-.compound-card.on {
-    display: flex;
-}
-.cc-inner {
-    width: 100%;
-    max-width: 430px;
-    background: var(--surf);
-    border: 1px solid var(--border2);
-    border-radius: 16px;
-    padding: 26px 24px 22px;
-    text-align: center;
-    box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.7);
-}
-.cc-kicker {
-    font-family: var(--fmono);
-    font-size: 11px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--accent-h);
-    margin-bottom: 8px;
-}
-.cc-title {
-    font-family: var(--fh);
-    font-weight: 800;
-    font-size: 20px;
-    line-height: 1.2;
-    color: var(--text);
-}
-.cc-graph {
-    width: 100%;
-    max-width: 320px;
-    height: auto;
-    margin: 18px auto 4px;
-    display: block;
-}
-.cc-axis {
-    stroke: var(--border3);
-    stroke-width: 1;
-}
-.cc-flat {
-    stroke: var(--muted2);
-    stroke-width: 1.5;
-    stroke-dasharray: 3 4;
-    fill: none;
-}
-.cc-flatlbl {
-    fill: var(--muted2);
-    font-family: var(--fmono);
-    font-size: 8px;
-}
-.cc-curve {
-    stroke: var(--accent-h);
-    stroke-width: 2.5;
-    fill: none;
-    stroke-linecap: round;
-    filter: drop-shadow(0 0 5px rgba(244, 255, 94, 0.35));
-}
-.cc-dot {
-    fill: var(--accent-h);
-    filter: drop-shadow(0 0 5px rgba(244, 255, 94, 0.85));
-}
-.cc-fork-dot {
-    fill: var(--text);
-}
-.cc-ylbl,
-.cc-xlbl {
-    fill: var(--muted2);
-    font-family: var(--fmono);
-    font-size: 8px;
-}
-.cc-body {
-    font-family: var(--fserif);
-    font-size: 14.5px;
-    line-height: 1.55;
-    color: var(--muted3);
-    margin-top: 6px;
-}
-.cc-body b {
-    color: var(--text);
-    font-weight: 600;
-}
-.cc-rule {
-    margin-top: 14px;
-    padding: 10px 12px;
-    background: var(--accent-bg);
-    border: 1px solid var(--accent-dim);
-    border-radius: 9px;
-    font-family: var(--fsans);
-    font-size: 12.5px;
-    color: var(--accent-h);
-    line-height: 1.4;
-}
-.cc-rule i {
-    font-style: normal;
-    color: #fff;
-}
-.cc-iff {
-    font-family: var(--fmono);
-    font-weight: 500;
-}
-.cc-go {
-    margin-top: 18px;
-    width: 100%;
-    padding: 13px;
-    border: none;
-    border-radius: 9px;
-    background: var(--accent-h);
-    color: #0a0a0a;
-    font-family: var(--fh);
-    font-weight: 800;
-    font-size: 14px;
-    cursor: pointer;
-}
-.cc-go:hover {
-    filter: brightness(1.06);
-}
-
 /* upgrade overlay */
 .upgrade-ov {
     position: fixed;
@@ -1922,3 +1935,168 @@ body.has-banner .top-bar {
     color: var(--text);
 }
 /* Removed stray trailing curly brace here */
+
+/* ── PWA install sheet ───────────────────────────────────────────────────────── */
+.pwa-sheet {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 9999;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+.pwa-sheet-inner {
+    background: var(--surf);
+    border: 1px solid var(--border2);
+    border-radius: 20px 20px 0 0;
+    padding: 28px 28px 40px;
+    width: 100%;
+    max-width: 480px;
+    text-align: center;
+    animation: pwa-slide-up 0.28s cubic-bezier(0.22,1,0.36,1) both;
+}
+@keyframes pwa-slide-up {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+}
+.pwa-flame {
+    font-size: 40px;
+    margin-bottom: 12px;
+    line-height: 1;
+}
+.pwa-title {
+    font-family: var(--fh);
+    font-weight: 800;
+    font-size: 20px;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+.pwa-sub {
+    font-size: 13px;
+    color: var(--muted3);
+    line-height: 1.55;
+    margin-bottom: 24px;
+}
+.pwa-btn {
+    display: block;
+    width: 100%;
+    padding: 15px;
+    background: var(--accent);
+    color: #1a0d05;
+    font-family: var(--fh);
+    font-weight: 800;
+    font-size: 15px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: filter 0.15s;
+    margin-bottom: 12px;
+}
+.pwa-btn:hover { filter: brightness(1.08); }
+.pwa-skip-row {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-top: 4px;
+}
+.pwa-skip {
+    background: none;
+    border: none;
+    color: var(--muted2);
+    font-family: var(--fmono);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+.pwa-skip:hover { color: var(--text); }
+.pwa-skip-perm { color: var(--muted); font-size: 11px; }
+/* iOS steps */
+.pwa-ios-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    text-align: left;
+    margin-bottom: 20px;
+}
+.pwa-ios-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.45;
+}
+.pwa-ios-n {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #1a0d05;
+    font-family: var(--fh);
+    font-weight: 800;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.pwa-share-icon {
+    font-size: 16px;
+    vertical-align: middle;
+}
+.pwa-ios-arrow {
+    font-family: var(--fmono);
+    font-size: 12px;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    margin-bottom: 16px;
+    animation: pulse-arrow 1.8s ease-in-out infinite;
+}
+@keyframes pulse-arrow {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+}
+
+.pwa-qr {
+    margin: 12px auto 12px;
+    border-radius: 10px;
+    overflow: hidden;
+    width: 160px;
+    height: 160px;
+    background: var(--surf2);
+}
+.pwa-url {
+    font-family: var(--fmono);
+    font-size: 11px;
+    color: var(--muted2);
+    letter-spacing: 0.04em;
+    margin-bottom: 16px;
+}
+
+/* ── PWA FAB ────────────────────────────────────────────────────────────────── */
+.pwa-fab {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--surf2);
+    border: 1px solid var(--border2);
+    color: var(--muted3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 200;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+.pwa-fab:hover {
+    background: var(--surf3);
+    color: var(--text);
+    transform: scale(1.08);
+}

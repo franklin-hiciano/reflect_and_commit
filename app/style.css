@@ -380,7 +380,7 @@ body.has-banner .corner-btn.tr {
     color: #a78bfa;
 }
 .h-opt {
-    color: #c9a9a6;
+    color: var(--accent);
 }
 /* ── version history button + panel ──────────────────────────────────────────────── */
 .history-panel {
@@ -891,8 +891,16 @@ body.has-banner .top-bar {
 }
 
 @media (max-width: 680px) {
+    /* "Reflect & Commit" stays, but truncates with an ellipsis instead of taking
+       over the row — min-width:0 is what lets a flex item actually shrink past its
+       text width so overflow/ellipsis can kick in. */
     .top-bar .brand {
-        display: none;
+        min-width: 0;
+        max-width: 34vw;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 13px;
     }
     /* pfp + username drop off on mobile; streak moves left of the help/reflect pair,
        so reflect ends up to the right of the streak instead of the left */
@@ -913,6 +921,18 @@ body.has-banner .top-bar {
     }
     .rcard-prompt {
         font-size: 22px;
+    }
+
+    /* second bar (undo/redo/history + prompt count) moves to the bottom of the
+       screen on mobile — the editor content grows to fill the space above it, so
+       reordering it after .edit-workspace in the flex column is enough. */
+    .action-bar {
+        order: 3;
+        border-bottom: none;
+        border-top: 1px solid var(--border2);
+    }
+    .edit-workspace {
+        order: 2;
     }
 }
 
@@ -1941,23 +1961,10 @@ body.has-banner .top-bar {
     text-underline-offset: 3px;
 }
 @keyframes reflectShake {
-    10%,
-    90% {
-        transform: translateX(-1px);
-    }
-    20%,
-    80% {
-        transform: translateX(2px);
-    }
-    30%,
-    50%,
-    70% {
-        transform: translateX(-4px);
-    }
-    40%,
-    60% {
-        transform: translateX(4px);
-    }
+    10%, 90% { transform: translateX(-1px); }
+    20%, 80% { transform: translateX(2px); }
+    30%, 50%, 70% { transform: translateX(-4px); }
+    40%, 60% { transform: translateX(4px); }
 }
 .reflect-btn.shake {
     animation: reflectShake 0.4s;
@@ -2041,9 +2048,7 @@ body.has-banner .top-bar {
     white-space: nowrap;
     pointer-events: none;
     opacity: 0;
-    transition:
-        opacity 0.12s,
-        transform 0.12s;
+    transition: opacity 0.12s, transform 0.12s;
     z-index: 50;
 }
 .help-btn-wrap:hover .help-tip {
@@ -2131,24 +2136,22 @@ body.has-banner .top-bar {
     z-index: 710;
     width: 38px;
     height: 38px;
-    border-radius: 50%;
+    background: none;
     /* deliberately a fixed red, not var(--accent) — the app's theme layers reassign
        --accent to warm ember orange, but a close button reads clearest as true red */
-    background: #e5484d;
-    color: #fff;
+    color: #e5484d;
     border: none;
     font-family: var(--fh);
     font-weight: 800;
-    font-size: 16px;
+    font-size: 20px;
     line-height: 1;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
 }
 .help-close:hover {
-    filter: brightness(1.12);
+    filter: brightness(1.25);
 }
 @media (max-width: 560px) {
     .help-close {
@@ -2190,12 +2193,8 @@ body.has-banner .top-bar {
     animation: habitSheetUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 @keyframes habitSheetUp {
-    from {
-        transform: translateY(100%);
-    }
-    to {
-        transform: translateY(0);
-    }
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
 }
 .habit-handle {
     width: 36px;
@@ -2330,11 +2329,15 @@ body.has-banner .top-bar {
     color: var(--accent-h);
 }
 .help-fab {
+    /* smaller than the habit-fab — it's just a "?" glyph, no icon to fill the circle,
+       so the full 46px size read as oversized */
+    width: 34px;
+    height: 34px;
     /* circle outline matches the "?" glyph color, same rule as the top-bar version */
     border-color: var(--muted3);
     font-family: var(--fh);
     font-weight: 700;
-    font-size: 16px;
+    font-size: 13px;
     line-height: 1;
 }
 @media (max-width: 480px) {

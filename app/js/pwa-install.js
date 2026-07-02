@@ -1,11 +1,12 @@
 // ── "Make it a habit": install-PWA popup ────────────────────────────────────────────
 // Shows automatically after a commitment (called from run-engine.js's endCommit, chained
 // through the compound card in onboarding.js so they never stack) — and any time via the
-// floating button in the bottom-right corner.
-// Desktop: a QR code to the install page below. Mobile: a real "Install app" button
-// when the browser can prompt natively (beforeinstallprompt fired); otherwise — e.g.
-// iOS Safari, which never fires that event — plain "Add to Home Screen" instructions,
-// since there's no way to make those browsers show their own install prompt on demand.
+// floating button in the bottom-left corner.
+// Same screen everywhere — a QR code + link to the install page. Mobile additionally
+// gets a real "Get app" button when the browser can prompt natively
+// (beforeinstallprompt fired); browsers that never fire that event (e.g. iOS Safari)
+// just get the QR/link like everyone else, since there's no on-demand install prompt
+// to offer there.
 //
 // Set the real install page here once it's live:
 const _INSTALL_URL = "https://reflectandcommit.com/install";
@@ -93,44 +94,25 @@ window._showHabitPopup = function () {
   if (pw && pw.classList.contains("on")) return;
 
   const native = document.getElementById("habitInstallNative");
-  const manual = document.getElementById("habitInstallManual");
-  const manualSteps = document.getElementById("habitManualSteps");
-  const qrWrap = document.getElementById("habitQrWrap");
   const qrUrlEl = document.getElementById("habitQrUrl");
-  if (native) native.style.display = "none";
-  if (manual) manual.style.display = "none";
-  if (qrWrap) qrWrap.style.display = "none";
 
   const mobile =
     typeof isMobile === "function" ? isMobile() : window.innerWidth <= 680;
 
-  if (mobile && _deferredInstallPrompt) {
-    // the browser is offering to prompt for us — use it directly, no QR needed
-    if (native) native.style.display = "";
-  } else if (mobile) {
-    // on this phone the browser won't hand us a native prompt — a QR to scan on the
-    // same device you're already holding makes no sense, so give manual steps instead
-    if (manual) manual.style.display = "";
-    if (manualSteps) {
-      const ua = navigator.userAgent || "";
-      manualSteps.textContent = /iphone|ipad|ipod/i.test(ua)
-        ? 'Tap the Share icon, then "Add to Home Screen."'
-        : 'Open your browser menu and tap "Add to Home screen" or "Install app."';
-    }
-  } else {
-    // desktop — hand the install flow to the phone via QR
-    if (qrWrap) qrWrap.style.display = "";
-    if (qrUrlEl) qrUrlEl.textContent = _INSTALL_URL.replace(/^https?:\/\//, "");
-    renderHabitQR();
-  }
+  // the native "Get app" button only appears on mobile browsers that can actually
+  // offer a real install prompt — everyone else (desktop, and mobile browsers with
+  // no beforeinstallprompt, e.g. iOS Safari) just gets the QR/link below
+  if (native) native.style.display = mobile && _deferredInstallPrompt ? "" : "none";
 
-  ov.classList.add("on");
-  if (!ov._bound) {
-    ov._bound = true;
-    ov.addEventListener("click", (e) => {
-      if (e.target === ov) window._dismissHabitPopup();
-    });
+  if (qrUrlEl) {
+    qrUrlEl.textContent = _INSTALL_URL.replace(/^https?:\/\//, "");
+    qrUrlEl.href = _INSTALL_URL;
   }
+  renderHabitQR();
+
+  // deliberately no outside-click or Escape dismissal here — "not now" / "do not ask
+  // again" are the only way out, so the choice is always an explicit one.
+  ov.classList.add("on");
 };
 
 function renderHabitQR() {
@@ -142,6 +124,3 @@ function renderHabitQR() {
   el.innerHTML = '<img alt="scan to install" width="168" height="168" src="' + src + '">';
 }
 
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") window._dismissHabitPopup();
-});

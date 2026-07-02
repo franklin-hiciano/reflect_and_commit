@@ -1,13 +1,18 @@
-// ── Parser (indentation-based) + Editor ���─────────────────────────────────────────────
-// Pure indented tree — no routing syntax. Indentation depth determines structure.
-// Level-0 lines are question nodes. Under a question:
-//   1 child  → text-response, continues to that child question
-//   2+ children → multiple-choice; children are option labels
+// ── Parser (indentation-based) + Editor ───────────────────────────────────────────────
+// Pure indented tree — no routing syntax. Indentation depth encodes BRANCHING only.
+// Level-0 lines are the base spine: consecutive level-0 lines chain together straight
+// down, no indent needed — the first one is the tree's start, and each next line is
+// simply "what's asked after the previous one," until a line has indented children.
+//   1 child  → text-response, continues to that child question (works at any depth —
+//              this is also how the old single-indent style still parses, unchanged)
+//   2+ children → multiple-choice; children are option labels, indented once under the
+//     question that asks them
 //     Each option label's children determine its next question:
 //       0 children  → option leads to commit
 //       1 child     → that child is the next question
-//       2+ children → option label is itself a question (recursive)
-// Leaf questions (no children) auto-commit.
+//       2+ children → option label is itself a question (recursive branch-within-branch)
+// Leaf questions (no children, and — for level-0 lines only — no next spine line either)
+// auto-commit.
 
 const LH = 21,
   PAD = 14;
@@ -59,7 +64,7 @@ function parseIndented(src) {
   const lineTypes = {}; // rawLine → 'question' | 'option' | 'continuation'
   const errors = []; // { rawLine, text, kind: 'number-title' }
 
-  function processQuestion(idx) {
+  function processQuestion(idx, fallbackNext) {
     const item = lineItems[idx];
     if (item.level > 0 && globalNodes.has(item.text)) {
       return item.text;
@@ -80,24 +85,33 @@ function parseIndented(src) {
     let nodeData;
 
     if (ch.length === 0) {
-      // Leaf → auto-commit
-      nodeData = {
-        title: item.text,
-        type: "text",
-        def: "done",
-        opts: [],
-        refs: [],
-      };
-    } else if (ch.length === 1) {
-      // Single child → text response → next question
-      lineTypes[lineItems[ch[0]].rawLine] = "continuation";
-      const nextId = processQuestion(ch[0]);
+      // No indented children — for a level-0 spine line, that doesn't necessarily mean
+      // "done": the next line of the spine (if any) is its continuation, chained with no
+      // indentation needed. fallbackNext supplies that; leaf/auto-commit only when
+      // there's truly nothing left (deepest branch content, or end of the spine).
+      const nextId = fallbackNext ? fallbackNext() : "done";
       nodeData = {
         title: item.text,
         type: "text",
         def: nextId,
         opts: [],
         refs: [],
+        rawLine: item.rawLine,
+      };
+    } else if (ch.length === 1) {
+      // Single child → text response → next question. Propagate fallbackNext through —
+      // this hop didn't branch, it's still the same logical chain, so if the child ALSO
+      // turns out to be a dead end, the spine's next line (if any) should pick up there
+      // too rather than silently terminating.
+      lineTypes[lineItems[ch[0]].rawLine] = "continuation";
+      const nextId = processQuestion(ch[0], fallbackNext);
+      nodeData = {
+        title: item.text,
+        type: "text",
+        def: nextId,
+        opts: [],
+        refs: [],
+        rawLine: item.rawLine,
       };
     } else {
       // Multiple children → option labels (multiple choice)
@@ -130,6 +144,7 @@ function parseIndented(src) {
         opts,
         def: null,
         refs: [],
+        rawLine: item.rawLine,
       };
     }
 
@@ -137,10 +152,18 @@ function parseIndented(src) {
     return id;
   }
 
-  // Process all root-level (level 0) nodes
+  // The base spine (level-0 lines) chains straight down in document order — no
+  // indentation needed between spine steps. Only branching (2+ indented children under
+  // any line, at any depth) still requires indenting.
+  const rootIdxs = [];
   lineItems.forEach((item, i) => {
-    if (item.level === 0) processQuestion(i);
+    if (item.level === 0) rootIdxs.push(i);
   });
+  function processSpine(pos) {
+    if (pos >= rootIdxs.length) return "done";
+    return processQuestion(rootIdxs[pos], () => processSpine(pos + 1));
+  }
+  processSpine(0);
 
   // Remove null placeholders (unreachable reserved slots)
   Object.keys(nodes).forEach((k) => {
@@ -185,6 +208,10 @@ function lnumsEl() {
 function lhl() {
   return document.getElementById("lhl");
 }
+function hideLineHl() {
+  const bar = lhl();
+  if (bar) bar.style.display = "none";
+}
 
 function updateEditor() {
   const t = ta();
@@ -212,7 +239,8 @@ function syncScroll() {
     h.scrollLeft = t.scrollLeft;
   }
   if (ln) ln.scrollTop = t.scrollTop;
-  if (_hoverLineIdx >= 0) _positionHoverStrip();
+  if (_hoverLineIdx >= 0) renderHoverBtns(false);
+  if (window._ngRepositionLineHl) window._ngRepositionLineHl();
 }
 
 function bindEditorEvents() {
@@ -222,7 +250,10 @@ function bindEditorEvents() {
 
   t.addEventListener("scroll", syncScroll);
   t.addEventListener("input", () => window._onSrcChange(true));
-  t.addEventListener("click", syncScroll);
+  t.addEventListener("click", () => {
+    hideLineHl();
+    syncScroll();
+  });
   t.addEventListener("keyup", syncScroll);
 
   t.addEventListener("keydown", (e) => {
@@ -373,12 +404,22 @@ function restoreHistory(idx) {
   closeHistory();
 }
 
+// ── recall defaults: every node recalls its OWN past answers unless the user has
+// explicitly turned that off. An absent key means "never decided" → defaults to
+// self-recall; an explicit empty array means "turned off" and stays off. This is
+// the one place that distinction gets resolved, so the gutter button, the graph's
+// recall icon, and the reflection screen's recall panel all agree. ─────────────────
+window._effectiveRecallSources = function (title) {
+  const map = window._recallMap || {};
+  const sources = map[title];
+  return sources === undefined ? [title] : sources;
+};
+
 // ── Hover buttons layer (editor) ────────────────────────────────────────────────────
 // ── Hover & Touch Recall Layer (Desktop + Mobile) ───────────────────────────────────
 // ── Hover & Touch Recall Layer (Desktop + Mobile) ───────────────────────────────────
 let _hoverLineIdx = -1;
 let _hoverStripEl = null;
-let _firstNodeCleared = false; // Tracks if the user intentionally turned off the default first node recall
 
 function initRecallListeners() {
   const lnums = document.getElementById("lnums");
@@ -529,14 +570,7 @@ function renderHoverBtns(isExplicitClick = false) {
     strip.style.width = "39px";
   }
 
-  const recallMap = window._recallMap || {};
-  let recalls = recallMap[lineText] || [];
-
-  // Rule: If it's the first line node, default to active unless explicitly cleared by the user
-  if (li === 0 && !recallMap.hasOwnProperty(lineText) && !_firstNodeCleared) {
-    recalls = ["Default Node Context"];
-    recallMap[lineText] = recalls;
-  }
+  const recalls = window._effectiveRecallSources(lineText);
 
   const btn = document.createElement("button");
   btn.style.pointerEvents = "auto";
@@ -577,9 +611,7 @@ function renderHoverBtns(isExplicitClick = false) {
   const handleAction = (e) => {
     if (e && e.stopPropagation) e.stopPropagation();
     if (isOn) {
-      // Turning it OFF
-      if (li === 0) _firstNodeCleared = true; // Block default re-activation on redraw
-
+      // Turning it OFF — persists as an explicit off, not just "back to unset"
       if (window.clearRecalls) {
         window.clearRecalls(lineText);
       } else {
@@ -673,14 +705,13 @@ function openRecallDropdown(nodeTitle, anchor, currentRecalls) {
     }
   }
 
+  // fixed + viewport coords so this works from any anchor — the text editor gutter,
+  // or a node card over in the graph panel — without caring which container it's in.
   const anchorRect = anchor.getBoundingClientRect();
-  const body = document.getElementById("editorBody") || document.body;
-  const bodyRect = body.getBoundingClientRect();
-  dd.style.position = "absolute";
-  dd.style.top = anchorRect.bottom - bodyRect.top + 4 + "px";
-  dd.style.left = anchorRect.left - bodyRect.left + "px";
-  body.style.position = "relative";
-  body.appendChild(dd);
+  dd.style.position = "fixed";
+  dd.style.top = anchorRect.bottom + 4 + "px";
+  dd.style.left = anchorRect.left + "px";
+  document.body.appendChild(dd);
   _recallDropEl = dd;
 
   setTimeout(() => {
@@ -706,17 +737,23 @@ function toggleRecall(nodeTitle, sourceId) {
   }
   if (window._writeRecall && typeof _activeTreeId !== "undefined")
     window._writeRecall(_activeTreeId, map);
+  if (window._renderNodeGraph) window._renderNodeGraph();
 }
 
 function clearRecalls(nodeTitle) {
   const map = (window._recallMap = window._recallMap || {});
-  delete map[nodeTitle];
+  // an empty array is a deliberate, persisted "off" — distinct from an absent key,
+  // which defaults to self-recall. deleting the key here would silently turn it
+  // back on the next time this node renders.
+  map[nodeTitle] = [];
   if (window._writeRecall && typeof _activeTreeId !== "undefined")
     window._writeRecall(_activeTreeId, map);
+  if (window._renderNodeGraph) window._renderNodeGraph();
 }
 
 // ── _onSrcChange ─────────────────────────────────────────────────────────────────────
 window._onSrcChange = function (write = true) {
+  hideLineHl();
   const t = ta();
   const src = t ? t.value : "";
   if (typeof _activeSrc !== "undefined") _activeSrc = src;
@@ -745,13 +782,14 @@ window._onSrcChange = function (write = true) {
           : "");
       pst.className = "pstatus err";
     } else {
-      const k = Object.keys(nodes).length;
-      pst.textContent = k ? k + (k === 1 ? " prompt" : " prompts") : "—";
-      pst.className = "pstatus" + (k ? " ok" : "");
+      // no error to flag — the bar stays quiet rather than showing a prompt count
+      pst.textContent = "";
+      pst.className = "pstatus";
     }
   }
 
   updateEditor();
+  if (window._renderNodeGraph) window._renderNodeGraph();
 };
 
 (function () {

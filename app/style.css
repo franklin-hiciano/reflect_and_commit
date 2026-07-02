@@ -65,6 +65,33 @@ body {
 .auth-screen.hidden {
     display: none;
 }
+
+/* ── app loading gate — sits over everything between sign-in and first content load ── */
+.app-loading-ov {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 998;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+.app-loading-ov.on {
+    display: flex;
+}
+.app-loading-spin {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    animation: appLoadingSpin 0.7s linear infinite;
+}
+@keyframes appLoadingSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
 .auth-box {
     background: var(--surf);
     border: 1px solid var(--border2);
@@ -78,8 +105,13 @@ body {
     font-family: var(--fh);
     font-weight: 800;
     font-size: 24px;
-    color: var(--accent);
+    color: #fff;
     margin-bottom: 6px;
+}
+/* "Reflect & Commit" wordmark — white, with just the ampersand in accent orange */
+.auth-logo .amp,
+.top-bar .brand .amp {
+    color: var(--accent);
 }
 .auth-sub {
     font-size: 11px;
@@ -246,19 +278,6 @@ body.has-banner .corner-btn.tr {
 .recall-txt {
     color: var(--muted3);
 }
-/* ── second bar: undo/redo/history on the left, prompt count on the right ────────── */
-.action-bar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 4px 14px;
-    border-bottom: 1px solid var(--border2);
-    background: var(--surf);
-    flex-shrink: 0;
-}
-.action-bar .pstatus {
-    flex-shrink: 0;
-}
 .pstatus {
     font-size: 10px;
     color: var(--muted);
@@ -269,6 +288,19 @@ body.has-banner .corner-btn.tr {
 }
 .pstatus.err {
     color: var(--danger);
+}
+/* ── pstatus in editor body — quiet unless flagging a number-title error ──────────── */
+.edit-text > .pstatus {
+    padding: 4px 12px;
+    font-size: 10px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    display: block;
+}
+/* nothing to say → collapse to nothing, so there's no empty strip sitting at the
+   bottom of the editor when there's no error to show */
+.edit-text > .pstatus:empty {
+    display: none;
 }
 .edit-workspace {
     flex: 1;
@@ -377,10 +409,10 @@ body.has-banner .corner-btn.tr {
     background: rgba(224, 121, 63, 0.28);
 }
 .h-title {
-    color: #a78bfa;
+    color: #fff;
 }
 .h-opt {
-    color: var(--accent);
+    color: #fff;
 }
 /* ── version history button + panel ──────────────────────────────────────────────── */
 .history-panel {
@@ -627,6 +659,140 @@ body.has-banner .corner-btn.tr {
     flex-direction: column;
     background: var(--bg);
 }
+
+/* ── split: node graph (left) + text editor (right) — always both open on desktop ── */
+.editor-split {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: row;
+}
+.node-graph-panel {
+    flex: 1;
+    min-width: 0;
+    border-right: 1px solid var(--border);
+    background: var(--bg);
+    position: relative;
+    overflow: hidden;
+    cursor: grab;
+    touch-action: none;
+}
+.node-graph-panel:active {
+    cursor: grabbing;
+}
+.ng-content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
+}
+.ng-node {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    background: var(--surf2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    font-family: var(--fmono);
+    font-size: 11px;
+    color: var(--text);
+    cursor: pointer;
+    user-select: none;
+    transition: border-color 0.1s, background 0.1s;
+}
+.ng-node:hover {
+    border-color: var(--accent-dim);
+    background: var(--surf3);
+}
+.ng-type-icon {
+    flex-shrink: 0;
+    display: flex;
+    color: var(--muted2);
+}
+.ng-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ng-plus {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid var(--border3);
+    background: var(--surf);
+    color: var(--muted2);
+    font-family: var(--fmono);
+    font-size: 11px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    transition: all 0.1s;
+}
+.ng-plus:hover {
+    border-color: var(--accent-dim);
+    color: var(--accent-h);
+    background: var(--accent-bg);
+}
+.ng-edge {
+    fill: none;
+    stroke: var(--border3);
+    stroke-width: 1.4;
+}
+.ng-drag-line {
+    stroke: var(--accent);
+    stroke-width: 1.6;
+    stroke-dasharray: 4 3;
+}
+.ng-recall {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid var(--border3);
+    background: var(--surf);
+    color: var(--muted2);
+    font-family: var(--fmono);
+    font-size: 11px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.1s;
+}
+.ng-recall.on {
+    border-color: var(--accent-dim);
+    color: var(--accent-h);
+    background: var(--accent-bg);
+}
+.ng-recall:hover {
+    border-color: var(--accent-dim);
+    color: var(--accent-h);
+}
+.ng-naming {
+    position: absolute;
+    z-index: 20;
+    transform: translateY(-50%);
+}
+.ng-naming input {
+    width: 184px;
+    height: 26px;
+    padding: 0 8px;
+    background: var(--surf3);
+    border: 1px solid var(--accent-dim);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--fmono);
+    font-size: 11px;
+    outline: none;
+}
 body.has-banner .top-bar {
     margin-top: var(--banner-h);
 }
@@ -635,7 +801,7 @@ body.has-banner .top-bar {
     align-items: center;
     gap: 10px;
     padding: 10px 14px;
-    border-bottom: 1px solid var(--border2);
+    border-bottom: none;
     background: var(--surf);
     flex-shrink: 0;
 }
@@ -643,7 +809,7 @@ body.has-banner .top-bar {
     font-family: var(--fh);
     font-weight: 800;
     font-size: 15px;
-    color: var(--accent);
+    color: #fff;
 }
 .top-bar .account {
     display: flex;
@@ -890,6 +1056,27 @@ body.has-banner .top-bar {
     color: var(--muted3);
 }
 
+.mobile-dock-flip {
+    display: none;
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: 16px;
+    z-index: 60;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    background: var(--surf2);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    color: var(--text);
+    font-family: var(--fmono);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
 @media (max-width: 680px) {
     /* "Reflect & Commit" stays, but truncates with an ellipsis instead of taking
        over the row — min-width:0 is what lets a flex item actually shrink past its
@@ -902,38 +1089,61 @@ body.has-banner .top-bar {
         white-space: nowrap;
         font-size: 13px;
     }
-    /* pfp + username drop off on mobile; streak moves left of the help/reflect pair,
-       so reflect ends up to the right of the streak instead of the left */
-    .top-bar .account-wrap {
+    /* layout order is unified across desktop and mobile — only the username drops
+       off to save space; the avatar stays so the account menu is still reachable */
+    .top-bar .user-name {
         display: none;
-    }
-    .top-bar > span[style*="flex:1"] {
-        order: 1;
-    }
-    .top-bar .streak-pill {
-        order: 2;
-    }
-    .top-bar .help-btn-wrap {
-        order: 3;
-    }
-    .top-bar .reflect-btn {
-        order: 4;
     }
     .rcard-prompt {
         font-size: 22px;
     }
 
-    /* second bar (undo/redo/history + prompt count) moves to the bottom of the
-       screen on mobile — the editor content grows to fill the space above it, so
-       reordering it after .edit-workspace in the flex column is enough. */
-    .action-bar {
-        order: 3;
-        border-bottom: none;
-        border-top: 1px solid var(--border2);
+    /* ── mobile split: canvas dominant (90%) by default, docked on the RIGHT, with
+       the editor as a 10% sliver on the LEFT. Both panes are ALWAYS exactly 90vw /
+       10vw — that size never changes, so the textarea and the graph canvas never
+       reflow or rewrap. Flipping sides is a pure transform:translateX on each pane
+       (compositor-only, no layout pass), sliding the whole rigid assembly rather
+       than resizing anything — tap the floating button to flip which edge the
+       editor docks to. */
+    .editor-split {
+        position: relative;
+        overflow: hidden;
+    }
+    .node-graph-panel {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 10vw;
+        width: 90vw;
+        flex: none;
+        border-right: none;
+        transform: translateX(0);
+        transition: transform 0.28s ease;
     }
     .edit-workspace {
-        order: 2;
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 10vw;
+        flex: none;
+        transform: translateX(0);
+        transition: transform 0.28s ease;
     }
+    .editor-split.flipped .node-graph-panel {
+        transform: translateX(-10vw);
+    }
+    .editor-split.flipped .edit-workspace {
+        transform: translateX(90vw);
+    }
+    .mobile-dock-flip {
+        display: flex;
+        /* clear the corner-fabs habit button, which also lives bottom-right */
+        right: 70px;
+    }
+}
+.mobile-dock-flip:active {
+    background: var(--surf3);
 }
 
 /* ===================== v4 — reflect top bar, card, underline input, paywall ========= */
@@ -951,6 +1161,15 @@ body.has-banner .top-bar {
     border-bottom: 1px solid var(--border2);
     position: relative;
     flex-shrink: 0;
+}
+/* brand sits between two equal-width side slots, so it lands dead center regardless
+   of how wide the return button on the right is */
+.reflect-top-side {
+    flex: 1;
+    display: flex;
+}
+.reflect-top-side-end {
+    justify-content: flex-end;
 }
 .reflect-top .brand {
     font-family: var(--fh);
@@ -1232,10 +1451,10 @@ body.has-banner .top-bar {
     --muted: #6b5c47;
     --muted2: #9c8a6e;
     --muted3: #c4b291;
-    --accent: #e0793f; /* dusk ember orange */
-    --accent-h: #ffae5c; /* glowing ember highlight */
-    --accent-dim: #a85a2c;
-    --accent-bg: #2a1709;
+    --accent: #eaff00; /* neon yellow */
+    --accent-h: #f7ffab; /* glowing highlight */
+    --accent-dim: #8a9600;
+    --accent-bg: #1f2200;
     --danger: #c8514a; /* warm rose-red, distinct from ember */
     --ok: #7fae6f;
     --ref: #9b86a8; /* dusky mauve for recall, no green */
@@ -1768,7 +1987,7 @@ body.has-banner .top-bar {
 
 /* ── syntax highlight: continuation lines ────────────────────────────────────────── */
 .h-cont {
-    color: var(--muted2);
+    color: #fff;
 }
 
 /* ── Hover Buttons & Recall Dropdown Layer ────────────────────────────────────────── */
@@ -1900,21 +2119,24 @@ body.has-banner .top-bar {
     background: rgba(240, 88, 88, 0.1);
 }
 
-/* ── undo / redo / history — left side of the action bar ─────────────────────────── */
-.action-bar-tools {
+/* ── undo / redo / history — floating, bottom-left ────────────────────────────────── */
+.bottom-left-cluster {
+    position: fixed;
+    bottom: 16px;
+    left: 14px;
+    z-index: 50;
     display: flex;
     gap: 5px;
-    flex-shrink: 0;
 }
-.action-bar-tools button {
+.bottom-left-cluster button {
     background: var(--surf);
     border: 1px solid var(--border2);
     color: var(--muted2);
     font-family: var(--fmono);
-    font-size: 12px;
-    width: 24px;
-    height: 24px;
-    border-radius: 7px;
+    font-size: 14px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -1922,11 +2144,11 @@ body.has-banner .top-bar {
     transition: all 0.1s;
     line-height: 1;
 }
-.action-bar-tools button:hover {
+.bottom-left-cluster button:hover {
     border-color: var(--border3);
     color: var(--text);
 }
-.action-bar-tools button.flash {
+.bottom-left-cluster button.flash {
     background: var(--accent-bg);
     color: var(--accent-h);
     border-color: var(--accent-dim);
@@ -1970,7 +2192,7 @@ body.has-banner .top-bar {
     animation: reflectShake 0.4s;
 }
 
-/* ── streak pill (top bar) ─────────────────────────────────────────────────────────── */
+/* ── streak pill (top bar) — grayed out unless extended today, colored once it is ─── */
 .streak-pill {
     display: flex;
     align-items: center;
@@ -1989,21 +2211,9 @@ body.has-banner .top-bar {
     color: var(--accent-h);
     background: var(--accent-bg);
 }
-.streak-pill .streak-flame {
-    width: 14px;
-    height: 14px;
-    display: block;
-    flex-shrink: 0;
-    filter: grayscale(1);
-    opacity: 0.55;
-}
-.streak-pill.on .streak-flame {
-    filter: none;
-    opacity: 1;
-}
 .streak-pill .streak-n {
-    font-family: var(--fh);
-    font-weight: 700;
+    font-family: var(--fmono);
+    font-weight: 500;
 }
 
 /* ── help button + tooltip (top bar) ──────────────────────────────────────────────── */
@@ -2168,7 +2378,8 @@ body.has-banner .top-bar {
     position: fixed;
     inset: 0;
     z-index: 650;
-    background: transparent;
+    /* the whole screen goes solid black behind the sheet — no blur, no tint */
+    background: #000;
     display: none;
     align-items: flex-end;
     justify-content: center;
@@ -2295,10 +2506,7 @@ body.has-banner .top-bar {
     color: var(--danger);
 }
 
-/* ── bottom-right floating buttons: help (once unlocked) + make-it-a-habit ───────── */
-/* A shared fixed-position stack — each button is display:none when inactive, so the
-   flex container collapses around whichever one(s) are actually showing instead of
-   needing hand-tuned offsets. */
+/* ── bottom-right floating button: make-it-a-habit ────────────────────────────────── */
 .corner-fabs {
     position: fixed;
     right: 16px;
@@ -2309,8 +2517,7 @@ body.has-banner .top-bar {
     align-items: center;
     gap: 12px;
 }
-.habit-fab,
-.help-fab {
+.habit-fab {
     width: 46px;
     height: 46px;
     border-radius: 50%;
@@ -2323,26 +2530,1239 @@ body.has-banner .top-bar {
     cursor: pointer;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
 }
-.habit-fab:hover,
-.help-fab:hover {
+.habit-fab:hover {
     border-color: var(--accent-dim);
     color: var(--accent-h);
-}
-.help-fab {
-    /* smaller than the habit-fab — it's just a "?" glyph, no icon to fill the circle,
-       so the full 46px size read as oversized */
-    width: 34px;
-    height: 34px;
-    /* circle outline matches the "?" glyph color, same rule as the top-bar version */
-    border-color: var(--muted3);
-    font-family: var(--fh);
-    font-weight: 700;
-    font-size: 13px;
-    line-height: 1;
 }
 @media (max-width: 480px) {
     .streak-pill {
         padding: 4px 8px;
         font-size: 11px;
     }
+}
+
+/* ===================== v8 — monastic consolidation =====================
+   Supersedes the accent/status tokens set by v4/v5/v7 above (later :root
+   wins the cascade). One muted accent instead of red/neon-yellow/blue/gold
+   all live at once — restraint is the point, not a missing color. Also adds
+   styling for the three structural-risk mechanics in run-engine.js: the
+   quiet time readout, the recall panel becoming part of the same quiet
+   system instead of a separate blue "info box," the hold-to-unlock commit
+   bar, and the "record locked" state once a written answer can't be
+   undone. */
+:root {
+    --accent: #9c8f74;      /* muted brass — the one accent, used sparingly */
+    --accent-h: #b8ab8c;
+    --accent-dim: #5c5645;
+    --accent-bg: #17150f;
+    --danger: #a8645a;      /* still reads as "no," just not neon */
+    --ok: #7f9271;          /* still reads as "yes," just not neon */
+    --ref: #8a8168;         /* recall sits in the same quiet palette now */
+    --gold: #b09c5c;
+}
+
+/* recall stops being a separate blue "info box" and becomes part of the
+   same quiet system — a fact the app is keeping, not a UI callout */
+.recall {
+    background: var(--surf2);
+    border: none;
+    border-left: 2px solid var(--border3);
+    border-radius: 4px;
+    padding: 12px 14px;
+}
+.recall-hd {
+    font-family: var(--fmono);
+    color: var(--muted2);
+}
+.recall-txt {
+    font-family: var(--fserif);
+    font-style: italic;
+}
+
+/* quiet time readout, left of the centered brand — also fixes the
+   .reflect-top-side "two equal slots" layout that only ever had the right
+   slot wired up */
+.reflect-meta {
+    justify-content: flex-start;
+    font-family: var(--fmono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    align-items: center;
+}
+
+/* "no going back once you've written something real" — shown in place of
+   the back button once the run's record has locked */
+.rlock-note {
+    font-family: var(--fmono);
+    font-size: 10px;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+    line-height: 1.6;
+}
+
+/* hold-to-unlock: the next/commit button stays visibly inert for a beat
+   after a written answer starts, so committing is a decision, not a
+   reflex. Thin fill bar reads as "still filling," not "broken." */
+.rnav-next.locked {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: var(--surf3);
+    color: var(--muted2);
+    border-color: var(--border3);
+}
+.rnav-hold-track {
+    height: 2px;
+    background: var(--border2);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 10px;
+}
+.rnav-hold-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--muted3);
+    transition: width 0.08s linear;
+}
+.rnav-hold-label {
+    font-family: var(--fmono);
+    font-size: 9px;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin-top: 6px;
+}
+
+/* ===================== v9 — whole-app monastic sweep =====================
+   v8 changed the color tokens, which every screen already inherits (editor,
+   node graph, top bar, overlays — all of it reads var(--accent) etc., so
+   that part was already app-wide). Two things were left over: decoration
+   tuned specifically for the old neon-yellow/red palette that now reads as
+   mismatched rather than intentional, and card corner-radius that drifted
+   between 12/16/18px screen to screen with no reason for the difference. */
+
+/* one radius for every "floating card" modal — auth, paywall, upgrade, the
+   compound-card explainer, the minted-commitment card, the reflection card.
+   bottom sheets (habit-inner) and full-bleed panels (history, milestones)
+   are a different pattern on purpose and keep their own shape. */
+.auth-box,
+.cc-inner,
+.minted-card,
+.rcard {
+    border-radius: 14px;
+}
+
+/* the "reflections compound" chart line/dot don't glow neon yellow under a
+   muted palette anymore — the line and dot alone say enough without it */
+.cc-curve,
+.cc-dot {
+    filter: none;
+}
+
+/* commitment confirmation: a quiet acknowledgment instead of a rainbow
+   spin + double glow. same beat, same "it happened," none of the confetti —
+   gamified celebration is exactly what this app is deliberately not. */
+.minted-rainbow {
+    background: radial-gradient(circle, var(--accent-bg) 0%, transparent 70%);
+    animation: mintedQuiet 1.4s ease-out forwards;
+}
+@keyframes mintedQuiet {
+    0% {
+        opacity: 0;
+        transform: scale(0.85);
+    }
+    30% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(1.02);
+    }
+}
+.minted-card {
+    box-shadow: 0 20px 60px -20px rgba(0, 0, 0, 0.7);
+}
+
+/* ===================== v10 — the monastic rebuild =====================
+   v8/v9 only swapped color values; the shapes and voices underneath were
+   still the old app — rounded gray card floating on black, filled accent
+   pill buttons, Syne-bold on every piece of small chrome. This layer
+   rebuilds those surfaces to match the composite direction:
+
+   · the reflection screen stops being a card-in-a-box and becomes the
+     screen itself — quiet readout rail up top, serif italic for anything
+     in the user's voice, mono for anything in the system's voice
+   · exactly one filled element per screen, or none — everything else is
+     a 1px hairline on transparent
+   · Syne survives only as the product wordmark (auth logo). every other
+     label demotes to quiet uppercase mono
+   · radii: 3px controls, 6px floating modals. nothing else. */
+
+:root {
+    --bg: #0f0f0f;
+    --surf: #131313;
+    --surf2: #161616;
+    --surf3: #1c1c1c;
+    --border: #1a1a1a;
+    --border2: #242424;
+    --border3: #33322e;
+    --text: #cfccc1;      /* body — quiet warm gray */
+    --text-hi: #e8e4d6;   /* the question itself — the brightest thing on screen */
+    --muted: #57544c;
+    --muted2: #797569;
+    --muted3: #a09b8d;
+    --r: 3px;
+}
+
+/* ── voices: serif italic = the user / the question. mono = the system. ── */
+.rcard-prompt,
+.rcard-end .end-h {
+    font-family: var(--fserif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 21px;
+    line-height: 1.65;
+    letter-spacing: 0;
+    color: var(--text-hi);
+}
+.rinput,
+#commitText,
+#endNotesText {
+    font-family: var(--fserif) !important;
+    font-style: italic;
+    font-size: 16px;
+    color: var(--text-hi);
+}
+.rinput::placeholder,
+#endNotesText::placeholder {
+    color: var(--muted);
+    font-style: italic;
+}
+
+/* system chrome — one quiet uppercase mono voice for every label & control */
+.reflect-return,
+.rnav-back,
+.rnav-next,
+.reflect-btn,
+.noti-banner-btn,
+.noti-banner-test,
+.noti-banner-x,
+.noti-banner-txt,
+.account-menu button,
+.milestones-title,
+.milestones-close,
+.habit-title,
+.habit-skip,
+.cc-kicker,
+.cc-go,
+.btn-google,
+.pay-alt,
+.end-finish,
+.rcard-type,
+.top-bar .brand,
+.reflect-top .brand,
+.reflect-go,
+.streak-pill,
+.history-header {
+    font-family: var(--fmono);
+    font-weight: 500;
+}
+.reflect-return,
+.rnav-back,
+.rnav-next,
+.reflect-btn,
+.cc-go,
+.milestones-close,
+.end-finish {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+/* ── the reflection screen: no more card-in-a-box ── */
+.reflect-screen {
+    background: var(--bg);
+}
+.reflect-top {
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px;
+}
+.reflect-top .brand {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted2);
+}
+.reflect-meta {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+.reflect-return {
+    border: 1px solid var(--border3);
+    border-radius: var(--r);
+    color: var(--muted2);
+    padding: 8px 14px;
+}
+.reflect-return:hover {
+    border-color: var(--muted2);
+    color: var(--text);
+    background: none;
+}
+.rcard {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    max-width: 560px;
+    padding: 6vh 8px 0;
+}
+.reflect-body {
+    padding: 0 24px 40px;
+}
+.rcard-prompt {
+    margin-bottom: 34px;
+}
+.rinput {
+    border-bottom: 1px solid var(--border3);
+    padding: 10px 2px;
+}
+.rfield-line {
+    background: var(--muted3);
+    height: 1px;
+}
+.ropt {
+    background: transparent;
+    border: 1px solid var(--border2);
+    border-radius: var(--r);
+    font-size: 13px;
+    color: var(--text);
+    padding: 13px 15px;
+    transition: border-color 0.12s;
+}
+.ropt:hover {
+    border-color: var(--muted2);
+    color: var(--text-hi);
+    background: transparent;
+}
+.rcard-nav {
+    margin-top: 26px;
+}
+.rnav-back,
+.rnav-next {
+    background: transparent;
+    border: 1px solid var(--border3);
+    border-radius: var(--r);
+    color: var(--text);
+    padding: 10px 18px;
+    white-space: nowrap;
+}
+.rnav-next:hover:not(:disabled),
+.rnav-back:hover {
+    border-color: var(--muted3);
+    color: var(--text-hi);
+}
+.rnav-next.locked {
+    background: transparent;
+    opacity: 0.35;
+}
+
+/* recall — your own words, quoted back in your own voice */
+.recall {
+    background: #131211;
+    border-left: 2px solid var(--border3);
+    padding: 13px 15px;
+    border-radius: 0 var(--r) var(--r) 0;
+}
+.recall-hd {
+    font-family: var(--fmono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+}
+.recall-txt {
+    color: var(--muted3);
+    font-size: 12.5px;
+}
+
+/* commitment screen — same flat language */
+.rcard-end .end-sub {
+    font-family: var(--fmono);
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    color: var(--muted2);
+    font-style: normal;
+}
+.ritual-date-btn {
+    font-family: var(--fmono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-size: 10px;
+    border-radius: var(--r);
+}
+#endCommitGo {
+    background: transparent;
+    border: 1px solid var(--accent-dim);
+    color: var(--accent-h);
+    border-radius: var(--r);
+}
+#endCommitGo:disabled {
+    border-color: var(--border2);
+    color: var(--muted);
+    opacity: 1;
+}
+#endCommitGo:hover:not(:disabled) {
+    background: var(--accent-bg);
+}
+
+/* ── editor chrome ── */
+.top-bar {
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+}
+.top-bar .brand {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted2);
+}
+/* the single accent use in the editor: the one action that matters */
+.reflect-btn {
+    background: transparent;
+    border: 1px solid var(--accent-dim);
+    color: var(--accent-h);
+    border-radius: var(--r);
+    padding: 9px 16px;
+}
+.reflect-btn:hover {
+    background: var(--accent-bg);
+}
+.streak-pill {
+    font-family: var(--fmono);
+    letter-spacing: 0.04em;
+}
+.ng-node {
+    border-radius: var(--r);
+    background: var(--surf);
+    border-color: var(--border2);
+}
+.ng-plus,
+.ng-recall {
+    border-radius: 2px;
+}
+.ng-naming input {
+    border-radius: var(--r);
+}
+.account-menu {
+    border-radius: var(--r);
+    box-shadow: none;
+}
+.account-menu button {
+    border-radius: 2px;
+    font-size: 11px;
+}
+
+/* ── auth / paywall / overlays: flat, sharp, one voice ── */
+.auth-box,
+.cc-inner,
+.minted-card {
+    border-radius: 6px;
+    background: var(--surf);
+    border: 1px solid var(--border2);
+    box-shadow: none;
+}
+.auth-logo {
+    /* the wordmark is the ONLY survivor of the display face */
+    font-family: var(--fh);
+}
+.auth-sub,
+.auth-note {
+    font-family: var(--fmono);
+}
+.btn-google {
+    border-radius: var(--r);
+    background: transparent;
+    border: 1px solid var(--border3);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+}
+.btn-google:hover {
+    background: var(--surf2);
+    border-color: var(--muted2);
+}
+.pay-price {
+    font-family: var(--fmono);
+    font-weight: 500;
+    font-size: 22px;
+    letter-spacing: 0.02em;
+    color: var(--text-hi);
+}
+.pay-btn {
+    background: transparent;
+    border: 1px solid var(--accent-dim);
+    color: var(--accent-h);
+}
+.pay-btn:hover {
+    background: var(--accent-bg);
+}
+.noti-banner-btn {
+    background: transparent;
+    color: var(--accent-h);
+    border: 1px solid var(--accent-dim);
+    border-radius: var(--r);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.noti-banner-test,
+.noti-banner-x {
+    border-radius: var(--r);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.noti-banner-txt {
+    font-weight: 500;
+    font-size: 11px;
+    color: var(--muted3);
+}
+.cc-title {
+    font-family: var(--fserif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 19px;
+    color: var(--text-hi);
+}
+.cc-rule {
+    border-radius: var(--r);
+}
+.cc-go {
+    background: transparent;
+    border: 1px solid var(--accent-dim);
+    color: var(--accent-h);
+    border-radius: var(--r);
+    font-weight: 500;
+}
+.cc-go:hover {
+    background: var(--accent-bg);
+    filter: none;
+}
+.minted-card {
+    border: 1px solid var(--accent-dim);
+    background: var(--surf);
+}
+.milestones-title,
+.history-header span {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted2);
+    font-weight: 500;
+}
+.habit-title {
+    font-weight: 500;
+    letter-spacing: 0.04em;
+}
+.habit-inner {
+    border-radius: 10px 10px 0 0;
+}
+.hold-btn {
+    font-family: var(--fmono);
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border-radius: var(--r);
+}
+
+@media (max-width: 680px) {
+    .rcard {
+        padding: 4vh 2px 0;
+        border-radius: 0;
+    }
+    .rcard-prompt {
+        font-size: 19px;
+    }
+}
+
+/* ===================== v11 — the editor as an instrument =====================
+   Paradigm: source-and-render. The text pane (right) is where doctrine gets
+   written; the graph pane (left) is the machine rendering it. Everything
+   here follows the same two voices as the reflection screen — serif italic
+   when the user is speaking, quiet mono when the system is — and the same
+   hairline-on-transparent control language. Also supplies the CSS that
+   node-graph.js has silently expected all along: .ng-row-top/.ng-row-bottom
+   (the two-row node card), .ng-minimap, .ng-vertical-toggle, .ng-add-fab —
+   none of which had a single rule, which is why nodes spilled and the
+   minimap rendered at browser-default SVG size. */
+
+/* ── the node card, actually styled for its two-row structure ── */
+.ng-node {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: stretch; /* the old one-row rule set center — in column flow that
+                             centered oversized rows and clipped titles on BOTH sides */
+    padding: 6px 8px;
+    background: var(--surf);
+    border: 1px solid var(--border2);
+    border-radius: var(--r);
+    overflow: hidden;
+    transition: border-color 0.1s;
+}
+.ng-row-top,
+.ng-row-bottom {
+    width: 100%;
+    min-width: 0;
+}
+.ng-node:hover {
+    border-color: var(--muted2);
+    background: var(--surf);
+}
+.ng-node.selected {
+    border-color: var(--accent-dim);
+}
+.ng-node.pressing {
+    border-color: var(--danger);
+}
+.ng-row-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+.ng-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    color: var(--text);
+    line-height: 1.4;
+}
+.ng-row-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+}
+.ng-plus,
+.ng-recall {
+    width: 15px;
+    height: 15px;
+    border-radius: 2px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--muted);
+    font-size: 10px;
+}
+.ng-node:hover .ng-plus,
+.ng-node:hover .ng-recall,
+.ng-node.selected .ng-plus,
+.ng-node.selected .ng-recall,
+.ng-recall.on {
+    border-color: var(--border3);
+    color: var(--muted2);
+}
+.ng-recall.on {
+    color: var(--accent-h);
+    border-color: var(--accent-dim);
+    background: transparent;
+}
+.ng-edge {
+    stroke: var(--border3);
+}
+
+/* ── minimap: a VSCode-style overview — small fixed box, top-right, done ── */
+.ng-minimap {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 120px;
+    height: 76px;
+    background: rgba(15, 15, 15, 0.92);
+    border: 1px solid var(--border2);
+    border-radius: var(--r);
+    z-index: 8;
+    display: none;
+    overflow: hidden;
+    cursor: pointer;
+}
+.ng-minimap.show {
+    display: block;
+}
+.ng-minimap svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* orientation toggle — quiet square, sits left of the minimap when it's showing */
+.ng-vertical-toggle {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 15, 15, 0.92);
+    border: 1px solid var(--border2);
+    border-radius: var(--r);
+    color: var(--muted);
+    cursor: pointer;
+    z-index: 8;
+}
+.ng-minimap.show ~ .ng-vertical-toggle {
+    right: 140px;
+}
+.ng-vertical-toggle:hover {
+    color: var(--muted3);
+    border-color: var(--border3);
+}
+.ng-vertical-toggle.on svg {
+    transform: rotate(90deg);
+}
+
+/* ── floating chrome: one hairline control language, no material-design FABs ── */
+.ng-add-fab-wrap {
+    position: fixed;
+    right: 16px;
+    bottom: 72px;
+    z-index: 60;
+    transition: transform 0.15s ease;
+}
+.ng-add-fab {
+    width: 34px;
+    height: 34px;
+    background: rgba(15, 15, 15, 0.92);
+    border: 1px solid var(--border3);
+    border-radius: var(--r);
+    color: var(--muted3);
+    font-family: var(--fmono);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.ng-add-fab:hover {
+    border-color: var(--muted2);
+    color: var(--text-hi);
+}
+.habit-fab {
+    width: 34px;
+    height: 34px;
+    border-radius: var(--r);
+    background: rgba(15, 15, 15, 0.92);
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    box-shadow: none;
+}
+.habit-fab:hover {
+    border-color: var(--border3);
+    color: var(--muted3);
+}
+/* undo / redo / history — one joined rail, not three floating chiclets */
+.bottom-left-cluster {
+    gap: 0;
+    border: 1px solid var(--border2);
+    border-radius: var(--r);
+    overflow: hidden;
+    background: rgba(15, 15, 15, 0.92);
+}
+.bottom-left-cluster button {
+    width: 30px;
+    height: 28px;
+    border: none;
+    border-right: 1px solid var(--border2);
+    border-radius: 0;
+    background: transparent;
+    font-size: 12px;
+    color: var(--muted);
+}
+.bottom-left-cluster button:last-child {
+    border-right: none;
+}
+.bottom-left-cluster button:hover {
+    color: var(--muted3);
+    background: var(--surf2);
+}
+.mobile-dock-flip {
+    background: rgba(15, 15, 15, 0.92);
+    border: 1px solid var(--border2);
+    border-radius: var(--r);
+    font-family: var(--fmono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted2);
+}
+
+/* ── top bar: identity left, the one action right ── */
+.top-bar {
+    padding: 0 14px;
+    height: 46px;
+    gap: 12px;
+}
+.top-bar .brand {
+    font-family: var(--fmono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted3);
+}
+.top-bar .brand .amp {
+    color: var(--accent);
+}
+.help-btn {
+    border-radius: var(--r);
+    border-color: var(--border3);
+    color: var(--muted);
+    font-family: var(--fmono);
+    font-weight: 500;
+}
+.help-btn:hover {
+    color: var(--muted3);
+}
+.help-btn-wrap .help-tip {
+    border-radius: var(--r);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+}
+.streak-pill {
+    border-radius: var(--r);
+    background: transparent;
+    border-color: var(--border2);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted2);
+}
+
+/* ── the text pane: where doctrine gets written ── */
+.editor-body {
+    background: var(--bg);
+}
+.node-graph-panel {
+    background: #0d0d0d; /* one step darker than the text pane — render vs. source */
+    border-right: 1px solid var(--border);
+}
+.lnums {
+    border-right: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 10px;
+}
+#src-ta {
+    caret-color: var(--accent-h);
+}
+#src-ta::selection {
+    background: rgba(156, 143, 116, 0.22);
+}
+.line-hl {
+    background: rgba(156, 143, 116, 0.08);
+}
+/* syntax voices: questions bright, options muted, structure quiet */
+.h-title {
+    color: var(--text-hi);
+    font-weight: 500;
+}
+.h-opt {
+    color: var(--muted3);
+}
+.h-cont {
+    color: var(--muted2);
+}
+.ng-naming input {
+    border-radius: var(--r);
+    background: var(--surf);
+    font-size: 11px;
+}
+
+/* ===================== v12 — candlelight =====================
+   The v10/v11 field was right but the temperature was wrong: neutral
+   gray-on-gray with a gray-brass accent reads as a void when the screen
+   holds three controls and a question. Restraint needs one living thing
+   against it. So: every dark warms up a few degrees (warm black, not
+   dead black), text goes cream, and the single accent becomes true
+   ember — real chroma, used only where attention belongs: the question
+   at night, the one action per screen, the selected node, the caret. */
+:root {
+    --bg: #14110d;
+    --surf: #181510;
+    --surf2: #1d1913;
+    --surf3: #242015;
+    --border: #241f18;
+    --border2: #2e2820;
+    --border3: #423a2c;
+    --text: #d9d2c0;
+    --text-hi: #f4ecd9;
+    --muted: #5f5847;
+    --muted2: #877d66;
+    --muted3: #b0a68b;
+    --accent: #d99a3e; /* ember */
+    --accent-h: #efb757;
+    --accent-dim: #8d6626;
+    --accent-bg: #261b0a;
+    --danger: #b5654f;
+    --ok: #8a9a6d;
+    --ref: #9a8f74;
+    --gold: #d9b05c;
+}
+.reflect-screen {
+    background: #100e0a;
+}
+.node-graph-panel {
+    background: #110f0b;
+}
+/* where the ember lives */
+#src-ta {
+    caret-color: var(--accent);
+}
+.ng-node.selected {
+    border-color: var(--accent);
+}
+.recall {
+    border-left-color: var(--accent-dim);
+}
+.rfield-line {
+    background: var(--accent);
+}
+
+/* inputs speak mono — the serif italic stays reserved for what's already
+   said (the question, quoted past answers), not what's being typed */
+.rinput,
+#commitText,
+#endNotesText {
+    font-family: var(--fmono) !important;
+    font-style: normal;
+    font-size: 14px;
+}
+.rinput::placeholder,
+#endNotesText::placeholder {
+    font-style: normal;
+}
+
+/* ── canvas on the RIGHT on desktop: source left, render right ── */
+@media (min-width: 681px) {
+    .edit-workspace {
+        order: 1;
+    }
+    .node-graph-panel {
+        order: 2;
+        border-right: none;
+        border-left: 1px solid var(--border);
+    }
+}
+
+/* ── canvas controls live in the canvas, not floating over the app ── */
+.ng-add-fab-wrap {
+    position: absolute;
+    right: 14px;
+    bottom: 14px;
+    z-index: 9;
+}
+.mobile-dock-flip {
+    position: absolute;
+    left: 14px;
+    right: auto;
+    bottom: 14px;
+    width: auto;
+    padding: 9px 14px;
+    z-index: 9;
+}
+@media (max-width: 680px) {
+    /* bottom-center of the canvas — clear of the undo rail (viewport bottom-left)
+       and the add/install stack (canvas bottom-right) */
+    .mobile-dock-flip {
+        left: 50%;
+        right: auto;
+        bottom: 14px;
+        transform: translateX(-50%);
+    }
+}
+/* the install nudge stacks above the canvas's own add button */
+.corner-fabs {
+    bottom: 62px;
+}
+
+/* ===================== v13 — card back, window gate, counter, always-back =====================
+   Reverses one earlier call (record-lock/no-back) per direct feedback: going back
+   is always allowed now — the record isn't a one-way door. Adds the card back
+   around the question, the reflect-time window gate, and the "3 / 7" counter that
+   replaces the clock. */
+
+.rcard {
+    position: relative;
+    background: var(--surf);
+    border: 1px solid var(--border2);
+    border-radius: var(--r);
+    padding: 44px 40px 36px;
+    margin-top: 5vh;
+}
+.rcard-counter {
+    position: absolute;
+    top: 16px;
+    right: 18px;
+    font-family: var(--fmono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+}
+@media (max-width: 680px) {
+    .rcard {
+        padding: 28px 22px 24px;
+        margin-top: 3vh;
+        border-radius: var(--r);
+    }
+}
+
+/* reflect-top: brand truly centered regardless of the return button's width,
+   now that there's no mirrored left slot (the clock readout is gone) */
+.reflect-top {
+    position: relative;
+    justify-content: center;
+    padding: 14px 20px;
+}
+.reflect-return {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+/* reflect button, dimmed + explains itself when the window's closed. still
+   clickable — tapping it while closed is how you find out when it opens */
+.reflect-btn.window-closed {
+    opacity: 0.4;
+}
+.reflect-btn.window-closed:hover {
+    background: var(--accent-bg);
+}
+
+/* ===================== v14 — one filled action, softer corners, plainer prompt =====================
+   Feedback: all-hairline read as too techy/uniform with no clear "this is THE
+   button," corners were too sharp for the warm palette, the italic prompt was
+   fighting for attention with the recall block's italic, and the wordmark
+   needed its personality back. */
+
+/* corners: one bump to --r cascades to every control that already reads it
+   (buttons, node cards, inputs, the minimap, panels) — moderate, not a pill */
+:root {
+    --r: 9px;
+}
+
+/* reflect is THE action on the editor screen — filled, not hairline, so your
+   eye finds it immediately instead of scanning a wall of identical outlines */
+.reflect-btn {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #1c1006;
+    font-weight: 600;
+}
+.reflect-btn:hover {
+    background: var(--accent-h);
+    border-color: var(--accent-h);
+}
+.reflect-btn:disabled,
+.reflect-btn.window-closed {
+    background: var(--surf3);
+    border-color: var(--border3);
+    color: var(--muted2);
+}
+.reflect-btn.window-closed:hover {
+    background: var(--surf3);
+}
+
+/* the question itself reads plainer — upright serif, not italic. italic stays
+   reserved for recalled/past text, so "this is what you're being asked" and
+   "this is what you already said" stay visually distinct */
+.rcard-prompt,
+.rcard-end .end-h {
+    font-style: normal;
+}
+
+/* the wordmark gets its personality back everywhere it appears — the editor
+   top bar, and "reflect"/"commit" during the ritual itself — all in Syne,
+   the one place the dynamic display face still earns its keep */
+.top-bar .brand,
+.reflect-top .brand {
+    font-family: var(--fh);
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    color: var(--text-hi);
+}
+.top-bar .brand {
+    font-size: 15px;
+}
+.reflect-top .brand {
+    font-size: 14px;
+}
+
+/* the "add to home screen" icon on mobile: a slow, subtle ember breathe so it
+   reads as worth tapping without being loud. it already disappears once the
+   app is actually installed (pwa-install.js's isStandalonePWA check). */
+@media (max-width: 680px) {
+    @keyframes habitFabBreathe {
+        0%,
+        100% {
+            border-color: var(--border2);
+            color: var(--muted3);
+            box-shadow: 0 0 0 0 rgba(217, 154, 62, 0);
+        }
+        50% {
+            border-color: var(--accent-dim);
+            color: var(--accent-h);
+            box-shadow: 0 0 10px 1px rgba(217, 154, 62, 0.35);
+        }
+    }
+    .habit-fab {
+        animation: habitFabBreathe 3.4s ease-in-out infinite;
+    }
+}
+
+/* ===================== v15 — neutral field, warm card, real ember, filled buttons =====================
+   Refinements on the candlelight pass: the warmth was soaking the WHOLE app
+   (background included), which muddied it. Pulling the warmth back to just
+   the card — where the question actually lives — while the background goes
+   properly neutral gray gives the same "one lit thing" effect with a
+   cleaner field around it. The accent gets real saturation instead of a
+   dusty muted tone. And every button gets an actual fill now, not just
+   reflect — filled-gray for secondary actions, filled-ember for the one
+   primary action per screen, so hierarchy reads by weight instead of by
+   hunting for the one non-gray thing on the screen. */
+:root {
+    --bg: #131313;         /* neutral — no warm cast */
+    --surf: #1c1a17;       /* barely warm, and lighter than bg on purpose */
+    --surf2: #242019;
+    --surf3: #2d2820;      /* the button-fill gray */
+    --border: #201e1c;
+    --border2: #2c2822;
+    --border3: #453f34;
+    --accent: #e8811a;     /* real ember — saturated, not dusty */
+    --accent-h: #ff9f3d;
+    --accent-dim: #a85f10;
+    --accent-bg: #2c1a08;
+}
+.reflect-screen {
+    background: var(--bg);
+}
+.node-graph-panel {
+    background: #101010;
+}
+
+/* ── filled buttons everywhere: warm-gray fill for secondary/tertiary actions ── */
+.rnav-back,
+.reflect-return,
+.btn-google,
+.ropt,
+.ritual-date-btn,
+.noti-banner-test,
+.noti-banner-x,
+.milestones-close,
+.account-menu button,
+.habit-skip,
+.help-btn,
+.habit-fab,
+.ng-add-fab,
+.ng-vertical-toggle,
+.bottom-left-cluster button,
+.mobile-dock-flip,
+.commit-node-btn {
+    background: var(--surf3);
+    border-color: var(--surf3);
+    color: var(--text);
+}
+.rnav-back:hover,
+.reflect-return:hover,
+.btn-google:hover,
+.ropt:hover,
+.ritual-date-btn:hover,
+.milestones-close:hover,
+.account-menu button:hover,
+.habit-skip:hover,
+.help-btn:hover,
+.habit-fab:hover,
+.ng-add-fab:hover,
+.ng-vertical-toggle:hover,
+.bottom-left-cluster button:hover,
+.mobile-dock-flip:hover {
+    background: #353026;
+    border-color: #353026;
+    color: var(--text-hi);
+}
+.bottom-left-cluster button {
+    border-right-color: var(--border);
+}
+
+/* ── filled ember for the one primary action per screen ── */
+.rnav-next,
+#endCommitGo,
+.cc-go,
+.pay-btn,
+.noti-banner-btn {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #1c1006;
+    font-weight: 600;
+}
+.rnav-next:hover:not(:disabled),
+#endCommitGo:hover:not(:disabled),
+.cc-go:hover,
+.pay-btn:hover,
+.noti-banner-btn:hover {
+    background: var(--accent-h);
+    border-color: var(--accent-h);
+}
+.rnav-next.locked,
+#endCommitGo:disabled {
+    background: var(--surf3);
+    border-color: var(--surf3);
+    color: var(--muted2);
+    font-weight: 500;
+}
+
+/* ── squircle, the Apple kind: percentage radius on square icon buttons scales
+   with the box itself (continuous-looking rounded-square), instead of one flat
+   px value that reads as "rounded rectangle" at every size. Text buttons keep a
+   fixed moderate radius since a percentage would look odd on a wide rectangle. ── */
+.help-btn,
+.habit-fab,
+.ng-add-fab,
+.ng-vertical-toggle,
+.bottom-left-cluster button {
+    border-radius: 30%;
+}
+:root {
+    --r: 11px;
+}
+
+/* ── the card: barely-warm and lighter than the field, sized to its content
+   instead of padded out to feel "designed" ── */
+.rcard {
+    padding: 26px 26px 22px;
+    margin-top: 4vh;
+}
+@media (max-width: 680px) {
+    .rcard {
+        padding: 20px 18px 18px;
+    }
+}
+
+/* the counter reads as an actual number, not a code token — pull it out of
+   the mono system voice into a plain UI face */
+.rcard-counter {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 11px;
+    letter-spacing: 0;
+    color: var(--muted3);
 }

@@ -38,6 +38,26 @@ let uid = null,
   notesTimer = null,
   unsubbers = [];
 
+// ── app loading gate ────────────────────────────────────────────────────────────────
+// Nothing in the editor should be interactive — and nothing the user types should be
+// able to race with — the user's actual synced content until it has genuinely landed
+// at least once. showContentGate() covers the app right as we sign in; markContentLoaded()
+// (called the first time the active tree's source snapshot resolves, whether or not a
+// doc exists yet) reveals it. It's a one-shot per sign-in — later tree switches don't
+// re-trigger the gate.
+let _contentLoaded = false;
+function showContentGate() {
+  _contentLoaded = false;
+  const ov = document.getElementById("appLoadingOv");
+  if (ov) ov.classList.add("on");
+}
+function markContentLoaded() {
+  if (_contentLoaded) return;
+  _contentLoaded = true;
+  const ov = document.getElementById("appLoadingOv");
+  if (ov) ov.classList.remove("on");
+}
+
 const setSyncDot = (s) => {
   const d = document.getElementById("syncDot");
   if (d) d.className = "sync-dot" + (s ? " " + s : "");
@@ -133,6 +153,7 @@ onAuthStateChanged(auth, async (user) => {
       return;
     }
     hidePaywall();
+    showContentGate();
     await migrateIfNeeded();
     window._uid = uid;
     subscribe();
@@ -145,6 +166,8 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById("authScreen").classList.remove("hidden");
     hidePaywall();
     setSyncDot("");
+    const ov = document.getElementById("appLoadingOv");
+    if (ov) ov.classList.remove("on");
   }
 });
 
@@ -300,7 +323,10 @@ window._subscribeTree = function (treeId) {
     onSnapshot(
       tDoc(treeId, "meta", "source"),
       (snap) => {
-        if (!snap.exists()) return;
+        if (!snap.exists()) {
+          markContentLoaded();
+          return;
+        }
         const data = snap.data();
         const remote = data.source || "";
         // restore recall map from Firestore
@@ -311,8 +337,11 @@ window._subscribeTree = function (treeId) {
           window._currentSrc = remote;
           window._onSrcChange && window._onSrcChange(false);
         }
+        markContentLoaded();
       },
-      () => {},
+      () => {
+        markContentLoaded();
+      },
     ),
   );
   window._treeUnsubs.push(

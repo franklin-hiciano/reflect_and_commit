@@ -24,7 +24,7 @@
         <!-- AUTH -->
         <div class="auth-screen" id="authScreen">
             <div class="auth-box">
-                <div class="auth-logo">Reflect &amp; Commit</div>
+                <div class="auth-logo">Reflect <span class="amp">&amp;</span> Commit</div>
                 <div class="auth-sub">
                     reflect on your day — then commit to one real move
                 </div>
@@ -46,7 +46,7 @@
         <!-- PAYWALL -->
         <div class="paywall" id="paywall">
             <div class="auth-box">
-                <div class="auth-logo">Reflect &amp; Commit</div>
+                <div class="auth-logo">Reflect <span class="amp">&amp;</span> Commit</div>
                 <div class="pay-price" id="payPrice">$29 · lifetime</div>
                 <div class="auth-sub" id="payBlurb">Unlock unlimited reflections and commitments.</div>
                 <button class="btn-google pay-btn" id="payBtn">Unlock with card</button>
@@ -55,10 +55,18 @@
             </div>
         </div>
 
+        <!-- APP LOADING GATE — covers the editor between sign-in and the first real
+             content snapshot landing, so nothing is interactive (and nothing the user
+             types) can race with, and get silently overwritten by, existing synced
+             content that's still on its way in. -->
+        <div class="app-loading-ov" id="appLoadingOv">
+            <div class="app-loading-spin"></div>
+        </div>
+
         <!-- NOTIFICATION BANNER -->
         <div class="noti-banner" id="notiBanner">
             <!-- phase 1: message + action -->
-            <span class="noti-banner-txt" id="notiBannerStatus">Get a daily nudge to reflect.</span>
+            <span class="noti-banner-txt" id="notiBannerStatus">Get a daily reminder to reflect.</span>
             <button class="noti-banner-btn" id="notiBannerBtn" onclick="sendTestNotif()">turn on</button>
             <button class="noti-banner-x" id="notiBannerDismiss" onclick="dismissNotiBanner()">don't ask again</button>
             <!-- phase 2: time picker (shown after notification confirmed) -->
@@ -69,30 +77,17 @@
         <!-- EDITOR (home / default screen) -->
         <div class="editor" id="editor">
             <div class="top-bar">
-                <div class="brand">Reflect &amp; Commit</div>
+                <!-- the one action at the true left edge, identity right after it,
+                     status/help/account on the right -->
+                <button class="reflect-btn" onclick="attemptReflect()" title="reflect">REFLECT ▶</button>
+                <div class="brand">Reflect <span class="amp">&amp;</span> Commit</div>
                 <span style="flex:1"></span>
+                <div class="streak-pill" id="streakPill" title="reflect today to start a streak" style="display:none">
+                    <span class="streak-n">0 day streak</span>
+                </div>
                 <div class="help-btn-wrap">
                     <button class="help-btn" id="helpBtn" onclick="window._openHelpOv()" aria-label="need help?">?</button>
                     <span class="help-tip">need help?</span>
-                </div>
-                <button class="reflect-btn" onclick="attemptReflect()" title="reflect">reflect ▶</button>
-                <div class="streak-pill" id="streakPill" title="reflect today to start a streak" style="display:none">
-                    <svg class="streak-flame" viewBox="0 0 24 24" aria-hidden="true">
-                        <defs>
-                            <linearGradient id="streakFlameGrad" x1="0.5" y1="1" x2="0.5" y2="0">
-                                <stop offset="0%" stop-color="#FF5C00" />
-                                <stop offset="50%" stop-color="#FF9600" />
-                                <stop offset="100%" stop-color="#FFD23E" />
-                            </linearGradient>
-                            <linearGradient id="streakFlameGradInner" x1="0.5" y1="1" x2="0.5" y2="0">
-                                <stop offset="0%" stop-color="#FFB800" />
-                                <stop offset="100%" stop-color="#FFF6D8" />
-                            </linearGradient>
-                        </defs>
-                        <path fill="url(#streakFlameGrad)" d="M12.5 1c1.3 2.9-1.1 4.6-2.4 6.9-1 1.8-1.5 3.6-.7 5.4-1.6-.6-2.6-2.1-2.7-3.8C4.9 11.2 4 13.5 4 16c0 4.4 3.6 8 8.4 8 4.9 0 8.9-3.7 8.9-8.6 0-3.6-1.7-6.5-3.9-8.5.4 1.9-.4 3.5-1.9 4.5.6-4-1.3-7.8-3-10.4z" />
-                        <path fill="url(#streakFlameGradInner)" d="M13.3 12.8c1.2 1.2 1.8 2.9 1.3 4.6-.4 1.4-1.6 2.3-1.6 3.9 0 1.1.5 1.9 1.3 2.3-2.6.4-4.8-1.4-4.8-3.9 0-1.6 1-2.5 1.5-3.9-.9.2-1.6.8-2 1.6-.3-.8-.2-1.7.2-2.5.9-1.7 2.6-1.6 4.1-2.1z" />
-                    </svg>
-                    <span class="streak-n">0</span>
                 </div>
                 <div class="account-wrap" id="accountWrap" onclick="window._toggleAccountMenu(event)">
                     <div class="account">
@@ -104,49 +99,80 @@
                     </div>
                 </div>
             </div>
-            <div class="action-bar">
-                <div class="action-bar-tools" id="actionBarTools">
-                    <button id="btn-undo" onclick="olUndo()" title="undo (⌘Z)">↶</button>
-                    <button id="btn-redo" onclick="olRedo()" title="redo (⇧⌘Z)">↷</button>
-                    <button onclick="openHistory()" title="version history">⟲</button>
+            <!-- SPLIT: text editor (left) + node graph (right) on desktop, always both open.
+                 (The graph stays first in the DOM so it's canvas-first on mobile — see the
+                 mobile media query in style.css — desktop just reorders it visually via
+                 `order`.) The graph is a live, left-to-right visualization of the tree —
+                 purely derived from parsedTree, never a separate source of truth. Pan by
+                 dragging the background; drag a node's "+" onto empty space to add a
+                 question; click a node to jump to its line in the text editor. -->
+            <div class="editor-split" id="editorSplit">
+                <div class="node-graph-panel" id="nodeGraphPanel">
+                    <div class="ng-content" id="ngContent"></div>
+                    <!-- top-right: overview of the whole tree once it outgrows the panel,
+                         plus the orientation toggle just to its left (minimap has to come
+                         first in the DOM so the toggle can shift left of it via ~ when
+                         it's showing) -->
+                    <div class="ng-minimap" id="ngMinimap">
+                        <svg id="ngMinimapSvg"></svg>
+                    </div>
+                    <button class="ng-vertical-toggle" id="ngVerticalToggle" onclick="window._ngToggleVertical()" title="switch graph orientation" aria-label="switch graph orientation">
+                        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+                            <path d="M2 8h12M9 4l4 4-4 4"></path>
+                        </svg>
+                    </button>
+                    <!-- canvas-owned controls live IN the canvas: add-a-question (bottom
+                         right) and the mobile dock flip (bottom left) -->
+                    <div class="ng-add-fab-wrap" id="ngAddFabWrap">
+                        <button class="ng-add-fab" id="ngAddFab" onclick="window._ngAddFromRightmost()" title="add a question to the end of the tree" aria-label="add a question to the end of the tree">+</button>
+                    </div>
+                    <button class="mobile-dock-flip" id="mobileDockFlip" onclick="window._toggleMobileDock()">
+                        <span id="mobileDockFlipLabel">canvas</span>
+                        <span id="mobileDockFlipArrow">→</span>
+                    </button>
                 </div>
-                <span style="flex:1"></span>
-                <span class="pstatus" id="pst"></span>
-            </div>
-            <div class="edit-workspace" id="editWorkspace">
-                <div class="edit-text" id="editText">
-                    <div class="editor-body" id="editorBody">
-                        <div class="lnums" id="lnums">1</div>
-                        <div class="editor-inner">
-                            <div class="line-hl" id="lhl" style="display:none"></div>
-                            <div class="hl-layer" id="hll" aria-hidden="true"></div>
-                            <textarea
-                                id="src-ta"
-                                spellcheck="false"
-                                autocomplete="off"
-                                placeholder="What stood out about today?
+                <div class="edit-workspace" id="editWorkspace">
+                    <div class="edit-text" id="editText">
+                        <div class="editor-body" id="editorBody">
+                            <div class="lnums" id="lnums">1</div>
+                            <div class="editor-inner">
+                                <div class="line-hl" id="lhl" style="display:none"></div>
+                                <div class="hl-layer" id="hll" aria-hidden="true"></div>
+                                <textarea
+                                    id="src-ta"
+                                    spellcheck="false"
+                                    autocomplete="off"
+                                    placeholder="What stood out about today?
   It led to something real
     Yes — it did
     No — not quite"
-                            ></textarea>
-                            <div class="hover-btns-layer" id="hoverBtnsLayer"></div>
+                                ></textarea>
+                                <div class="hover-btns-layer" id="hoverBtnsLayer"></div>
+                            </div>
                         </div>
+                        <span class="pstatus" id="pst"></span>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- BOTTOM-LEFT CLUSTER: undo / redo / history (floating) -->
+        <div class="bottom-left-cluster">
+            <button id="btn-undo" onclick="olUndo()" title="undo (⌘Z)">↶</button>
+            <button id="btn-redo" onclick="olRedo()" title="redo (⇧⌘Z)">↷</button>
+            <button onclick="openHistory()" title="version history">⟲</button>
+        </div>
+
         <!-- REFLECTION SCREEN -->
         <div class="reflect-screen" id="reflectScreen">
             <div class="reflect-top">
-                <span class="brand">Reflect &amp; Commit</span>
-                <span class="reflect-go">▶ reflect</span>
-                <span style="flex:1"></span>
+                <span class="brand" id="reflectTopBrand">reflect</span>
                 <button class="reflect-return" onclick="finishReflection()">return</button>
             </div>
             <div class="reflect-body">
                 <div class="rcard" id="rcard">
                     <div class="rcard-main" id="rcardMain">
+                        <div class="rcard-counter" id="rcardCounter"></div>
                         <div class="rcard-recall" id="rcardRecall"></div>
                         <div class="rcard-prompt" id="rcardPrompt"></div>
                         <div class="rfield" id="rcardInput">
@@ -165,6 +191,9 @@
                             <button class="rnav-back" id="rBack" onclick="runBack()">‹ back</button>
                             <span style="flex:1"></span>
                             <button class="rnav-next" id="rNext" onclick="submitCard()">next →</button>
+                        </div>
+                        <div class="rnav-hold-track" id="rHoldTrack" style="display:none">
+                            <div class="rnav-hold-fill" id="rHoldFill"></div>
                         </div>
                     </div>
                     <div class="rcard-end" id="rcardEnd" style="display:none">
@@ -309,28 +338,24 @@
             </div>
         </div>
 
-        <!-- MAKE IT A HABIT — install-PWA bottom sheet, shown after a commitment or via the FAB -->
+        <!-- MAKE IT A HABIT — install-PWA bottom sheet, shown after a commitment or via the FAB.
+             Same screen on desktop and mobile: title, install button (mobile-only, when the
+             browser can prompt natively), QR code, the "accessible from your home screen"
+             blurb, the typed-out link, then the two dismiss actions. -->
         <div class="habit-ov" id="habitOv">
             <div class="habit-inner">
                 <div class="habit-handle"></div>
                 <div class="habit-title">Make it a habit</div>
-                <div class="habit-sub">An app, accessible from your home screen.</div>
 
-                <!-- mobile, browser can prompt natively -->
+                <!-- mobile only, and only when the browser can prompt natively -->
                 <div class="habit-install-native" id="habitInstallNative" style="display:none">
-                    <button class="btn-google pay-btn" id="habitInstallBtn" onclick="window._installPWA()">Install app</button>
+                    <button class="btn-google pay-btn" id="habitInstallBtn" onclick="window._installPWA()">Get app</button>
                 </div>
 
-                <!-- mobile, no native prompt available (e.g. iOS Safari) -->
-                <div class="habit-install-manual" id="habitInstallManual" style="display:none">
-                    <div class="habit-manual-steps" id="habitManualSteps"></div>
-                </div>
-
-                <!-- desktop: QR to the install page -->
-                <div class="habit-qr-wrap" id="habitQrWrap" style="display:none">
+                <div class="habit-qr-wrap" id="habitQrWrap">
                     <div class="habit-qr" id="habitQr"></div>
-                    <div class="habit-qr-label">scan to install on your phone</div>
-                    <div class="habit-qr-url" id="habitQrUrl"></div>
+                    <div class="habit-sub">An app, accessible from your home screen.</div>
+                    <a class="habit-qr-url" id="habitQrUrl" href="#" target="_blank" rel="noopener"></a>
                 </div>
 
                 <div class="habit-actions">
@@ -340,10 +365,8 @@
             </div>
         </div>
 
-        <!-- BOTTOM-RIGHT CORNER FLOATING BUTTONS -->
+        <!-- BOTTOM-LEFT, ABOVE THE DOCK TOGGLE — mirrors the add button on the right. -->
         <div class="corner-fabs" id="cornerFabs">
-            <!-- help — only shown once the streak has taken its place in the top bar -->
-            <button class="help-fab" id="helpFabBtn" onclick="window._openHelpOv()" title="need help?" aria-label="need help?" style="display:none">?</button>
             <!-- make it a habit — manual trigger, hidden once already running as an installed PWA -->
             <button class="habit-fab" id="habitFabBtn" onclick="window._showHabitPopup()" title="add to home screen" aria-label="add to home screen">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="19" height="19">
@@ -369,7 +392,7 @@
         <!-- UPGRADE OVERLAY -->
         <div class="upgrade-ov" id="upgradeOv">
             <div class="auth-box">
-                <div class="auth-logo">Reflect &amp; Commit</div>
+                <div class="auth-logo">Reflect <span class="amp">&amp;</span> Commit</div>
                 <div class="pay-price">$99 <small style="font-size:16px;font-weight:600;color:var(--muted2)">/yr</small></div>
                 <div class="auth-sub">You've made 10 commitments — unlock unlimited to keep going.</div>
                 <button class="btn-google pay-btn" onclick="window.open(window._upgradeUrl,'_blank')">Upgrade to continue</button>
@@ -381,6 +404,7 @@
         <script type="module" src="firebase-init.js"></script>
         <script src="js/screens.js"></script>
         <script src="js/editor-canvas.js"></script>
+        <script src="js/node-graph.js"></script>
         <script src="js/run-engine.js"></script>
         <script src="js/outcomes-settings.js"></script>
         <script src="js/onboarding.js"></script>

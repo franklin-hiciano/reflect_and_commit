@@ -131,7 +131,7 @@ function updateNotiBanner(){
   if(!status||!btn)return;
   const perm=_hasNotif?Notification.permission:'unsupported';
   const testSent=localStorage.getItem('notif_test_sent')==='1';
-  let msg='Get a daily nudge to reflect.', label='turn on';
+  let msg='Get a daily reminder to reflect.', label='turn on';
   if(!_hasNotif){msg="Notifications aren't supported in this browser.";}
   else if(!window.isSecureContext){msg='Open via http://localhost or https to enable reminders.';}
   else if(perm==='denied'){msg='Reminders are blocked — allow notifications in your browser settings.';label='retry';}

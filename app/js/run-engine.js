@@ -3,14 +3,44 @@ let currentRun=null;     // { runId, steps:[{nodeId,answer,next}], complete }
 let tnode=null;
 let _runSaveTimer=null;
 let _commitSourceNode=null;   // node the user credits for this commitment (turns it gold)
+let _holdTimer=null;          // "sit with this" timer on the "next" button for text nodes
+let _holdTimerDone=false;     // has the timer elapsed for the CURRENT card
+const HOLD_MS=2200;           // minimum time before commit can even be considered
+const REFLECT_WINDOW_MIN=100; // the reflect window is this many minutes, starting at your reminder time
 
 function currentRunId(){return currentRun?currentRun.runId:null;}
 function firstNode(){return Object.keys(parsedTree)[0]||null;}
 
-// ── reflect entry — just check that the tree has at least one node ──
+// ── reflect window: gated to a 100-minute window starting at your reminder time
+// (js/outcomes-settings.js's notifTime(), default 8pm) — this isn't something you
+// reach for at 2pm to get it out of the way; it happens once, at night. ──────────
+function reflectWindowRange(){
+  const time=(typeof notifTime==='function')?notifTime():'20:00';
+  const parts=time.split(':').map(Number);
+  const start=new Date();start.setHours(parts[0]||20,parts[1]||0,0,0);
+  const end=new Date(start.getTime()+REFLECT_WINDOW_MIN*60000);
+  return{start,end};
+}
+function withinReflectWindow(){
+  const{start,end}=reflectWindowRange();
+  const now=new Date();
+  return now>=start&&now<=end;
+}
+function fmtClock(d){return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}).toLowerCase();}
+function refreshReflectAvailability(){
+  const btn=document.querySelector('.reflect-btn');
+  if(!btn)return;
+  btn.classList.toggle('window-closed',!withinReflectWindow());
+  const{start,end}=reflectWindowRange();
+  btn.title='reflect · opens '+fmtClock(start)+', closes '+fmtClock(end);
+}
+setInterval(refreshReflectAvailability,30000);
+
+// ── reflect entry — tree has to parse clean AND the window has to be open ──
 function attemptReflect(){
   if(!Object.keys(parsedTree).length)return;
   if(window._parseErrors&&window._parseErrors.length){flashReflectError();return;}
+  if(!withinReflectWindow()){flashReflectClosed();return;}
   startReflection();
 }
 function flashReflectError(){
@@ -20,6 +50,19 @@ function flashReflectError(){
   void btn.offsetWidth; // restart the animation if it's already mid-shake
   btn.classList.add('shake');
   setTimeout(()=>btn.classList.remove('shake'),400);
+}
+function flashReflectClosed(){
+  const btn=document.querySelector('.reflect-btn');
+  if(!btn)return;
+  const{start}=reflectWindowRange();
+  const now=new Date();
+  const label=now<start?('opens '+fmtClock(start)):('opens '+fmtClock(start)+' tomorrow');
+  const original=btn.textContent;
+  btn.textContent=label;
+  btn.classList.remove('shake');
+  void btn.offsetWidth;
+  btn.classList.add('shake');
+  setTimeout(()=>{btn.classList.remove('shake');btn.textContent=original;},1700);
 }
 
 // ── start / exit ──
@@ -31,6 +74,7 @@ function startReflection(){
 }
 function exitReflection(){
   const sc=document.getElementById('reflectScreen');if(sc)sc.classList.remove('on');
+  clearHoldLock();
   currentRun=null;tnode=null;
 }
 
@@ -39,27 +83,99 @@ function renderCard(){
   const node=parsedTree[tnode];
   document.getElementById('rcardEnd').style.display='none';
   document.getElementById('rcardMain').style.display='';
+  const brand=document.getElementById('reflectTopBrand');if(brand)brand.textContent='reflect';
   const prompt=document.getElementById('rcardPrompt');if(prompt)prompt.textContent=node?node.title:'';
   const rc=document.getElementById('rcardRecall');if(rc)rc.innerHTML=buildRecall(node);
+  updateReflectCounter();
   const input=document.getElementById('rcardInput'),choices=document.getElementById('rcardChoices'),next=document.getElementById('rNext');
   if(node&&node.type==='text'){
     input.style.display='';choices.style.display='none';choices.innerHTML='';next.style.display='';
     const ip=document.getElementById('rInput');if(ip){ip.value='';setTimeout(()=>ip.focus(),60);}
+    bindReflectInputOnce();
+    startHoldLock();
   }else if(node){
     input.style.display='none';choices.style.display='';next.style.display='none';
     choices.innerHTML=node.opts.map((o,i)=>'<button class="ropt" onclick="chooseSingle('+i+')">'+esc(o.l)+'</button>').join('');
+    clearHoldLock();
   }
+  // always allow going back — the record isn't a one-way door
   const back=document.getElementById('rBack');if(back)back.style.display=(currentRun&&currentRun.steps.length>0)?'':'none';
+}
+
+// ── "3 / 7" — which question you're on, out of how many the tree currently has.
+// top-right corner of the card itself, not the screen chrome. (Branching means
+// your actual path may end well before 7 — this is the tree's size, a sense of
+// how much is here, not a literal countdown to the end.) ────────────────────────
+function updateReflectCounter(){
+  const el=document.getElementById('rcardCounter');if(!el)return;
+  // completed / total — how many you've actually answered so far, not which
+  // one you're currently on. Starts at 0, same as any honest progress count.
+  const done=currentRun?currentRun.steps.length:0;
+  const total=Object.keys(parsedTree||{}).length||Math.max(done,1);
+  el.textContent=done+' / '+total;
+}
+
+// ── next only unlocks once BOTH are true: you've sat with the question for a
+// beat (HOLD_MS), and you've actually filled the line — not just typed a few
+// words into it. Two different kinds of "this is a real answer," checked together. ──
+function lineFilled(){
+  const ip=document.getElementById('rInput');
+  if(!ip)return false;
+  // has to overflow the box by a full width's worth of extra text, not just
+  // spill past the edge — a couple overflowing characters isn't "filled the line"
+  return ip.value.trim().length>0&&ip.scrollWidth>=ip.clientWidth*2;
+}
+function refreshNextGate(){
+  const node=parsedTree[tnode];
+  if(!node||node.type!=='text')return;
+  const next=document.getElementById('rNext');
+  if(!next)return;
+  const ok=_holdTimerDone&&lineFilled();
+  next.disabled=!ok;
+  next.classList.toggle('locked',!ok);
+}
+function bindReflectInputOnce(){
+  const ip=document.getElementById('rInput');
+  if(!ip||ip._gateBound)return;
+  ip._gateBound=true;
+  ip.addEventListener('input',refreshNextGate);
+}
+function clearHoldLock(){
+  clearTimeout(_holdTimer);_holdTimer=null;_holdTimerDone=false;
+  const next=document.getElementById('rNext');if(next){next.classList.remove('locked');next.disabled=false;}
+  const track=document.getElementById('rHoldTrack');if(track)track.style.display='none';
+  const fill=document.getElementById('rHoldFill');if(fill)fill.style.width='0%';
+}
+function startHoldLock(){
+  clearHoldLock();
+  const track=document.getElementById('rHoldTrack'),fill=document.getElementById('rHoldFill');
+  if(track)track.style.display='';
+  refreshNextGate();
+  const start=Date.now();
+  const tick=()=>{
+    const pct=Math.min(100,((Date.now()-start)/HOLD_MS)*100);
+    if(fill)fill.style.width=pct+'%';
+    if(pct>=100){
+      _holdTimerDone=true;
+      if(track)track.style.display='none';
+      refreshNextGate();
+      return;
+    }
+    _holdTimer=setTimeout(tick,60);
+  };
+  tick();
 }
 function buildRecall(node){
   if(!node||!node.title)return'';
-  const map=window._recallMap||{};
-  const sources=map[node.title];
+  const sources=window._effectiveRecallSources?window._effectiveRecallSources(node.title):[];
   if(!sources||!sources.length)return'';
   let html='';
   sources.forEach(sourceId=>{
     const past=getPastAnswers(sourceId,1,7);
-    html+='<div class="recall"><div class="recall-hd">↩ you, 1–7d ago · '+esc(sourceId)+'</div>';
+    // self-recall (the default) doesn't need to name the question — it's the one
+    // right above. only label it when it's pulling from a DIFFERENT question.
+    const hd=(sourceId===node.title)?'↩ you, 1–7d ago':'↩ you, 1–7d ago · '+esc(sourceId);
+    html+='<div class="recall"><div class="recall-hd">'+hd+'</div>';
     if(!past.length)html+='<div class="recall-empty">nothing in this window</div>';
     else past.forEach(p=>{const dd=p.date?new Date(p.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';html+='<div class="recall-row"><span class="recall-date">'+esc(dd)+'</span><span class="recall-txt">'+esc(p.text.slice(0,160))+'</span></div>';});
     html+='</div>';
@@ -105,11 +221,18 @@ function blinkTo(midFn){
 function chooseSingle(i){const node=parsedTree[tnode];if(!node)return;const o=node.opts[i];if(!o)return;advance({type:'single',label:o.l},o.n);}
 function submitCard(){
   const node=parsedTree[tnode];if(!node||node.type!=='text')return;
+  const next=document.getElementById('rNext');if(next&&next.disabled)return; // still on hold
   const ip=document.getElementById('rInput');const text=(ip?ip.value:'').trim();
   if(ip){ip.value='';ip.blur();}
   advance({type:'text',text},node.def);
 }
-function onCardKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submitCard();}}
+function onCardKey(e){
+  if(e.key==='Enter'&&!e.shiftKey){
+    e.preventDefault();
+    const next=document.getElementById('rNext');if(next&&next.disabled)return;
+    submitCard();
+  }
+}
 function runBack(){
   if(!currentRun||!currentRun.steps.length)return;
   const s=currentRun.steps.pop();currentRun.complete=false;saveRunSoon();
@@ -126,6 +249,7 @@ function autoGrowInput(el){
 function showEndScreen(){
   document.getElementById('rcardMain').style.display='none';
   const end=document.getElementById('rcardEnd');end.style.display='';
+  const brand=document.getElementById('reflectTopBrand');if(brand)brand.textContent='commit';
   _commitDateVal='';
   const ct=document.getElementById('commitText');if(ct)ct.value='';
   const dl=document.getElementById('commitDateLabel');if(dl)dl.textContent='add a date';

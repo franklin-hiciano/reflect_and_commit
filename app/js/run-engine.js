@@ -11,11 +11,12 @@ const REFLECT_WINDOW_MIN=100; // the reflect window is this many minutes, starti
 function currentRunId(){return currentRun?currentRun.runId:null;}
 function firstNode(){return Object.keys(parsedTree)[0]||null;}
 
-// ── reflect window: gated to a 100-minute window starting at your reminder time
-// (js/outcomes-settings.js's notifTime(), default 8pm) — this isn't something you
-// reach for at 2pm to get it out of the way; it happens once, at night. ──────────
+// ── reflect window: gated to a 100-minute window starting at your reflect-open
+// time (js/outcomes-settings.js's openTime(), default 8pm, settable separately
+// from the notification time via the bell) — this isn't something you reach for
+// at 2pm to get it out of the way; it happens once, at night. ────────────────────
 function reflectWindowRange(){
-  const time=(typeof notifTime==='function')?notifTime():'20:00';
+  const time=(typeof openTime==='function')?openTime():'20:00';
   const parts=time.split(':').map(Number);
   const start=new Date();start.setHours(parts[0]||20,parts[1]||0,0,0);
   const end=new Date(start.getTime()+REFLECT_WINDOW_MIN*60000);

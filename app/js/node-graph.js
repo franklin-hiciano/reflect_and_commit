@@ -59,7 +59,7 @@ function ngNodeLevel(rawLine) {
 function ngBuildGraph() {
   const tree = typeof parsedTree !== "undefined" ? parsedTree : {};
   const ids = Object.keys(tree).filter((id) => tree[id] && tree[id].rawLine != null);
-  if (!ids.length) return { nodes: [], edges: [], roots: [], byId: {} };
+  if (!ids.length) return { nodes: [], edges: [], roots: [], byId: {}, referenced: new Set() };
 
   const referenced = new Set();
   const edges = [];
@@ -82,7 +82,7 @@ function ngBuildGraph() {
   const roots = ids.filter((id) => ngNodeLevel(tree[id].rawLine) === 0);
   const byId = {};
   ids.forEach((id) => (byId[id] = { id, ...tree[id] }));
-  return { nodes: ids.map((id) => byId[id]), edges, roots, byId };
+  return { nodes: ids.map((id) => byId[id]), edges, roots, byId, referenced };
 }
 
 function ngLayout(graph) {
@@ -90,8 +90,16 @@ function ngLayout(graph) {
   graph.nodes.forEach((n) => (outgoing[n.id] = []));
   graph.edges.forEach((e) => outgoing[e.from] && outgoing[e.from].push(e));
 
+  // a top-level (level-0) line that's ALSO reached by reference from elsewhere
+  // in the tree (recall/def reuse — see ngBuildGraph's `referenced` set) is a
+  // reusable target, not a second, independent branch of its own. It should
+  // show up exactly once, nested under whatever node actually references it —
+  // not floating as its own root too. So it's excluded from the DFS start set
+  // here; it still renders (it's still in graph.nodes), just only reachable
+  // via the edge that points at it.
   const orderedRoots = graph.roots
     .slice()
+    .filter((id) => !graph.referenced || !graph.referenced.has(id))
     .sort((a, b) => graph.byId[a].rawLine - graph.byId[b].rawLine);
 
   // pass 1 — column = depth, via plain DFS (unchanged from before: a node reached
@@ -509,7 +517,7 @@ function ngDeleteNode(id) {
 
   const endIdx = ngSubtreeEndIdx(items, idx);
   const rawStart = items[idx].rawLine;
-  const rawEnd = endIdx < items.length ? items[endIdx].rawLine : rawLines.length;
+  const rawEnd = ngRawEndFor(items, endIdx, rawLines);
 
   rawLines.splice(rawStart, rawEnd - rawStart);
 
@@ -728,6 +736,17 @@ function ngSubtreeEndIdx(items, idx) {
   while (j < items.length && items[j].level > lv) j++;
   return j;
 }
+// ── raw-line boundary for an item-index end, without trusting rawLines.length as
+// the "end of real content" fallback. A textarea value that ends with a trailing
+// newline splits into a spurious empty trailing element (`"a\n".split("\n")` →
+// `["a", ""]`) that ngLineItems correctly ignores (blank lines aren't items) but
+// which still inflates rawLines.length by one — so falling back to rawLines.length
+// inserted new content one line PAST the real last line, leaving a stray blank
+// line before it (this is the "+" button's "two newlines then option n" bug). ────
+function ngRawEndFor(items, endIdx, rawLines) {
+  if (endIdx < items.length) return items[endIdx].rawLine;
+  return items.length ? items[items.length - 1].rawLine + 1 : rawLines.length;
+}
 
 function ngCreateChildNode(parentId, title) {
   const t = ta();
@@ -757,7 +776,7 @@ function ngCreateChildNode(parentId, title) {
     const childIdx = kids[0];
     const endIdx = ngSubtreeEndIdx(items, childIdx);
     const childStartRaw = items[childIdx].rawLine;
-    const rawEnd = endIdx < items.length ? items[endIdx].rawLine : rawLines.length;
+    const rawEnd = ngRawEndFor(items, endIdx, rawLines);
 
     for (let r = childStartRaw; r < rawEnd; r++) {
       if (rawLines[r] != null) rawLines[r] = "  " + rawLines[r];
@@ -769,7 +788,7 @@ function ngCreateChildNode(parentId, title) {
   } else {
     const lastChildIdx = kids[kids.length - 1];
     const endIdx = ngSubtreeEndIdx(items, lastChildIdx);
-    const rawEnd = endIdx < items.length ? items[endIdx].rawLine : rawLines.length;
+    const rawEnd = ngRawEndFor(items, endIdx, rawLines);
     const n = kids.length + 1;
     rawLines.splice(rawEnd, 0, indent(level + 1) + "option " + n, indent(level + 2) + title);
     newSrc = rawLines.join("\n");

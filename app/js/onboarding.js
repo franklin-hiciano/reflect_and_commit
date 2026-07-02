@@ -1,3 +1,38 @@
+// ── Notif-time screen: the very first thing shown on first launch — set both
+// when you're notified and when the reflect window opens (the bell popover,
+// reused here as a centered modal via the backdrop + .first-run). Chains into
+// the intro video either way, same pattern as everything else in this file. ────
+const _NOTIF_SETTINGS_KEY = 'rc_notif_settings_seen';
+
+window._maybeShowNotifSettings = function () {
+  try {
+    if (localStorage.getItem(_NOTIF_SETTINGS_KEY) === '1') {
+      window._maybeShowIntroVideo && window._maybeShowIntroVideo();
+      return;
+    }
+  } catch (e) {}
+  const auth = document.getElementById('authScreen');
+  const pw = document.getElementById('paywall');
+  if ((auth && !auth.classList.contains('hidden')) || (pw && pw.classList.contains('on'))) {
+    window._maybeShowIntroVideo && window._maybeShowIntroVideo();
+    return;
+  }
+  const pop = document.getElementById('notifPop');
+  if (!pop) {
+    window._maybeShowIntroVideo && window._maybeShowIntroVideo();
+    return;
+  }
+  const nt = document.getElementById('notifPopNotifyTime');
+  if (nt) nt.value = typeof notifTime === 'function' ? notifTime() : '20:00';
+  const ot = document.getElementById('notifPopOpenTime');
+  if (ot) ot.value = typeof openTime === 'function' ? openTime() : '20:00';
+  const intro = document.getElementById('notifPopIntro');
+  if (intro) intro.style.display = '';
+  pop.classList.add('open', 'first-run');
+  const backdrop = document.getElementById('notifBackdrop');
+  if (backdrop) backdrop.classList.add('on');
+};
+
 // ── Intro video overlay (shown once on first entry, after auth) ──────────────────
 // Set this to your Vimeo video ID when the video is ready:
 const _INTRO_VIDEO_ID = '';   // e.g. '1204235305'

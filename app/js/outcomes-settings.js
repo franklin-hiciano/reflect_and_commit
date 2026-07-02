@@ -9,6 +9,13 @@ function notifTime(){return localStorage.getItem('notif_time')||'20:00';}
 function setNotifTime(t){if(t)localStorage.setItem('notif_time',t);}
 function notifConfirmed(){return localStorage.getItem('notif_confirmed')==='1';}
 
+// ── reflect-window open time — split out from notif_time: notif_time is when the
+// daily reminder fires, open_time is when the reflect window itself unlocks (read
+// by run-engine.js's reflectWindowRange). Falls back to notifTime() until someone
+// explicitly sets it apart via the bell, so nothing changes for existing users.
+function openTime(){return localStorage.getItem('open_time')||notifTime();}
+function setOpenTime(t){if(t)localStorage.setItem('open_time',t);}
+
 // ── loud notifications (vibration + requireInteraction) ──
 function loudEnabled(){return localStorage.getItem('notif_loud')==='1';}
 function toggleLoudNotif(){
@@ -147,6 +154,51 @@ function dismissNotiBanner(){
 }
 
 function refreshNotifUI(){checkNotiBanner();}
+
+// ── notif bell popover — the one place both times get set together. Anchored
+// under the bell normally; also reused (via .first-run + the backdrop) as the
+// screen shown the very first time the app is opened, see onboarding.js. ───────
+window._toggleNotifSettings=function(e){
+  if(e)e.stopPropagation();
+  const pop=document.getElementById('notifPop');
+  if(!pop)return;
+  if(pop.classList.contains('open')){
+    window._closeNotifSettings();
+    return;
+  }
+  const nt=document.getElementById('notifPopNotifyTime');if(nt)nt.value=notifTime();
+  const ot=document.getElementById('notifPopOpenTime');if(ot)ot.value=openTime();
+  pop.classList.add('open');
+  setTimeout(()=>{document.addEventListener('click',_onNotifPopOutsideClick,{once:true});},0);
+};
+function _onNotifPopOutsideClick(e){
+  const pop=document.getElementById('notifPop');
+  if(!pop||pop.classList.contains('first-run'))return; // first-run only closes via "done"
+  const wrap=document.querySelector('.notif-bell-wrap');
+  if(wrap&&wrap.contains(e.target))return;
+  pop.classList.remove('open');
+}
+window._onNotifPopChange=function(){
+  const nt=document.getElementById('notifPopNotifyTime');
+  const ot=document.getElementById('notifPopOpenTime');
+  if(nt&&nt.value)setNotifTime(nt.value);
+  if(ot&&ot.value)setOpenTime(ot.value);
+  if(_hasNotif&&Notification.permission==='granted')scheduleNotif();
+  if(typeof refreshReflectAvailability==='function')refreshReflectAvailability();
+};
+window._closeNotifSettings=function(){
+  window._onNotifPopChange();
+  const pop=document.getElementById('notifPop');
+  if(!pop)return;
+  const wasFirstRun=pop.classList.contains('first-run');
+  pop.classList.remove('open','first-run');
+  const intro=document.getElementById('notifPopIntro');if(intro)intro.style.display='none';
+  const backdrop=document.getElementById('notifBackdrop');if(backdrop)backdrop.classList.remove('on');
+  if(wasFirstRun){
+    try{localStorage.setItem('rc_notif_settings_seen','1');}catch(e){}
+    window._maybeShowIntroVideo&&window._maybeShowIntroVideo();
+  }
+};
 
 // ── init ──
 (function init(){

@@ -1,415 +1,84 @@
 <!doctype html>
 <html>
-    <head>
-        <meta charset="utf-8" />
-        <meta
-            name="viewport"
-            content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"
-        />
-        <title>Reflect &amp; Commit</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&family=DM+Mono:wght@400;500&display=swap" />
-        <link rel="stylesheet" href="style.css" />
-        <!-- PWA -->
-        <link rel="manifest" href="manifest.json" />
-        <meta name="theme-color" content="#0a0a0a" />
-        <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-        <link rel="icon" href="icons/icon-192.png" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Reflect & Commit" />
-    </head>
-    <body>
-        <!-- AUTH -->
-        <div class="auth-screen" id="authScreen">
-            <div class="auth-box">
-                <div class="auth-logo">Reflect <span class="amp">&amp;</span> Commit</div>
-                <div class="auth-sub">
-                    reflect on your day — then commit to one real move
-                </div>
-                <button class="btn-google" id="btnSignIn">
-                    <svg width="16" height="16" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.47 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                    Continue with Google
-                </button>
-                <div class="auth-note">
-                    Your reflections and commitments are private. Synced across your devices.
-                </div>
-            </div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <title>Reflect &amp; Commit</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="icon" href="icons/icon-192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Reflect &amp; Commit" />
+  </head>
+  <body>
+    <!-- AUTH -->
+    <div class="auth-screen" id="authScreen">
+      <div class="auth-box">
+        <div class="auth-logo">Reflect <span class="amp">&amp;</span> Commit</div>
+        <button class="btn-google" id="btnSignIn" onclick="doSignIn()">Continue with Google</button>
+      </div>
+    </div>
+
+    <!-- HOME — opened from the app icon. settings / edit questions only. -->
+    <div class="screen on" id="homeScreen">
+      <button class="add-corner" onclick="addQuestion()" title="add a question">+</button>
+      <div class="top-right-cluster">
+        <input type="time" id="notifyTimeInput" onchange="onNotifyTimeChange(this.value)" />
+        <button class="btn-test" onclick="sendSelfNotification()">test</button>
+      </div>
+
+      <div class="home-section grow" style="margin-top:52px">
+        <div id="qList" class="q-list"></div>
+      </div>
+
+      <button class="btn-text signout-corner" onclick="doSignOut()">sign out</button>
+    </div>
+
+    <!-- LANDING — shown when NOT running as an installed PWA. Desktop: QR to
+         install on your phone. Mobile: triggers the native install prompt. -->
+    <div class="screen" id="landingScreen">
+      <div class="landing-inner">
+        <div class="auth-logo">Reflect <span class="amp">&amp;</span> Commit</div>
+        <button class="btn-google" id="getStartedBtn" onclick="onGetStarted()">Get started</button>
+        <div class="landing-qr-wrap" id="landingQrWrap" style="display:none">
+          <img id="landingQrImg" class="landing-qr-img" alt="scan to install on your phone" />
+          <div class="landing-qr-sub">scan with your phone to install — mobile only, no desktop app.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NOT AVAILABLE -->
+    <div class="screen" id="unavailableScreen">
+      <div class="unavail-inner">
+        <div class="unavail-label">not available right now</div>
+        <div class="unavail-time">next reflection: <span id="nextAvailLabel"></span></div>
+        <button class="btn-text" onclick="goHome()">go to settings</button>
+      </div>
+    </div>
+
+    <!-- REFLECTION SCREEN — pill at the very top, nothing else -->
+    <div class="screen" id="reflectScreen">
+      <div class="reflect-black">
+        <div class="pill-wrap">
+          <div class="question-label" id="questionLabel"></div>
+          <div class="pill">
+            <input id="answerInput" class="pill-input" type="text" autocomplete="off"
+              placeholder="type your answer…" oninput="onAnswerInput(this.value)"
+              onkeydown="if(event.key==='Enter') nextCard()" />
+            <button class="pill-recall" id="recallBtn" style="display:none">↺</button>
+            <button class="pill-next" id="nextBtn" onclick="nextCard()">→</button>
+          </div>
+          <div class="recall-panel" id="recallPanel"></div>
         </div>
 
-        <!-- PAYWALL -->
-        <div class="paywall" id="paywall">
-            <div class="auth-box">
-                <div class="auth-logo">Reflect <span class="amp">&amp;</span> Commit</div>
-                <div class="pay-price" id="payPrice">$29 · lifetime</div>
-                <div class="auth-sub" id="payBlurb">Unlock unlimited reflections and commitments.</div>
-                <button class="btn-google pay-btn" id="payBtn">Unlock with card</button>
-                <button class="pay-alt" onclick="doSignOut()">use a different account</button>
-                <div class="auth-note">Secure checkout powered by Stripe.</div>
-            </div>
-        </div>
+        <button class="reflect-exit" onclick="exitReflection()">✕</button>
+      </div>
+    </div>
 
-        <!-- APP LOADING GATE — covers the editor between sign-in and the first real
-             content snapshot landing, so nothing is interactive (and nothing the user
-             types) can race with, and get silently overwritten by, existing synced
-             content that's still on its way in. -->
-        <div class="app-loading-ov" id="appLoadingOv">
-            <div class="app-loading-spin"></div>
-        </div>
-
-        <!-- NOTIFICATION BANNER -->
-        <div class="noti-banner" id="notiBanner">
-            <!-- phase 1: message + action -->
-            <span class="noti-banner-txt" id="notiBannerStatus">Get a daily reminder to reflect.</span>
-            <button class="noti-banner-btn" id="notiBannerBtn" onclick="sendTestNotif()">turn on</button>
-            <button class="noti-banner-x" id="notiBannerDismiss" onclick="dismissNotiBanner()">don't ask again</button>
-            <!-- phase 2: time picker (shown after notification confirmed) -->
-            <input type="time" class="noti-banner-time" id="notiBannerTime" value="20:00" style="display:none" onchange="onBannerTimeChange()" />
-            <button class="noti-banner-btn" id="notiBannerDone" style="display:none" onclick="onBannerDone()">done</button>
-        </div>
-
-        <!-- EDITOR (home / default screen) -->
-        <div class="editor" id="editor">
-            <div class="top-bar">
-                <!-- the one action at the true left edge, identity right after it,
-                     status/help/account on the right -->
-                <button class="reflect-btn" onclick="attemptReflect()" title="reflect">REFLECT ▶</button>
-                <div class="brand">Reflect <span class="amp">&amp;</span> Commit</div>
-                <span style="flex:1"></span>
-                <div class="streak-pill" id="streakPill" title="reflect today to start a streak" style="display:none">
-                    <span class="streak-n">0 day streak</span>
-                </div>
-                <div class="help-btn-wrap">
-                    <button class="help-btn" id="helpBtn" onclick="window._openHelpOv()" aria-label="need help?">?</button>
-                    <span class="help-tip">need help?</span>
-                </div>
-                <div class="account-wrap" id="accountWrap" onclick="window._toggleAccountMenu(event)">
-                    <div class="account">
-                        <img class="auth-avatar" id="userAvatar" src="" alt="" />
-                        <span class="user-name" id="userName"></span>
-                    </div>
-                    <div class="account-menu" id="accountMenu">
-                        <button onclick="doSignOut()">sign out</button>
-                    </div>
-                </div>
-            </div>
-            <!-- SPLIT: text editor (left) + node graph (right) on desktop, always both open.
-                 (The graph stays first in the DOM so it's canvas-first on mobile — see the
-                 mobile media query in style.css — desktop just reorders it visually via
-                 `order`.) The graph is a live, left-to-right visualization of the tree —
-                 purely derived from parsedTree, never a separate source of truth. Pan by
-                 dragging the background; drag a node's "+" onto empty space to add a
-                 question; click a node to jump to its line in the text editor. -->
-            <div class="editor-split" id="editorSplit">
-                <div class="node-graph-panel" id="nodeGraphPanel">
-                    <div class="ng-content" id="ngContent"></div>
-                    <!-- top-right: overview of the whole tree once it outgrows the panel,
-                         plus the orientation toggle just to its left (minimap has to come
-                         first in the DOM so the toggle can shift left of it via ~ when
-                         it's showing) -->
-                    <div class="ng-minimap" id="ngMinimap">
-                        <svg id="ngMinimapSvg"></svg>
-                    </div>
-                    <button class="ng-vertical-toggle" id="ngVerticalToggle" onclick="window._ngToggleVertical()" title="switch graph orientation" aria-label="switch graph orientation">
-                        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
-                            <path d="M2 8h12M9 4l4 4-4 4"></path>
-                        </svg>
-                    </button>
-                    <!-- canvas-owned controls live IN the canvas: add-a-question (bottom
-                         right) and the mobile dock flip (bottom left) -->
-                    <div class="ng-add-fab-wrap" id="ngAddFabWrap">
-                        <button class="ng-add-fab" id="ngAddFab" onclick="window._ngAddFromRightmost()" title="add a question to the end of the tree" aria-label="add a question to the end of the tree">+</button>
-                    </div>
-                    <button class="mobile-dock-flip" id="mobileDockFlip" onclick="window._toggleMobileDock()">
-                        <span id="mobileDockFlipLabel">canvas</span>
-                        <span id="mobileDockFlipArrow">→</span>
-                    </button>
-                </div>
-                <div class="edit-workspace" id="editWorkspace">
-                    <div class="edit-text" id="editText">
-                        <div class="editor-body" id="editorBody">
-                            <div class="lnums" id="lnums">1</div>
-                            <div class="editor-inner">
-                                <div class="line-hl" id="lhl" style="display:none"></div>
-                                <div class="hl-layer" id="hll" aria-hidden="true"></div>
-                                <textarea
-                                    id="src-ta"
-                                    spellcheck="false"
-                                    autocomplete="off"
-                                    placeholder="What stood out about today?
-  It led to something real
-    Yes — it did
-    No — not quite"
-                                ></textarea>
-                                <div class="hover-btns-layer" id="hoverBtnsLayer"></div>
-                            </div>
-                        </div>
-                        <span class="pstatus" id="pst"></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- BOTTOM-LEFT CLUSTER: undo / redo / history (floating) -->
-        <div class="bottom-left-cluster">
-            <button id="btn-undo" onclick="olUndo()" title="undo (⌘Z)">↶</button>
-            <button id="btn-redo" onclick="olRedo()" title="redo (⇧⌘Z)">↷</button>
-            <button onclick="openHistory()" title="version history">⟲</button>
-        </div>
-
-        <!-- REFLECTION SCREEN -->
-        <div class="reflect-screen" id="reflectScreen">
-            <div class="reflect-top">
-                <span class="brand" id="reflectTopBrand">reflect</span>
-                <button class="reflect-return" onclick="finishReflection()">return</button>
-            </div>
-            <div class="reflect-body">
-                <div class="rcard" id="rcard">
-                    <div class="rcard-main" id="rcardMain">
-                        <div class="rcard-counter" id="rcardCounter"></div>
-                        <div class="rcard-recall" id="rcardRecall"></div>
-                        <div class="rcard-prompt" id="rcardPrompt"></div>
-                        <div class="rfield" id="rcardInput">
-                            <input
-                                id="rInput"
-                                class="rinput"
-                                type="text"
-                                placeholder="type your response…"
-                                autocomplete="off"
-                                onkeydown="onCardKey(event)"
-                            />
-                            <span class="rfield-line"></span>
-                        </div>
-                        <div class="rcard-choices" id="rcardChoices"></div>
-                        <div class="rcard-nav">
-                            <button class="rnav-back" id="rBack" onclick="runBack()">‹ back</button>
-                            <span style="flex:1"></span>
-                            <button class="rnav-next" id="rNext" onclick="submitCard()">next →</button>
-                        </div>
-                        <div class="rnav-hold-track" id="rHoldTrack" style="display:none">
-                            <div class="rnav-hold-fill" id="rHoldFill"></div>
-                        </div>
-                    </div>
-                    <div class="rcard-end" id="rcardEnd" style="display:none">
-                        <div class="rcard-meta">
-                            <span class="rcard-type">COMMITMENT</span>
-                        </div>
-                        <div class="end-h">commit to one move</div>
-                        <div class="end-sub">One thing you'll make real. The day after, a clean yes or no.</div>
-                        <div class="rfield">
-                            <input
-                                id="commitText"
-                                class="rinput"
-                                type="text"
-                                placeholder="I will…"
-                                autocomplete="off"
-                                oninput="refreshEndCommit()"
-                            />
-                            <button
-                                class="commit-node-btn"
-                                id="commitNodeBtn"
-                                onclick="toggleCommitNodePop()"
-                                title="which question led you here?"
-                            >
-                                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-                                    <circle cx="12" cy="5" r="2.4"></circle>
-                                    <circle cx="6" cy="18" r="2.4"></circle>
-                                    <circle cx="18" cy="18" r="2.4"></circle>
-                                    <path d="M12 7.4V11M12 11l-5 4.6M12 11l5 4.6"></path>
-                                </svg>
-                            </button>
-                            <span class="rfield-line"></span>
-                        </div>
-                        <div class="commit-node-pop" id="commitNodePop" style="display:none"></div>
-                        <button
-                            class="ritual-date-btn"
-                            id="commitDateBtn"
-                            onclick="document.getElementById('commitDate').showPicker?document.getElementById('commitDate').showPicker():document.getElementById('commitDate').focus()"
-                        >
-                            <span id="commitDateLabel">add a date</span>
-                        </button>
-                        <input type="date" id="commitDate" class="ritual-date-input" onchange="onDatePicked()" />
-                        <div class="end-actions">
-                            <button class="rnav-back" onclick="endToggleNotes()">just take a note</button>
-                            <span style="flex:1"></span>
-                            <button class="reflect-btn" id="endCommitGo" onclick="endCommit()" disabled>commit</button>
-                        </div>
-                        <div class="end-notes" id="endNotes" style="display:none">
-                            <div class="end-notes-label">notes — you don't have to commit to anything.</div>
-                            <textarea id="endNotesText" class="cmt-notes" placeholder="free notes — anything." oninput="endNotesInput()"></textarea>
-                        </div>
-                        <button class="end-finish" id="rBackEnd" onclick="finishReflection()">finish without committing</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- MILESTONES -->
-        <div class="milestones-ov" id="milestonesOv">
-            <div class="milestones-top">
-                <div class="milestones-title">commitments</div>
-                <button class="milestones-close" onclick="closeMilestones()">✕</button>
-            </div>
-            <div class="milestones-body" id="milestonesBody"></div>
-        </div>
-
-        <!-- MINTED ANIMATION -->
-        <div class="minted-ov" id="mintedOv">
-            <div class="minted-rainbow"></div>
-            <div class="minted-card" id="mintedCard">
-                <div class="minted-text" id="mintedText"></div>
-                <div class="minted-badge">✓</div>
-            </div>
-        </div>
-
-        <!-- DAY-AFTER CHECK-IN -->
-        <div class="ritual checkin" id="checkinOv">
-            <div class="ritual-inner" id="checkinInner">
-                <div class="ritual-sub">the day after</div>
-                <div class="ritual-enact-text" id="checkinText"></div>
-                <div class="ritual-actions col">
-                    <button class="hold-btn ok" data-action="yes"><span class="hold-fill"></span><span class="hold-label">hold · yes</span></button>
-                    <button class="hold-btn bad" data-action="no"><span class="hold-fill"></span><span class="hold-label">hold · no</span></button>
-                </div>
-            </div>
-        </div>
-
-        <!-- INTRO VIDEO OVERLAY -->
-        <div class="intro-video-ov" id="introVideoOv">
-            <div class="intro-video-inner">
-                <div class="intro-video-label">before you start</div>
-                <div class="intro-video-title">How to design a question that works.</div>
-                <div class="intro-video-frame">
-                    <div class="intro-video-ph" id="introVideoPh">
-                        <div class="intro-play-dot"></div>
-                        <span>video coming soon</span>
-                    </div>
-                    <iframe id="introVideoFrame" class="intro-video-iframe" src="" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen style="display:none"></iframe>
-                </div>
-                <button class="intro-video-skip" onclick="window._dismissIntroVideo()">skip for now →</button>
-            </div>
-        </div>
-
-        <!-- VERSION HISTORY PANEL -->
-        <div class="history-panel" id="historyPanel" style="display:none">
-            <div class="history-header">
-                <span>version history</span>
-                <button class="history-close" onclick="closeHistory()">✕</button>
-            </div>
-            <div class="history-list" id="historyList"></div>
-        </div>
-
-        <!-- FIRST-RUN COMPOUND CARD -->
-        <div class="compound-card" id="compoundCard">
-            <div class="cc-inner">
-                <div class="cc-kicker">how this works</div>
-                <div class="cc-title">Most forks don't matter. A few change everything.</div>
-                <svg class="cc-graph" viewBox="0 0 320 200" aria-hidden="true">
-                    <line x1="20" y1="18" x2="20" y2="180" class="cc-axis"/>
-                    <line x1="20" y1="180" x2="306" y2="180" class="cc-axis"/>
-                    <path d="M20,178 L130,108" class="cc-axis" stroke-width="2"/>
-                    <circle cx="130" cy="108" r="3.5" class="cc-fork-dot"/>
-                    <text x="130" y="98" text-anchor="middle" class="cc-flatlbl">today</text>
-                    <path d="M130,108 L300,120" class="cc-flat"/>
-                    <path d="M130,108 L300,108" class="cc-flat"/>
-                    <path d="M130,108 L300,96" class="cc-flat"/>
-                    <text x="298" y="136" text-anchor="end" class="cc-flatlbl">forks that barely move you</text>
-                    <path id="ccCurve" d="M130,108 C200,104 250,76 300,22" class="cc-curve"/>
-                    <circle r="5" class="cc-dot">
-                        <animateMotion dur="3.4s" repeatCount="indefinite" keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines="0.45 0 1 1">
-                            <mpath href="#ccCurve"/>
-                        </animateMotion>
-                    </circle>
-                    <text x="300" y="16" text-anchor="end" class="cc-ylbl">changes everything</text>
-                </svg>
-                <div class="cc-body">
-                    Every night you're choosing what to spend the question on. Most calls — which task first, whether to skip the gym — barely move you; do them a hundred different ways and you land in roughly the same place. A few — quitting something, starting the hard thing, telling someone the truth — send you somewhere completely different. The tree's job is to help you tell those two apart, on the night they're actually in front of you.
-                </div>
-                <div class="cc-rule">
-                    <span class="cc-iff">the bet&nbsp;⟺</span> make more of the forks that change everything, fewer of the ones that don't
-                </div>
-                <button class="cc-go" onclick="window._dismissCompoundCard()">got it</button>
-            </div>
-        </div>
-
-        <!-- MAKE IT A HABIT — install-PWA bottom sheet, shown after a commitment or via the FAB.
-             Same screen on desktop and mobile: title, install button (mobile-only, when the
-             browser can prompt natively), QR code, the "accessible from your home screen"
-             blurb, the typed-out link, then the two dismiss actions. -->
-        <div class="habit-ov" id="habitOv">
-            <div class="habit-inner">
-                <div class="habit-handle"></div>
-                <div class="habit-title">Make it a habit</div>
-
-                <!-- mobile only, and only when the browser can prompt natively -->
-                <div class="habit-install-native" id="habitInstallNative" style="display:none">
-                    <button class="btn-google pay-btn" id="habitInstallBtn" onclick="window._installPWA()">Get app</button>
-                </div>
-
-                <div class="habit-qr-wrap" id="habitQrWrap">
-                    <div class="habit-qr" id="habitQr"></div>
-                    <div class="habit-sub">An app, accessible from your home screen.</div>
-                    <a class="habit-qr-url" id="habitQrUrl" href="#" target="_blank" rel="noopener"></a>
-                </div>
-
-                <div class="habit-actions">
-                    <button class="habit-skip" onclick="window._dismissHabitPopup()">not now</button>
-                    <button class="habit-skip habit-skip-forever" onclick="window._dismissHabitPopupForever()">do not ask again</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- BOTTOM-LEFT, ABOVE THE DOCK TOGGLE — mirrors the add button on the right. -->
-        <div class="corner-fabs" id="cornerFabs">
-            <!-- make it a habit — manual trigger, hidden once already running as an installed PWA -->
-            <button class="habit-fab" id="habitFabBtn" onclick="window._showHabitPopup()" title="add to home screen" aria-label="add to home screen">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="19" height="19">
-                    <rect x="7" y="2" width="10" height="20" rx="2.2"></rect>
-                    <line x1="11" y1="18.4" x2="13" y2="18.4"></line>
-                </svg>
-            </button>
-        </div>
-
-        <!-- HELP SCREEN — its own full black screen. Just the callout, the video, the X. -->
-        <div class="help-ov" id="helpOv">
-            <div class="help-title">How to design a good reality check</div>
-            <div class="help-video-frame">
-                <div class="help-video-ph" id="helpVideoPh">
-                    <div class="help-play-dot"></div>
-                    <span>video coming soon</span>
-                </div>
-                <iframe id="helpVideoFrame" class="help-video-iframe" src="" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen style="display:none"></iframe>
-            </div>
-            <button class="help-close" id="helpCloseBtn" onclick="window._closeHelpOv()" aria-label="close">✕</button>
-        </div>
-
-        <!-- UPGRADE OVERLAY -->
-        <div class="upgrade-ov" id="upgradeOv">
-            <div class="auth-box">
-                <div class="auth-logo">Reflect <span class="amp">&amp;</span> Commit</div>
-                <div class="pay-price">$99 <small style="font-size:16px;font-weight:600;color:var(--muted2)">/yr</small></div>
-                <div class="auth-sub">You've made 10 commitments — unlock unlimited to keep going.</div>
-                <button class="btn-google pay-btn" onclick="window.open(window._upgradeUrl,'_blank')">Upgrade to continue</button>
-                <button class="pay-alt" onclick="document.getElementById('upgradeOv').classList.remove('on')">maybe later</button>
-            </div>
-        </div>
-
-        <!-- FIREBASE -->
-        <script type="module" src="firebase-init.js"></script>
-        <script src="js/screens.js"></script>
-        <script src="js/editor-canvas.js"></script>
-        <script src="js/node-graph.js"></script>
-        <script src="js/run-engine.js"></script>
-        <script src="js/outcomes-settings.js"></script>
-        <script src="js/onboarding.js"></script>
-        <script src="js/streak.js"></script>
-        <script src="js/pwa-install.js"></script>
-        <script src="js/help.js"></script>
-    </body>
+    <script type="module" src="firebase-init.js"></script>
+    <script src="js/app.js"></script>
+  </body>
 </html>

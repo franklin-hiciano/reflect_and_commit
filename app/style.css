@@ -73,9 +73,6 @@ body::after {
 .btn-quiet:hover { color: var(--ink-dim); }
 
 .home-body { flex: 1; overflow-y: auto; padding: 74px 20px 60px; max-width: 640px; width: 100%; margin: 0 auto; }
-.desktop-nudge { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); line-height: 1.55;
-  border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; }
-.desktop-nudge b { color: var(--ink); font-weight: 400; word-break: break-all; }
 .q-list { display: flex; flex-direction: column; gap: 10px; }
 /* a full rebuild replaces every row, so any per-row fade replays constantly
    and reads as flicker rather than motion — keep it, but fast and subtle */
@@ -296,4 +293,16 @@ body::after {
 .device-shade.on { display: flex; }
 .device-shade-inner { text-align: center; }
 .device-shade-title { font-family: var(--mono); font-size: 13px; letter-spacing: .02em; color: var(--ink-dim); margin-bottom: 18px; }
+
+/* confirm-before-editing-on-mobile gate — asks every time until dismissed
+   for good, rather than a permanent nagging banner */
+.mobile-edit-gate {
+  position: fixed; inset: 0; z-index: 998; display: none;
+  align-items: center; justify-content: center;
+  background: rgba(6,6,7,.92); backdrop-filter: blur(6px);
+}
+.mobile-edit-gate.on { display: flex; }
+.mobile-edit-gate-inner { text-align: center; padding: 0 30px; max-width: 340px; }
+.mobile-edit-gate-text { font-family: var(--serif); font-size: 17px; color: var(--ink); line-height: 1.5; margin-bottom: 26px; }
+.mobile-edit-gate-inner .btn-ghost { display: block; width: 100%; margin-bottom: 12px; }
 

@@ -1,1111 +1,428 @@
 <!doctype html>
-<html lang="en">
+<html>
     <head>
         <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width,initial-scale=1" />
-        <title>
-            Reflect &amp; Commit — build a machine that prompts you with your
-            own principles
-        </title>
         <meta
-            name="description"
-            content="Reflect & Commit isn't journaling. You design a tree of prompts that pull the truth out of you each night, then commit to one real move. The day after, a clean yes or no."
+            name="viewport"
+            content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"
         />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link
-            href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Cabin:wght@400;500;600&family=DM+Mono:wght@400;500&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap"
-            rel="stylesheet"
+        <title>Reflect &amp; Commit</title>
+        <link rel="stylesheet" href="app/style.css" />
+        <link rel="manifest" href="app/manifest.json" />
+        <meta name="theme-color" content="#0a0a0b" />
+        <link rel="apple-touch-icon" href="app/icons/apple-touch-icon.png" />
+        <link rel="icon" href="app/icons/icon-192.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta
+            name="apple-mobile-web-app-status-bar-style"
+            content="black-translucent"
         />
-        <style>
-            :root {
-                --bg: #000000;
-                --surf: #130f0a;
-                --surf2: #18130c;
-                --border: #2a1f12;
-                --border2: #352818;
-                --text: #f0e3cf;
-                --muted: #9c8a6e;
-                --muted2: #c4b291;
-                --faint: #6b5c47;
-                --acc: #e0793f;
-                --acc-bg: #2a1709;
-                --acc-dim: #a85a2c;
-                --ref: #9b86a8;
-                --rec: #9b86a8;
-                --good: #7fae6f;
-                --fh: "Syne", sans-serif;
-                --fs: "Cabin", Georgia, serif;
-                --fm: "DM Mono", ui-monospace, monospace;
-                --fprompt: "Source Serif 4", Georgia, serif;
-            }
-            * {
-                box-sizing: border-box;
-                margin: 0;
-                padding: 0;
-            }
-            html {
-                scroll-behavior: smooth;
-            }
-            body {
-                background: var(--bg);
-                color: var(--text);
-                font-family: var(--fs);
-                line-height: 1.6;
-                font-size: 16px;
-                -webkit-font-smoothing: antialiased;
-            }
-            a {
-                color: inherit;
-                text-decoration: none;
-            }
-            .wrap {
-                max-width: 1000px;
-                margin: 0 auto;
-                padding: 0 24px;
-            }
-            .mono {
-                font-family: var(--fm);
-            }
-
-            /* header */ /* header (Updated: Permanent Sticky Behavior) */
-            header {
-                position: sticky;
-                top: 0;
-                background: var(--bg);
-                z-index: 1000;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 16px 0;
-                border-bottom: 1px solid var(--border);
-            }
-            .brand {
-                font-family: var(--fh);
-                font-weight: 800;
-                font-size: 18px;
-                letter-spacing: 0.2px;
-            }
-            .brand b {
-                color: var(--acc);
-            }
-            .nav-cta {
-                border: 1px solid var(--border2);
-                padding: 9px 16px;
-                border-radius: 8px;
-                font-family: var(--fh);
-                font-weight: 700;
-                font-size: 13px;
-                transition: 0.15s;
-            }
-            .nav-cta:hover {
-                border-color: var(--acc-dim);
-                color: var(--acc);
-            }
-
-            /* NEW: Split layout for Hero top section */
-            .hero-split {
-                display: grid;
-                grid-template-columns: 1.2fr 0.8fr;
-                gap: 32px;
-                text-align: left;
-                align-items: center;
-                margin-bottom: 40px;
-            }
-            .hero-left h1 {
-                text-align: left !important;
-                margin-left: 0 !important;
-            }
-            .hero-right {
-                display: flex;
-                justify-content: flex-end;
-            }
-
-            /* hero */
-            .hero {
-                padding: 60px 0 36px;
-                text-align: center;
-            }
-            .kicker {
-                font-family: var(--fm);
-                font-size: 12px;
-                letter-spacing: 0.22em;
-                text-transform: uppercase;
-                color: var(--acc);
-            }
-            .hero h1 {
-                font-family: var(--fh);
-                font-weight: 800;
-                font-size: clamp(32px, 5.4vw, 56px);
-                line-height: 1.04;
-                letter-spacing: -0.02em;
-                margin: 18px auto 0;
-                max-width: 880px;
-            }
-            .hero h1 em {
-                font-style: normal;
-                color: var(--acc);
-            }
-            .hero .sub {
-                margin: 22px auto 0;
-                font-size: 19px;
-                color: var(--muted2);
-                max-width: 600px;
-            }
-            .cta-row {
-                margin-top: 30px;
-                display: flex;
-                gap: 13px;
-                justify-content: center;
-                flex-wrap: wrap;
-            }
-            .btn {
-                display: inline-block;
-                padding: 14px 24px;
-                border-radius: 9px;
-                font-family: var(--fh);
-                font-weight: 800;
-                font-size: 15px;
-                transition: 0.15s;
-            }
-            .btn-primary {
-                background: var(--acc);
-                color: #1a0d05;
-            }
-            .btn-primary:hover {
-                filter: brightness(1.07);
-            }
-            .btn-ghost {
-                border: 1px solid var(--border2);
-                color: var(--text);
-            }
-            .btn-ghost:hover {
-                border-color: var(--acc-dim);
-                color: var(--acc);
-            }
-            .micro {
-                margin-top: 14px;
-                font-family: var(--fm);
-                font-size: 12px;
-                color: var(--faint);
-            }
-
-            /* video */
-            .video-wrap {
-                margin: 46px auto 0;
-                max-width: 780px;
-            }
-            .video-frame {
-                position: relative;
-                width: 100%;
-                aspect-ratio: 16/9;
-                background: #000;
-                border-radius: 14px;
-                overflow: hidden;
-                border: 1px solid var(--border2);
-                box-shadow: 0 30px 80px -24px rgba(0, 0, 0, 0.7);
-            }
-            .video-frame video,
-            .video-frame iframe {
-                width: 100%;
-                height: 100%;
-                display: block;
-                border: 0;
-            }
-            .video-ph {
-                position: absolute;
-                inset: 0;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-direction: column;
-                gap: 12px;
-                color: var(--muted);
-                background: radial-gradient(
-                    120% 120% at 50% 0,
-                    #16180c,
-                    #0c0d10
-                );
-            }
-            .play-dot {
-                width: 60px;
-                height: 60px;
-                border-radius: 50%;
-                border: 1px solid var(--acc-dim);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-            .play-dot:after {
-                content: "";
-                border-left: 17px solid var(--acc);
-                border-top: 10px solid transparent;
-                border-bottom: 10px solid transparent;
-                margin-left: 4px;
-            }
-            .video-ph span {
-                font-family: var(--fm);
-                font-size: 12px;
-                letter-spacing: 0.04em;
-            }
-
-            /* section scaffolding */
-            section {
-                padding: 70px 0;
-            }
-            .sec-tag {
-                font-family: var(--fs);
-                font-size: 12px;
-                letter-spacing: 0.18em;
-                text-transform: uppercase;
-                color: var(--acc-dim);
-            }
-            .sec-h {
-                font-family: var(--fh);
-                font-weight: 800;
-                font-size: clamp(26px, 3.6vw, 38px);
-                line-height: 1.1;
-                letter-spacing: -0.01em;
-                margin-top: 10px;
-            }
-            .sec-lead {
-                margin-top: 16px;
-                font-size: 18px;
-                color: var(--muted2);
-                max-width: 620px;
-            }
-
-            /* mechanism */
-            .mech {
-                display: grid;
-                grid-template-columns: 1.05fr 0.95fr;
-                gap: 36px;
-                align-items: start;
-                margin-top: 38px;
-            }
-            .codecard {
-                background: #0d0a07;
-                border: 1px solid var(--border2);
-                border-radius: 14px;
-                padding: 20px 18px;
-                font-family: var(--fm);
-                font-size: 13.5px;
-                line-height: 1.85;
-                overflow-x: auto;
-                box-shadow: inset 0 0 0 1px rgba(235, 255, 0, 0.03);
-                white-space: pre;
-                display: block;
-            }
-            .codecard .c-title {
-                color: var(--text);
-            }
-            .codecard .c-arrow {
-                color: var(--acc);
-            }
-            .codecard .c-dest {
-                color: var(--muted2);
-            }
-            .codecard .c-opt {
-                color: var(--ref);
-            }
-            .codecard .c-rec {
-                color: var(--rec);
-            }
-            .codecard .c-cmt {
-                color: var(--faint);
-            }
-            .codecard .c-done {
-                color: var(--acc);
-            }
-            .legend {
-                display: flex;
-                flex-direction: column;
-                gap: 18px;
-            }
-            .leg {
-                display: flex;
-                gap: 14px;
-                align-items: flex-start;
-            }
-            .leg .dot {
-                flex: none;
-                width: 10px;
-                height: 10px;
-                border-radius: 3px;
-                margin-top: 7px;
-            }
-            .leg h4 {
-                font-family: var(--fh);
-                font-weight: 700;
-                font-size: 15px;
-            }
-            .leg p {
-                color: var(--muted);
-                font-size: 14.5px;
-                margin-top: 2px;
-            }
-
-            /* contrast */
-            .twocol {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 22px;
-                margin-top: 38px;
-            }
-            .col {
-                border: 1px solid var(--border);
-                border-radius: 14px;
-                padding: 26px 24px;
-            }
-            .col.without {
-                background: var(--surf);
-            }
-            .col.with {
-                background: linear-gradient(180deg, #1c130b, #100b07);
-                border-color: var(--acc-dim);
-            }
-            .col .col-tag {
-                font-family: var(--fm);
-                font-size: 12px;
-                letter-spacing: 0.1em;
-                text-transform: uppercase;
-            }
-            .without .col-tag {
-                color: var(--muted);
-            }
-            .with .col-tag {
-                color: var(--acc);
-            }
-            .col p {
-                margin-top: 14px;
-                font-size: 16px;
-                color: var(--muted2);
-            }
-            .with p {
-                color: var(--text);
-            }
-
-            /* cascade */
-            .cascade {
-                margin-top: 34px;
-                border-left: 2px solid var(--acc-dim);
-                padding: 6px 0 6px 24px;
-            }
-            .cascade .lead-in {
-                font-family: var();
-                font-size: 12px;
-                letter-spacing: 0.14em;
-                text-transform: uppercase;
-                color: var(--acc-dim);
-            }
-            .cascade p {
-                margin-top: 12px;
-                font-size: 19px;
-                line-height: 1.6;
-            }
-            .cascade .arw {
-                color: var(--acc);
-                font-family: var(--fm);
-            }
-
-            /* forks */
-            .forkwrap {
-                margin-top: 30px;
-            }
-            .forksvg {
-                width: 100%;
-                max-width: 640px;
-                height: auto;
-                display: block;
-                margin: 0 auto;
-            }
-            .fk-axis {
-                stroke: var(--border2);
-                stroke-width: 1;
-            }
-            .fk-past {
-                stroke: #4d3c24;
-                stroke-width: 2;
-                fill: none;
-            }
-            .fk-minor {
-                stroke: var(--muted);
-                stroke-width: 1.4;
-                stroke-dasharray: 3 4;
-                fill: none;
-            }
-            .fk-major {
-                stroke: var(--acc);
-                stroke-width: 2.6;
-                fill: none;
-                stroke-linecap: round;
-                filter: drop-shadow(0 0 6px rgba(235, 255, 0, 0.4));
-            }
-            .fk-today {
-                fill: var(--text);
-            }
-            .fk-lbl {
-                font-family: var(--fm);
-                font-size: 11px;
-                fill: var(--muted);
-            }
-            .fk-acc {
-                fill: var(--acc);
-            }
-
-            /* steps */
-            .steps {
-                display: grid;
-                grid-template-columns: repeat(3, 1fr);
-                gap: 22px;
-                margin-top: 38px;
-            }
-            .step {
-                padding: 4px 2px;
-            }
-            .step .n {
-                font-family: var(--fm);
-                font-size: 13px;
-                color: var(--acc);
-            }
-            .step h4 {
-                font-family: var(--fh);
-                font-weight: 700;
-                font-size: 17px;
-                margin-top: 8px;
-            }
-            .step p {
-                color: var(--muted);
-                font-size: 15px;
-                margin-top: 7px;
-            }
-            .effort {
-                margin-top: 34px;
-                background: var(--acc-bg);
-                border: 1px solid var(--acc-dim);
-                border-radius: 12px;
-                padding: 18px 20px;
-                font-size: 16px;
-                color: var(--text);
-            }
-            .effort b {
-                color: var(--acc);
-            }
-
-            /* NEW: Split layout for Proof section */
-            .proof-split {
-                display: grid;
-                grid-template-columns: 1fr 1.2fr;
-                gap: 40px;
-                align-items: center;
-                margin-top: 38px;
-            }
-            .proof-left {
-                display: flex;
-                justify-content: center;
-                width: 100%;
-            }
-            .proof-right {
-                text-align: left;
-            }
-            .reel-wrap {
-                width: 100%;
-                max-width: 340px;
-                aspect-ratio: 9 / 16;
-                background: #0d0a07;
-                border: 1px solid var(--border2);
-                border-radius: 14px;
-                overflow: hidden;
-            }
-
-            /* proof */
-            .proof {
-                border: 1px solid var(--border2);
-                border-radius: 16px;
-                padding: 34px 30px;
-                background: var(--surf);
-                max-width: 760px;
-                margin: 0; /* Changed from margin: 38px auto 0 to handle split layout spacing */
-            }
-            .proof p {
-                font-size: 18px;
-                line-height: 1.62;
-                color: var(--text);
-            }
-            .proof p + p {
-                margin-top: 16px;
-            }
-            .proof .who {
-                margin-top: 20px;
-                font-family: var(--fm);
-                font-size: 13px;
-                color: var(--muted);
-            }
-            .proof b {
-                color: var(--acc);
-                font-weight: 600;
-            }
-
-            /* demo runner */
-            .demo-runner {
-                max-width: 520px;
-                margin: 38px auto 0;
-            }
-            .dr-card,
-            .dr-end {
-                background: #0d0a07;
-                border: 1px solid var(--border2);
-                border-radius: 16px;
-                padding: 32px 34px;
-            }
-            .dr-meta {
-                font-family: var(--fm);
-                font-size: 11px;
-                letter-spacing: 0.14em;
-                color: var(--muted);
-                margin-bottom: 16px;
-            }
-            .dr-prompt {
-                font-family: var(--fprompt);
-                font-weight: 600;
-                font-size: 22px;
-                line-height: 1.35;
-                color: var(--text);
-                margin-bottom: 22px;
-            }
-            .dr-input-wrap {
-                position: relative;
-                margin-bottom: 6px;
-            }
-            .dr-input {
-                width: 100%;
-                background: transparent;
-                border: none;
-                border-bottom: 1px solid var(--border2);
-                color: var(--text);
-                font-family: var(--fm);
-                font-size: 17px;
-                padding: 10px 2px;
-                outline: none;
-            }
-            .dr-input:focus + .dr-input-line {
-                transform: scaleX(1);
-            }
-            .dr-input-line {
-                position: absolute;
-                left: 0;
-                bottom: 0;
-                height: 2px;
-                width: 100%;
-                background: var(--acc);
-                transform: scaleX(0);
-                transform-origin: left;
-                transition: transform 0.25s ease;
-                pointer-events: none;
-            }
-            .dr-choices {
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
-            }
-            .dr-choice {
-                text-align: left;
-                background: rgba(255, 255, 255, 0.04);
-                border: 1px solid var(--border2);
-                color: var(--text);
-                font-family: var(--fs);
-                font-size: 16px;
-                padding: 12px 16px;
-                border-radius: 9px;
-                cursor: pointer;
-                transition: all 0.12s;
-                width: 100%;
-            }
-            .dr-choice:hover {
-                border-color: var(--acc-dim);
-                color: var(--acc);
-            }
-            .dr-nav {
-                display: flex;
-                align-items: center;
-                justify-content: flex-end;
-                margin-top: 18px;
-            }
-            .dr-next {
-                font-family: var(--fh);
-                font-weight: 700;
-                font-size: 13px;
-                background: var(--acc);
-                color: #1a0d05;
-                border: none;
-                border-radius: 9px;
-                padding: 10px 20px;
-                cursor: pointer;
-                transition: 0.15s;
-            }
-            .dr-next:hover {
-                filter: brightness(1.07);
-            }
-            .dr-end-h {
-                font-family: var(--fh);
-                font-weight: 800;
-                font-size: 22px;
-                color: var(--text);
-                margin-bottom: 8px;
-            }
-            .dr-end-sub {
-                font-size: 14px;
-                color: var(--muted2);
-                margin-bottom: 20px;
-            }
-            /* editor demo */
-            .editor-demo {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 20px;
-                margin-top: 38px;
-                align-items: start;
-            }
-            .editor-demo-pane {
-                background: #0d0a07;
-                border: 1px solid var(--border2);
-                border-radius: 14px;
-                overflow: hidden;
-            }
-            .editor-demo-ta {
-                width: 100%;
-                min-height: 220px;
-                background: transparent;
-                border: none;
-                color: var(--text);
-                font-family: var(--fm);
-                font-size: 12px;
-                line-height: 1.8;
-                padding: 18px;
-                outline: none;
-                resize: vertical;
-            }
-            .editor-demo-run {
-                display: flex;
-                flex-direction: column;
-            }
-            .edr-card {
-                background: #0d0a07;
-                border: 1px solid var(--border2);
-                border-radius: 14px;
-                padding: 22px 24px;
-                min-height: 140px;
-            }
-            .edr-prompt {
-                font-family: var(--fh);
-                font-weight: 700;
-                font-size: 17px;
-                line-height: 1.35;
-                color: var(--text);
-                margin-bottom: 16px;
-            }
-            .edr-choices {
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-            }
-            @media (max-width: 720px) {
-                .editor-demo {
-                    grid-template-columns: 1fr;
-                }
-            }
-
-            /* pricing */
-            .pricing {
-                text-align: center;
-            }
-            .price-card {
-                max-width: 400px;
-                margin: 38px auto 0;
-                background: var(--surf);
-                border: 1px solid var(--border2);
-                border-radius: 18px;
-                padding: 38px 32px;
-                text-align: center;
-            }
-            .price-amt {
-                font-family: var(--fh);
-                font-weight: 800;
-                font-size: 46px;
-                letter-spacing: -0.02em;
-            }
-            .price-amt small {
-                font-size: 18px;
-                color: var(--muted);
-                font-weight: 600;
-            }
-            .price-note {
-                color: var(--muted);
-                font-family: var(--fm);
-                font-size: 13px;
-                margin-top: 6px;
-            }
-            .price-list {
-                margin-top: 24px;
-                text-align: left;
-                display: flex;
-                flex-direction: column;
-                gap: 11px;
-                color: var(--muted2);
-                font-size: 15px;
-            }
-            .price-list span:before {
-                content: "✓";
-                color: var(--acc);
-                margin-right: 10px;
-                font-weight: 700;
-            }
-            .price-card .btn {
-                width: 100%;
-                margin-top: 26px;
-            }
-
-            footer {
-                border-top: 1px solid var(--border);
-                padding: 30px 0 54px;
-                text-align: center;
-                color: var(--faint);
-                font-family: var(--fm);
-                font-size: 12.5px;
-            }
-
-            @media (max-width: 720px) {
-                .hero-split {
-                    grid-template-columns: 1fr;
-                    text-align: center;
-                }
-                .hero-left h1 {
-                    text-align: center !important;
-                }
-                .hero-right {
-                    justify-content: center;
-                }
-                .proof-split {
-                    grid-template-columns: 1fr;
-                }
-                .mech {
-                    grid-template-columns: 1fr;
-                    gap: 26px;
-                }
-                .twocol {
-                    grid-template-columns: 1fr;
-                }
-                .steps {
-                    grid-template-columns: 1fr;
-                    gap: 18px;
-                }
-                .hero .sub {
-                    font-size: 17px;
-                }
-            }
-        </style>
+        <meta
+            name="apple-mobile-web-app-title"
+            content="Reflect &amp; Commit"
+        />
     </head>
     <body>
-        <div class="wrap">
-            <header>
-                <div class="brand">Reflect <b>&amp;</b> Commit</div>
-                <a
-                    class="btn btn-primary"
-                    href="/app/"
-                    style="
-                        padding: 8px 16px;
-                        font-size: 13.5px;
-                        border-radius: 7px;
-                    "
-                    >Get started</a
-                >
-            </header>
-
-            <section class="hero" style="padding-top: 48px">
-                <div class="hero-split">
-                    <div class="hero-left">
-                        <div class="kicker">Reflect &amp; Commit</div>
-                        <h1>
-                            The No 1<em>.</em> reality checker for ambitious
-                            people
-                        </h1>
-                        <sub>who work from home.</sub>
-                    </div>
-                    <div class="hero-right">
-                        <div
-                            style="
-                                font-family: var(--fm);
-                                font-size: 13px;
-                                color: var(--muted);
-                                letter-spacing: 0.05em;
-                            "
-                        ></div>
-
-                        <div class="cta-row" style="margin-top: 0">
-                            <a class="btn btn-primary" href="/app/"
-                                >Get started</a
-                            >
-                        </div>
-                    </div>
+        <!-- AUTH -->
+        <div class="auth-screen" id="authScreen">
+            <div class="auth-box">
+                <div class="auth-logo">
+                    Reflect <span class="amp">&amp;</span> Commit
                 </div>
-            </section>
-
-            <section>
-                <div class="sec-tag"></div>
-                <h2>Execute your little ideas. See where you go.</h2>
-                <div class="proof" style="margin-top: 20px; max-width: 100%">
-                    <p>
-                        Reflect and Commit has helped me think of tiny risks (a
-                        shady business and this app) I've spent
-                        <b>105-110 hours</b> working on in the last 5 weeks,
-                        which has slowly raised my ego in my ability to get shit
-                        done enough that I'm skipping college to make money on
-                        my own.
-                    </p>
-                    <div class="who">— Franklin</div>
-                </div>
-                <div class="proof-split">
-                    <div class="proof-right"></div>
-                </div>
-            </section>
-
-            <section>
-                <div class="sec-tag"></div>
-                <h2>Take more risks.</h2>
-                <div class="twocol">
-                    <div class="col without">
-                        <div class="col-tag">
-                            Reflect and Commit asks you questions you made a few
-                            weeks ago to convince yourself to take risks you're
-                            afraid of the very next day.
-                        </div>
-                        <p></p>
-                    </div>
-                </div>
-            </section>
-
-            <footer>
-                Reflect &amp; Commit — built by Franklin · build the questions,
-                beat your own patterns.
-            </footer>
+                <button class="btn-ghost" id="btnSignIn" onclick="doSignIn()">
+                    Continue with Google
+                </button>
+            </div>
         </div>
-        <script>
-            // ── Landing page interactive demos ───────────────────────────────────────────
-            // Mini tree parser: handles >> dest, opt >> dest, >> done
-            function mpParse(src) {
-                var nodes = {},
-                    order = [],
-                    cur = null;
-                src.split("\n").forEach(function (raw) {
-                    var line = raw.replace(/#.*/, "").trimEnd();
-                    if (!line.trim()) return;
-                    var indent = line.match(/^(\s*)/)[1].length,
-                        t = line.trim();
-                    if (indent === 0) {
-                        cur = t;
-                        if (!nodes[cur]) {
-                            nodes[cur] = {
-                                type: "text",
-                                title: cur,
-                                opts: [],
-                                next: null,
-                            };
-                            order.push(cur);
-                        }
-                    } else if (cur) {
-                        if (t.startsWith(">>")) {
-                            var dest = t.slice(2).trim();
-                            nodes[cur].next =
-                                dest === "done" ? "__done__" : dest;
-                        } else if (
-                            t.indexOf(" >> ") !== -1 &&
-                            !t.startsWith("@")
-                        ) {
-                            var parts = t.split(" >> ");
-                            var lbl = parts[0].trim(),
-                                d = parts[1] ? parts[1].trim() : "";
-                            nodes[cur].opts.push({
-                                l: lbl,
-                                next: d === "done" ? "__done__" : d,
-                            });
-                            nodes[cur].type = "choice";
-                        }
-                    }
-                });
-                return { nodes: nodes, first: order[0] || null };
-            }
 
-            // ── fixed demo (my tree) ──
-            var demoState = null;
-            var DEMO_SRC =
-                "What did you actually do with today? Hours, not vibes.\n  >> Did you move the thing that matters most right now?\n\nDid you move the thing that matters most right now?\n  yes >> What made today work? Name it so tomorrow can copy it.\n  no  >> What did you avoid, and what were you afraid would happen?\n\nWhat made today work? Name it so tomorrow can copy it.\n  >> done\n\nWhat did you avoid, and what were you afraid would happen?\n  >> done";
-            function initDemo() {
-                demoState = mpParse(DEMO_SRC);
-                demoState.cur = demoState.first;
-                // reset commit screen to step 1
-                var ei = document.getElementById("drEndInput");
-                var ec = document.getElementById("drEndConfirm");
-                if (ei) ei.style.display = "";
-                if (ec) ec.style.display = "none";
-                var dc = document.getElementById("drCommit");
-                if (dc) dc.value = "";
-                var btn = document.getElementById("drCommitBtn");
-                if (btn) {
-                    btn.disabled = true;
-                    btn.style.opacity = "0.45";
-                    btn.style.cursor = "not-allowed";
-                }
-                demoRender();
-            }
-            function demoRender() {
-                var s = demoState,
-                    card = document.getElementById("drCard"),
-                    end = document.getElementById("drEnd");
-                if (!s.cur || s.cur === "__done__") {
-                    card.style.display = "none";
-                    end.style.display = "";
-                    return;
-                }
-                card.style.display = "";
-                end.style.display = "none";
-                var node = s.nodes[s.cur];
-                document.getElementById("drMeta").textContent =
-                    node.type === "text" ? "TEXT RESPONSE" : "CHOICE";
-                document.getElementById("drPrompt").textContent = node.title;
-                var iw = document.getElementById("drInputWrap"),
-                    ch = document.getElementById("drChoices"),
-                    nx = document.getElementById("drNext");
-                if (node.type === "text") {
-                    iw.style.display = "";
-                    ch.innerHTML = "";
-                    nx.style.display = "";
-                    var inp = document.getElementById("drInput");
-                    inp.value = "";
-                    setTimeout(function () {
-                        inp.focus();
-                    }, 60);
-                    inp.onkeydown = function (e) {
-                        if (e.key === "Enter") demoNext();
-                    };
-                } else {
-                    iw.style.display = "none";
-                    nx.style.display = "none";
-                    ch.innerHTML = node.opts
-                        .map(function (o) {
-                            return (
-                                '<button class="dr-choice" onclick="demoChoose(\'' +
-                                o.next.replace(/'/g, "\\'") +
-                                "'\">" +
-                                o.l +
-                                "</button>"
-                            );
-                        })
-                        .join("");
-                }
-            }
-            function drCommitInput() {
-                var v = document.getElementById("drCommit").value.trim();
-                var btn = document.getElementById("drCommitBtn");
-                if (!btn) return;
-                btn.disabled = !v;
-                btn.style.opacity = v ? "1" : "0.45";
-                btn.style.cursor = v ? "pointer" : "not-allowed";
-            }
-            function demoCommit() {
-                var v = document.getElementById("drCommit").value.trim();
-                if (!v) return;
-                document.getElementById("drEndInput").style.display = "none";
-                document.getElementById("drCommittedText").textContent = v;
-                document.getElementById("drEndConfirm").style.display = "";
-            }
-            function demoNext() {
-                if (
-                    !demoState ||
-                    !demoState.cur ||
-                    demoState.cur === "__done__"
-                )
-                    return;
-                var node = demoState.nodes[demoState.cur];
-                demoState.cur = node.next || "__done__";
-                demoRender();
-            }
-            function demoChoose(next) {
-                demoState.cur = next;
-                demoRender();
-            }
-            initDemo();
+        <!-- LANDING — same near-black, same fonts as the app itself. Just a
+         quiet doorway, not a separate world. Three sub-steps, one visible
+         at a time: intro (tagline lives ONLY here) → cross-device install
+         gate (clean, centered, nothing else on screen) → this device's
+         own install. -->
+        <div class="screen" id="landingScreen">
+            <div class="landing-inner" id="landingIntro">
+                <div class="auth-logo">
+                    Reflect <span class="amp">&amp;</span> Commit
+                </div>
+                <div class="landing-tag">Take more risks.</div>
+                <button class="btn-ghost" onclick="goToInstallGate()">
+                    Get started
+                </button>
+            </div>
 
-            // ── editor demo ──
-            var edrState = null;
-            function runEditorDemo() {
-                var src = document.getElementById("editorDemoTa").value;
-                edrState = mpParse(src);
-                if (!edrState.first) {
-                    alert("Nothing to run — check your tree syntax.");
-                    return;
-                }
-                edrState.cur = edrState.first;
-                edrRender();
-            }
-            function edrRender() {
-                var s = edrState;
-                var ep = document.getElementById("edrPrompt"),
-                    iw = document.getElementById("edrInputWrap"),
-                    ch = document.getElementById("edrChoices"),
-                    end = document.getElementById("edrEnd");
-                if (!s || !s.cur || s.cur === "__done__") {
-                    if (ep) ep.textContent = "commit.";
-                    if (iw) iw.style.display = "none";
-                    if (ch) ch.innerHTML = "";
-                    if (end) end.style.display = "";
-                    return;
-                }
-                if (end) end.style.display = "none";
-                var node = s.nodes[s.cur];
-                if (!node) {
-                    edrState.cur = "__done__";
-                    edrRender();
-                    return;
-                }
-                if (ep) ep.textContent = node.title;
-                if (node.type === "text") {
-                    if (iw) iw.style.display = "";
-                    if (ch) ch.innerHTML = "";
-                    var inp = document.getElementById("edrInput");
-                    if (inp) {
-                        inp.value = "";
-                        setTimeout(function () {
-                            inp.focus();
-                        }, 60);
-                    }
-                } else {
-                    if (iw) iw.style.display = "none";
-                    if (ch)
-                        ch.innerHTML = node.opts
-                            .map(function (o) {
-                                return (
-                                    '<button class="dr-choice" onclick="edrChoose(\'' +
-                                    o.next.replace(/'/g, "\\'") +
-                                    "'\">" +
-                                    o.l +
-                                    "</button>"
-                                );
-                            })
-                            .join("");
-                }
-            }
-            function edrKey(e) {
-                if (e.key === "Enter" && edrState) {
-                    var node = edrState.nodes[edrState.cur];
-                    edrState.cur = (node && node.next) || "__done__";
-                    edrRender();
-                }
-            }
-            function edrChoose(next) {
-                if (!edrState) return;
-                edrState.cur = next;
-                edrRender();
-            }
-        </script>
+            <!-- this app is only worth it synced across both devices, so the
+           first ask is always "get the OTHER one installed too" — advances
+           automatically once that device signs in, no button to press -->
+            <div
+                class="install-gate"
+                id="landingStepOther"
+                style="display: none"
+            >
+                <div class="install-gate-headline" id="otherDeviceLabel"></div>
+                <img
+                    id="landingQr"
+                    class="landing-qr-img"
+                    style="display: none"
+                    alt="scan to install on your phone"
+                />
+                <div class="install-gate-url" id="otherDeviceHint"></div>
+            </div>
+
+            <div
+                class="landing-inner"
+                id="landingStepHere"
+                style="display: none"
+            >
+                <button
+                    class="btn-ghost"
+                    id="getStartedBtn"
+                    onclick="onGetStarted()"
+                >
+                    Get started
+                </button>
+                <div
+                    class="landing-manual"
+                    id="landingManual"
+                    style="display: none"
+                ></div>
+            </div>
+        </div>
+
+        <!-- HOME — settings + edit questions -->
+        <div class="screen" id="homeScreen">
+            <div class="home-topbar">
+                <button
+                    class="icon-btn edit-toggle"
+                    id="editToggle"
+                    onclick="toggleEditMode()"
+                    title="edit — star or remove questions"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.6"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <path
+                            d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 3 21l.5-4.5L17 3z"
+                        />
+                    </svg>
+                </button>
+                <button
+                    class="icon-btn"
+                    onclick="sendSelfNotification()"
+                    title="send yourself a test notification"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.6"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <path
+                            d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"
+                        />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                </button>
+                <button
+                    class="icon-btn"
+                    id="settingsToggle"
+                    onclick="toggleSettingsPanel()"
+                    title="settings"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.6"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <circle cx="12" cy="12" r="3" />
+                        <path
+                            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+                        />
+                    </svg>
+                </button>
+            </div>
+            <div class="home-body">
+                <div
+                    class="desktop-nudge"
+                    id="desktopNudge"
+                    style="display: none"
+                >
+                    Editing is easier on your computer. Open
+                    <b id="desktopUrl"></b> — your questions sync automatically.
+                </div>
+                <div id="qList" class="q-list"></div>
+                <button
+                    class="add-below"
+                    onclick="addQuestion()"
+                    title="add a question"
+                >
+                    + question
+                </button>
+            </div>
+            <div class="settings-panel" id="settingsPanel">
+                <div class="settings-panel-inner">
+                    <div class="notify-time-group">
+                        <button
+                            class="notify-countdown"
+                            id="notifyCountdown"
+                            onclick="openTimePicker()"
+                        ></button>
+                        <input
+                            type="time"
+                            id="notifyTimeInput"
+                            class="notify-time-hidden"
+                            onchange="onNotifyTimeChange(this.value)"
+                            tabindex="-1"
+                        />
+                    </div>
+                    <button class="btn-quiet" onclick="doSignOut()">
+                        sign out
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- NOT AVAILABLE -->
+        <div class="screen" id="unavailableScreen">
+            <div class="unavail-inner">
+                <div class="unavail-label">not yet</div>
+                <div class="unavail-time">
+                    next reflection <span id="nextAvailLabel"></span>
+                </div>
+                <button class="btn-quiet" onclick="goHome()">settings</button>
+            </div>
+        </div>
+
+        <!-- REFLECTION — a single black stage; phases swap inside it -->
+        <div class="screen reflect" id="reflectScreen">
+            <button
+                class="reflect-back"
+                id="reflectBack"
+                onclick="goBackPhase()"
+                title="back"
+                style="display: none"
+            >
+                ‹
+            </button>
+            <button
+                class="reflect-collapse"
+                id="reflectCollapse"
+                onclick="toggleTranscript()"
+                title="show / hide history"
+                style="display: none"
+            >
+                history
+            </button>
+            <button
+                class="reflect-exit"
+                onclick="exitReflection()"
+                title="leave"
+            >
+                ✕
+            </button>
+
+            <!-- DAY-AFTER CHECK-IN -->
+            <div class="phase" id="phaseCheckin">
+                <div class="checkin-kicker">yesterday you said</div>
+                <div class="checkin-text" id="checkinText"></div>
+                <button class="hold" id="checkinHold" data-label="hold — I did">
+                    <svg class="hold-ring" viewBox="0 0 72 72">
+                        <circle class="hold-track" cx="36" cy="36" r="33" />
+                        <circle
+                            class="hold-fill"
+                            id="checkinRingFill"
+                            cx="36"
+                            cy="36"
+                            r="33"
+                        />
+                    </svg>
+                    <span class="hold-label">hold — I did</span>
+                </button>
+                <button
+                    class="btn-shapeless"
+                    onclick="resolveCheckin('missed')"
+                >
+                    I didn't
+                </button>
+            </div>
+
+            <!-- QUESTION FLOW = chat: a transcript that scrolls up, a composer below -->
+            <div class="phase chat" id="phaseChat">
+                <div class="chat-scroll" id="chatScroll"></div>
+                <div class="composer" id="composer">
+                    <div
+                        class="chat-choices"
+                        id="chatChoices"
+                        style="display: none"
+                    ></div>
+                    <button
+                        class="chat-recall"
+                        id="chatRecall"
+                        style="display: none"
+                    >
+                        <span class="chev">›</span> past answers
+                    </button>
+                    <div class="chat-recall-list" id="chatRecallList"></div>
+                    <div class="composer-bar" id="composerBar">
+                        <textarea
+                            id="answerField"
+                            class="composer-input"
+                            rows="1"
+                            spellcheck="false"
+                            autocomplete="off"
+                            placeholder="type your answer…"
+                        ></textarea>
+                        <button
+                            class="composer-mic"
+                            id="micBtn"
+                            onclick="toggleMic()"
+                            title="dictate"
+                        >
+                            <svg
+                                viewBox="0 0 24 24"
+                                width="17"
+                                height="17"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <rect
+                                    x="9"
+                                    y="3"
+                                    width="6"
+                                    height="12"
+                                    rx="3"
+                                />
+                                <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+                            </svg>
+                        </button>
+                        <button
+                            class="composer-send"
+                            id="sendBtn"
+                            onclick="composerSend()"
+                            title="send"
+                        >
+                            <svg
+                                viewBox="0 0 24 24"
+                                width="17"
+                                height="17"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path d="M5 12h14M13 6l6 6-6 6" />
+                            </svg>
+                        </button>
+                    </div>
+                    <button
+                        class="continue-desktop"
+                        id="continueDesktop"
+                        style="display: none"
+                        onclick="showDesktopHint()"
+                    >
+                        easier on your computer ›
+                    </button>
+                </div>
+            </div>
+
+            <!-- COMMIT -->
+            <div class="phase" id="phaseCommit">
+                <div class="commit-kicker">one move</div>
+                <textarea
+                    id="commitField"
+                    class="answer-mono commit-field"
+                    rows="1"
+                    spellcheck="false"
+                    autocomplete="off"
+                    placeholder="I will…"
+                ></textarea>
+                <div class="commit-due-row">
+                    <span class="commit-due-label">by</span>
+                    <select
+                        class="commit-due-select"
+                        id="commitDueSelect"
+                        onchange="onCommitDueChange(this.value)"
+                    ></select>
+                </div>
+                <button
+                    class="hold"
+                    id="commitHold"
+                    data-label="hold to commit"
+                >
+                    <svg class="hold-ring" viewBox="0 0 72 72">
+                        <circle class="hold-track" cx="36" cy="36" r="33" />
+                        <circle
+                            class="hold-fill"
+                            id="commitRingFill"
+                            cx="36"
+                            cy="36"
+                            r="33"
+                        />
+                    </svg>
+                    <span class="hold-label">hold to commit</span>
+                </button>
+                <button class="btn-shapeless" onclick="skipCommit()">
+                    nevermind
+                </button>
+            </div>
+
+            <!-- DONE -->
+            <div class="phase" id="phaseDone">
+                <div class="done-mark">✓</div>
+                <div class="done-text" id="doneText">
+                    committed. see you tomorrow.
+                </div>
+                <button
+                    class="btn-shapeless"
+                    id="keepGoingBtn"
+                    onclick="keepReflecting()"
+                >
+                    keep reflecting ›
+                </button>
+            </div>
+
+            <!-- PARKED — after "continue on your computer": phone goes quiet, other
+           device picks up in real time (or via push, within a few minutes) -->
+            <div class="phase" id="phaseParked">
+                <div class="parked-mark">↗</div>
+                <div class="parked-title">saved</div>
+                <div class="parked-sub">
+                    continue at <b id="parkedUrl"></b> — it'll pick up right
+                    where you left off.
+                </div>
+                <button class="btn-shapeless" onclick="resumeHere()">
+                    keep going here instead
+                </button>
+            </div>
+        </div>
+
+        <!-- shown on any device that isn't the current "active" one -->
+        <div class="device-shade" id="deviceShade">
+            <div class="device-shade-inner">
+                <div class="device-shade-title">
+                    in use on your other device
+                </div>
+                <button class="btn-shapeless" onclick="takeOverDevice()">
+                    use here instead
+                </button>
+            </div>
+        </div>
+
+        <script type="module" src="app/firebase-init.js?v=14"></script>
+        <script src="app/js/app.js?v=14"></script>
     </body>
 </html>

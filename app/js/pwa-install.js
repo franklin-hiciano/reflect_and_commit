@@ -1,3 +1,13 @@
+// ⚠️ NOT LOADED — index.html has no <script src="js/pwa-install.js"> tag, and
+// none of the DOM ids below (habitOv, habitFabBtn, habitQr, ...) exist in
+// index.html, so nothing in this file has ever run in production. Its ideas
+// (a QR/link "make it a habit" popup, shown after a commitment and via a
+// floating button) were the right instinct but got reimplemented directly in
+// app.js as the cross-device pairing nudge (maybeShowOtherDeviceGate +
+// #otherDeviceGate, triggered from run-engine.js's endCommit and from a
+// "install on your other device" button in settings) so there's one system
+// instead of two. Safe to delete this file — it's currently 100% dead code.
+//
 // ── "Make it a habit": install-PWA popup ────────────────────────────────────────────
 // Shows automatically after a commitment (called from run-engine.js's endCommit, chained
 // through the compound card in onboarding.js so they never stack) — and any time via the

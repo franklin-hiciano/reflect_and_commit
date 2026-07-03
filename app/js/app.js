@@ -161,14 +161,22 @@ function deviceKind() { return isPhone() ? "mobile" : "desktop"; }
 // Safari's manual "Add to Home Screen", so (1) on the NEXT launch is the
 // only way that case is ever detected.
 function markDeviceSeenIfInstalled() { if (isStandalone()) window._markDeviceSeen && window._markDeviceSeen(deviceKind()); }
-window.addEventListener("appinstalled", () => { window._markDeviceSeen && window._markDeviceSeen(deviceKind()); });
+window.addEventListener("appinstalled", () => {
+  window._markDeviceSeen && window._markDeviceSeen(deviceKind());
+  // if we were still mid-onboarding (native prompt accepted before we ever
+  // got to "here"), move straight into the home screen + cross-device nudge
+  // instead of leaving the landing screen sitting there with nothing to do.
+  const landing = document.getElementById("landingScreen");
+  if (landing && landing.classList.contains("on")) enterHome();
+});
 // fires whenever the onboarding doc changes — this is how the OTHER device
-// signing in gets noticed live, with nothing to click or refresh.
+// signing in gets noticed live, with nothing to click or refresh: if the
+// gate is up because we're waiting on it, this either drops it or (rarely)
+// re-renders it if something upstream re-triggered it.
 window._onOnboardingUpdated = () => {
-  const other = document.getElementById("landingStepOther");
-  if (!other || other.style.display === "none") return;
-  const need = isPhone() ? "desktopSeenAt" : "mobileSeenAt";
-  if (window._onboarding && window._onboarding[need]) window.onOtherDeviceDone();
+  const home = document.getElementById("homeScreen");
+  if (home && home.classList.contains("on")) maybeShowOtherDeviceGate();
+  renderSettings();
 };
 // focusing this device is treated as "I'm using this one now" — claim it as
 // active so the other device shades itself.
@@ -176,17 +184,25 @@ window.addEventListener("focus", () => { if (window._uid) window._claimActiveDev
 
 // ---------- routing ----------
 function showScreen(id) { document.querySelectorAll(".screen").forEach((s) => s.classList.remove("on")); document.getElementById(id).classList.add("on"); }
-function goHome() { stopVoice(); if (isStandalone()) { showScreen("homeScreen"); maybeShowMobileEditGate(); } else { showScreen("landingScreen"); resetLandingToIntro(); } }
+// landing on the home screen: the cross-device nudge takes priority over the
+// (lower-stakes) "editing on phone" reminder — no point warning someone about
+// editing on their phone before they even have the option of a desktop.
+function enterHome() {
+  showScreen("homeScreen");
+  if (!maybeShowOtherDeviceGate()) maybeShowMobileEditGate();
+}
+function goHome() { stopVoice(); if (isStandalone()) { enterHome(); } else { showScreen("landingScreen"); resetLandingToIntro(); } }
 function isStandalone() { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; }
 // install is required on every device before use — phone AND desktop each
 // get their own install prompt the first time they sign in on that device.
-function routeAfterAuth() { if (isStandalone()) { showScreen("homeScreen"); maybeShowMobileEditGate(); } else { showScreen("landingScreen"); resetLandingToIntro(); } }
+function routeAfterAuth() { if (isStandalone()) { enterHome(); } else { showScreen("landingScreen"); resetLandingToIntro(); } }
 
 // ---------- mobile edit confirmation ----------
 // questions are meant to be written on desktop; the notification + reflecting
 // happens on the phone, and if a good idea shows up you go write it properly
 // on desktop. mobile CAN still edit, but every time (until dismissed for
-// good) it asks first, rather than nagging with a permanent banner.
+// good) it asks first, rather than nagging with a permanent banner. This only
+// ever applies once desktop is actually installed — see maybeShowOtherDeviceGate.
 const LS_MOBILE_EDIT_ACK = "rc_mobile_edit_ack";
 function maybeShowMobileEditGate() {
   const gate = document.getElementById("mobileEditGate");
@@ -200,79 +216,104 @@ window.dismissMobileEditGate = (forever) => {
   if (gate) gate.classList.remove("on");
 };
 
-// ---------- cross-device install gate ----------
-// whichever device you land on, it leads with getting the OTHER one
-// installed first — the point of this app is both devices staying in sync,
-// so the very first thing you do is set up the pair, not just the device
-// in front of you. Three sub-steps of #landingScreen, one visible at a time.
+// ---------- local install (this device) ----------
+// "Get started" leads straight into installing THIS device — no detour
+// through "go install the other one first". Once this device is genuinely
+// installed, maybeShowOtherDeviceGate() takes over the cross-device ask, as
+// an overlay over the home screen rather than a gate in front of it.
 const INSTALL_URL = "reflectandcommit.com/install";
 function resetLandingToIntro() {
   const intro = document.getElementById("landingIntro");
-  const other = document.getElementById("landingStepOther");
   const here = document.getElementById("landingStepHere");
-  if (!intro || !other || !here) return;
-  intro.style.display = "block"; other.style.display = "none"; here.style.display = "none";
+  if (!intro || !here) return;
+  intro.style.display = "block"; here.style.display = "none";
+  const btn = document.getElementById("getStartedBtn");
+  const manual = document.getElementById("landingManual");
+  if (btn) btn.style.display = "";
+  if (manual) { manual.style.display = "none"; manual.innerHTML = ""; }
 }
 window.goToInstallGate = () => {
-  // if the other kind of device has ALREADY been installed, don't nag about
-  // it again — go straight to this device's own install step. NOTE: we do
-  // NOT mark this device "seen" here — clicking "Get started" isn't an
-  // install. Seen is only ever set by markDeviceSeenIfInstalled() (already
-  // standalone on load) or the 'appinstalled' event listener above.
-  const need = isPhone() ? "desktopSeenAt" : "mobileSeenAt";
-  if (window._onboarding && window._onboarding[need]) {
-    document.getElementById("landingIntro").style.display = "none";
-    return window.onOtherDeviceDone();
-  }
   document.getElementById("landingIntro").style.display = "none";
-  document.getElementById("landingStepOther").style.display = "flex";
+  const here = document.getElementById("landingStepHere");
+  here.style.display = "block";
+  const explainer = document.getElementById("onboardingExplainer");
+  if (explainer) {
+    explainer.textContent = isPhone()
+      ? "You'll get a notification here when it's time to reflect."
+      : "Write your questions here — you'll get a notification on your phone when it's time to reflect.";
+  }
+};
+function maybeOpenFromUrl() { const p = new URLSearchParams(location.search); if (p.get("reflect") === "1") { history.replaceState({}, "", location.pathname); openReflection(); } }
+
+// ---------- cross-device pairing nudge (over the home screen) ----------
+// Shown whenever THIS device is installed but the OTHER kind has never
+// actually installed. Desktop's copy asks you to add mobile too and come
+// back here; mobile's copy just sends you to desktop — no round-trip is
+// asked of the phone, since tonight's notification still lands here either
+// way. Dismissing ("Not now") only closes it for this visit: it reappears
+// next time you open the app, or after your next commitment (see
+// run-engine.js's endCommit), until the pairing is actually done.
+function otherKind() { return isPhone() ? "desktop" : "mobile"; }
+function otherDeviceSeen() { return !!(window._onboarding && window._onboarding[otherKind() + "SeenAt"]); }
+function qrSrcFor(url) {
+  // higher error-correction + resolution so it scans instantly and holds up
+  // sharp even on a retina display, not the soft/low-density default
+  return "https://api.qrserver.com/v1/create-qr-code/?size=320x320&ecc=H&data=" + encodeURIComponent("https://" + url);
+}
+window.maybeShowOtherDeviceGate = function () {
+  const gate = document.getElementById("otherDeviceGate");
+  if (!gate) return false;
+  if (otherDeviceSeen()) { gate.classList.remove("on"); return false; }
   const label = document.getElementById("otherDeviceLabel");
   const qr = document.getElementById("landingQr");
   const hint = document.getElementById("otherDeviceHint");
   if (isPhone()) {
-    label.textContent = "Good reflections only happen on desktop.";
+    label.textContent = "Go set up Reflect & Commit on your computer to write your questions — you'll still get tonight's reflection right here.";
     qr.style.display = "none";
     hint.textContent = INSTALL_URL;
   } else {
-    label.textContent = "Reflections always start on your phone.";
-    // higher error-correction + resolution so it scans instantly and holds
-    // up sharp even on a retina display, not the soft/low-density default
-    qr.src = "https://api.qrserver.com/v1/create-qr-code/?size=320x320&ecc=H&data=" + encodeURIComponent("https://" + INSTALL_URL);
+    label.textContent = "Now install it on your phone too. Come back here once you're done.";
+    qr.src = qrSrcFor(INSTALL_URL);
     qr.style.display = "block";
     hint.textContent = INSTALL_URL;
   }
-  // check again right away in case the other device beat us here between
-  // the sign-in listener attaching and this click
-  window._onOnboardingUpdated && window._onOnboardingUpdated();
+  gate.classList.add("on");
+  return true;
 };
-window.onOtherDeviceDone = () => {
-  document.getElementById("landingStepOther").style.display = "none";
-  const here = document.getElementById("landingStepHere");
-  here.style.display = "block";
-  // the mental model, stated once, right where it matters: this is the
-  // moment you're setting up a device, not a permanent banner later.
-  const explainer = document.getElementById("onboardingExplainer");
-  if (explainer) {
-    explainer.textContent = isPhone()
-      ? "You'll get a notification here when it's time to reflect. Write and edit your questions on your computer — if a good idea comes up mid-reflection, that's where you go build it out."
-      : "Write your questions here. You'll get a notification on your phone when it's time to reflect — and if a good idea shows up, come back here to expand on it.";
-  }
-  renderSettings();
+window.dismissOtherDeviceGate = () => {
+  const gate = document.getElementById("otherDeviceGate");
+  if (gate) gate.classList.remove("on");
 };
-function maybeOpenFromUrl() { const p = new URLSearchParams(location.search); if (p.get("reflect") === "1") { history.replaceState({}, "", location.pathname); openReflection(); } }
 
 // ---------- install ----------
 let deferredInstallPrompt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferredInstallPrompt = e; });
 function isMobileUA() { return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.userAgentData && navigator.userAgentData.mobile); }
 window.onGetStarted = async () => {
-  if (deferredInstallPrompt) { deferredInstallPrompt.prompt(); await deferredInstallPrompt.userChoice; deferredInstallPrompt = null; return; }
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    const choice = await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    // 'appinstalled' (above) also fires and marks this device seen; this just
+    // moves the screen along right away instead of waiting on that event.
+    if (choice && choice.outcome === "accepted") enterHome();
+    return;
+  }
   document.getElementById("getStartedBtn").style.display = "none";
-  document.getElementById("landingManual").style.display = "block";
-  document.getElementById("landingManual").textContent = isMobileUA()
+  const manual = document.getElementById("landingManual");
+  manual.style.display = "block";
+  manual.innerHTML = (isMobileUA()
     ? "tap ⋮ in your browser's toolbar, then Add to Home screen."
-    : "click the install icon (⊕) in your address bar, or ⋮ menu → Install Reflect & Commit.";
+    : "click the install icon (⊕) in your address bar, or ⋮ menu → Install Reflect & Commit.")
+    + '<button class="btn-quiet" style="margin-top:16px;display:block" onclick="onManualInstallDone()">I’ve done this — continue</button>';
 };
+// there's no JS signal at all for a manual "Add to Home Screen" (iOS Safari,
+// and anyone who ignores the native prompt and does it by hand) — this is a
+// best-effort "take my word for it and move on" continue button so people
+// aren't stuck on this screen forever. The real confirmation still happens
+// automatically on the NEXT launch, via markDeviceSeenIfInstalled() finding
+// isStandalone() true.
+window.onManualInstallDone = () => { markDeviceSeenIfInstalled(); enterHome(); };
 
 // ---------- notification window ----------
 const REFLECT_WINDOW_MS = 2 * 60 * 60 * 1000;
@@ -322,7 +363,14 @@ if ("serviceWorker" in navigator) {
 // notify-time controls now appear in TWO places (onboarding + settings
 // panel) — both share the same classes, so every instance updates together
 // rather than each needing its own id.
-function renderSettings() { document.querySelectorAll(".notify-time-hidden").forEach((el) => { el.value = settings.notifyTime || "20:00"; }); renderNotifyLabel(); }
+function renderSettings() {
+  document.querySelectorAll(".notify-time-hidden").forEach((el) => { el.value = settings.notifyTime || "20:00"; });
+  renderNotifyLabel();
+  // manual re-entry point for the cross-device nudge, once it's been
+  // dismissed with "Not now" — hidden entirely once the pair is done.
+  const otherBtn = document.getElementById("otherDeviceSettingsBtn");
+  if (otherBtn) otherBtn.style.display = (typeof otherDeviceSeen === "function" && otherDeviceSeen()) ? "none" : "";
+}
 function renderNotifyLabel() {
   const els = document.querySelectorAll(".notify-countdown"); if (!els.length) return;
   const [h, m] = (settings.notifyTime || "20:00").split(":").map(Number);

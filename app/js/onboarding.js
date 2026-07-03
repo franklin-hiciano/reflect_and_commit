@@ -1,3 +1,13 @@
+// ⚠️ NOT LOADED — index.html has no <script src="js/onboarding.js"> tag, and
+// none of the DOM ids below (notifPop, introVideoOv, compoundCard, ...) exist
+// in index.html either, so nothing in this file has ever run in production.
+// run-engine.js used to call window._maybeShowCompoundCard() from here after
+// a commitment; that call site was removed (2026-07-03) in favor of the
+// cross-device install nudge in app.js (maybeShowOtherDeviceGate). Safe to
+// delete this file, or to wire it back up deliberately if the "compound
+// card" teaching moment / intro video is still wanted — just know it's
+// currently 100% dead code.
+//
 // ── Notif-time screen: the very first thing shown on first launch — set both
 // when you're notified and when the reflect window opens (the bell popover,
 // reused here as a centered modal via the backdrop + .first-run). Chains into

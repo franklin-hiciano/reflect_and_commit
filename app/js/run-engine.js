@@ -314,14 +314,10 @@ function endCommit(){
   if(!text||!_commitDateVal)return;
   if(window._addCommitment)window._addCommitment(text,_commitDateVal,_commitSourceNode);
   exitReflection();
-  // teach "reflections compound" right after someone lands their first real commitment —
-  // not before they've used the app at all. _maybeShowCompoundCard no-ops after night one.
-  // it chains into the "make it a habit" install popup on dismiss so the two never stack;
-  // if it's already been seen, show the habit popup straight away.
-  let compoundWillShow=false;
-  try{compoundWillShow=localStorage.getItem('rc_compound_seen')!=='1';}catch(e){}
-  if(window._maybeShowCompoundCard)window._maybeShowCompoundCard();
-  if(!compoundWillShow&&window._maybeShowHabitPopup)window._maybeShowHabitPopup();
+  // right after landing a real commitment is a good moment to nudge toward
+  // pairing the other device, if that still hasn't happened — a no-op once
+  // both devices are installed (see maybeShowOtherDeviceGate in app.js).
+  if(window.maybeShowOtherDeviceGate)window.maybeShowOtherDeviceGate();
 }
 function endToggleNotes(){
   const en=document.getElementById('endNotes');if(!en)return;

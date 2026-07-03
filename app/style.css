@@ -72,33 +72,9 @@ body::after {
 .btn-quiet { background: none; border: none; color: var(--ink-faint); font-family: var(--mono); font-size: 12px; cursor: pointer; }
 .btn-quiet:hover { color: var(--ink-dim); }
 
-.home-body { flex: 1; overflow-y: auto; padding: 74px 20px 60px; max-width: 640px; width: 100%; margin: 0 auto; }
-.q-list { display: flex; flex-direction: column; gap: 10px; }
-/* a full rebuild replaces every row, so any per-row fade replays constantly
-   and reads as flicker rather than motion — keep it, but fast and subtle */
-/* no per-row entrance animation — a full rebuild replaying a fade on every
-   row is exactly what reads as "flicker," so rows just appear instantly */
-.q-node.dragging-active {
-  position: relative; z-index: 20; background: #101012; border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.45); transition: none; cursor: grabbing;
-}
-.q-node.drag-over { box-shadow: inset 0 2px 0 0 var(--ink-dim); }
-.q-node.drag-over-below { box-shadow: inset 0 -2px 0 0 var(--ink-dim); }
-.q-row { display: flex; align-items: center; gap: 2px; border-bottom: 1px solid var(--line); padding: 4px 2px; transition: border-color .3s; }
-.q-row:focus-within { border-color: #34333a; }
-.q-drag-handle { background: none; border: none; color: var(--ink-faint); font-size: 13px; cursor: grab; padding: 8px 4px 8px 2px; letter-spacing: -2px; }
-.q-drag-handle:active { cursor: grabbing; }
-.q-star { background: none; border: none; color: var(--ink-faint); cursor: pointer; padding: 8px 8px 8px 2px; line-height: 1; display: inline-flex; position: relative; }
-.q-star svg { width: 15px; height: 15px; }
-.q-star.on { color: var(--ink); }
-.q-star::after {
-  content: attr(title); position: absolute; top: 100%; left: 0; margin-top: 6px; white-space: nowrap;
-  font-family: var(--mono); font-size: 11px; color: var(--ink-dim); background: #141416; border: 1px solid var(--line);
-  border-radius: 6px; padding: 5px 8px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 30;
-}
-.q-star:hover::after { opacity: 1; }
+.home-body { flex: 1; overflow-y: auto; padding: 74px 20px 40px; max-width: 640px; width: 100%; margin: 0 auto; }
 
-/* icon buttons: pen (edit toggle), gear (settings), bell (test) — deliberately
+/* icon buttons: pen (graph toggle), gear (settings), bell (test) — deliberately
    plain-line so they read as premium controls rather than UI chrome */
 .home-topbar { display: flex; justify-content: flex-end; gap: 4px; padding: 14px 16px 0; }
 .icon-btn { background: none; border: none; color: var(--ink-dim); cursor: pointer; padding: 9px; border-radius: 8px; display: inline-flex; transition: color .2s, background .2s; }
@@ -106,51 +82,113 @@ body::after {
 .icon-btn svg { width: 18px; height: 18px; }
 .icon-btn.on { color: var(--ink); }
 
-.add-below { display: block; width: 100%; margin: 18px 0 6px; background: none; border: 1px dashed var(--line); border-radius: 10px;
-  color: var(--ink-faint); font-family: var(--mono); font-size: 13px; padding: 12px; cursor: pointer; transition: color .2s, border-color .2s; }
-.add-below:hover { color: var(--ink-dim); border-color: #35343a; }
-
 .settings-panel { position: fixed; inset: auto 0 0 0; z-index: 60; display: none;
   background: #101012; border-top: 1px solid var(--line); padding: 22px 20px calc(22px + env(safe-area-inset-bottom)); }
 .settings-panel.on { display: block; animation: screenIn .25s var(--ease); }
 .settings-panel-inner { display: flex; align-items: center; gap: 14px; max-width: 420px; margin: 0 auto; }
 .settings-panel .notify-time-group { flex: 1; }
-.q-text {
+
+/* ---------- graph view: a live, read-only picture of the tree ---------- */
+.tree-graph { margin-bottom: 18px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; transition: max-height .3s var(--ease), opacity .25s; }
+.tree-graph.collapsed { max-height: 0; opacity: 0; margin-bottom: 0; border-color: transparent; overflow: hidden; pointer-events: none; }
+.graph-scroll { position: relative; overflow: auto; max-height: 320px; }
+.graph-scroll { width: var(--w); height: var(--h); min-width: 100%; }
+.graph-edges { position: absolute; top: 0; left: 0; pointer-events: none; }
+.graph-edge { fill: none; stroke: var(--line); stroke-width: 1.6; }
+.graph-edge.dashed { stroke: var(--ink-faint); stroke-dasharray: 3 4; }
+.graph-edge-label { fill: var(--ink-faint); font-family: var(--mono); font-size: 10px; }
+.graph-card {
+  position: absolute; display: flex; align-items: center; gap: 4px; padding: 6px 10px; box-sizing: border-box;
+  background: #111113; border: 1px solid var(--line); border-radius: 8px; font-family: var(--mono); font-size: 11.5px;
+  color: var(--ink-dim); line-height: 1.3; overflow: hidden;
+}
+.graph-card.choice { border-color: #35343a; color: var(--ink); }
+.graph-card.terminal { background: transparent; border-style: dashed; color: var(--ink-faint); justify-content: center; font-size: 11px; }
+.graph-card.star { border-color: var(--gold-dim); }
+.graph-card-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.graph-badge { flex-shrink: 0; font-size: 10px; color: var(--ink-faint); }
+.graph-empty { padding: 22px 16px; text-align: center; font-family: var(--mono); font-size: 12px; color: var(--ink-faint); }
+
+/* ---------- tree editor: the low-attention block editor ---------- */
+.tree-editor { display: flex; flex-direction: column; }
+.t-list { display: flex; flex-direction: column; }
+.t-row { position: relative; transition: transform .05s linear; }
+.t-row.dragging-active { position: relative; z-index: 20; background: #101012; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.45); transition: none; cursor: grabbing; }
+.t-row.drag-over { box-shadow: inset 0 2px 0 0 var(--ink-dim); }
+.t-row.drag-over-below { box-shadow: inset 0 -2px 0 0 var(--ink-dim); }
+.t-row-head { display: flex; align-items: center; gap: 2px; border-bottom: 1px solid var(--line); padding: 4px 2px; transition: border-color .3s; }
+.t-row-head:focus-within { border-color: #34333a; }
+.t-drag { background: none; border: none; color: var(--ink-faint); font-size: 13px; cursor: grab; padding: 8px 4px 8px 2px; letter-spacing: -2px; opacity: .55; transition: opacity .2s; }
+.t-drag:hover { opacity: 1; }
+.t-drag:active { cursor: grabbing; }
+.t-icon { background: none; border: none; color: var(--ink-faint); cursor: pointer; padding: 7px; display: inline-flex; align-items: center; border-radius: 6px; transition: color .2s, background .2s; }
+.t-icon:hover { color: var(--ink-dim); background: #131315; }
+.t-icon svg { width: 14px; height: 14px; }
+.t-star.on { color: var(--gold); }
+.t-recall.on { color: var(--ink-dim); }
+.t-recall.on svg, .t-star.on svg { color: inherit; }
+.t-del:hover { color: #b46; }
+.t-text {
   flex: 1; min-width: 0; background: none; border: none; color: var(--ink); padding: 11px 6px;
-  /* editing reads best in mono (matches every other input) — the serif look
-     only applies once a question is being asked back to you on reflectScreen */
   font-family: var(--mono); font-size: 15px; outline: none;
-  /* long questions fade into the right edge instead of hard-clipping, so the
-     row always reads as one continuous line no matter how far you've typed */
   -webkit-mask-image: linear-gradient(to right, black 88%, transparent 100%);
   mask-image: linear-gradient(to right, black 88%, transparent 100%);
 }
-.q-text::placeholder { color: var(--ink-faint); }
-.q-icons { display: flex; align-items: center; flex-shrink: 0; }
-.q-icon-btn { background: none; border: none; color: var(--ink-faint); font-size: 13px; cursor: pointer; padding: 8px; transition: color .25s; }
-.q-recall-icon.on { color: var(--ink-dim); }
-.q-del-icon:hover { color: #b46; }
-.q-split { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; border: 1px solid var(--line); border-radius: 6px; padding: 4px 7px; margin: 0 3px; }
-.q-split:hover { color: var(--ink); border-color: #35343a; }
+.t-text::placeholder { color: var(--ink-faint); }
+
+/* the inline "+": a hairline until you're near it, then a small target —
+   the whole point is that inserting a question never opens a dialog or
+   requires knowing where in a file to type. */
+.t-gap { position: relative; height: 9px; display: flex; align-items: center; justify-content: center; }
+.t-gap::before { content: ""; position: absolute; left: 8px; right: 8px; top: 50%; height: 1px; background: transparent; transition: background .2s; }
+.t-gap:hover::before { background: var(--line); }
+.t-gap-plus {
+  position: relative; z-index: 2; width: 18px; height: 18px; border-radius: 50%; background: #131315; border: 1px solid var(--line);
+  color: var(--ink-faint); display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity .15s, color .15s, border-color .15s;
+}
+.t-gap-plus svg { width: 10px; height: 10px; }
+.t-gap:hover .t-gap-plus, .t-gap.open .t-gap-plus { opacity: 1; }
+.t-gap-plus:hover { color: var(--ink); border-color: #35343a; }
+.t-gap.open { height: auto; padding: 4px 0; }
+.t-gap-input {
+  flex: 1; margin: 0 4px 0 28px; background: #101012; border: 1px solid #35343a; border-radius: 6px; color: var(--ink);
+  font-family: var(--mono); font-size: 14px; padding: 8px 10px; outline: none;
+}
+
+.t-textbtn {
+  background: none; border: 1px solid var(--line); border-radius: 6px; color: var(--ink-faint); cursor: pointer;
+  font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; padding: 5px 8px; margin: 0 2px;
+  transition: color .2s, border-color .2s; flex-shrink: 0;
+}
+.t-textbtn:hover { color: var(--ink-dim); border-color: #35343a; }
 
 /* branches — options map to at most two lanes (A / B), one level deep */
-.q-branches { margin: 4px 0 6px 12px; padding-left: 14px; border-left: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
-.q-opts { display: flex; flex-direction: column; gap: 6px; }
-.q-opt-row { display: flex; align-items: center; gap: 6px; }
-.q-opt-label { flex: 1; min-width: 0; max-width: 220px; background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; color: var(--ink); font-family: var(--mono); font-size: 13px; outline: none; }
-.q-opt-label:focus { border-color: #35343a; }
-.q-exit-toggle { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--ink-dim); font-family: var(--mono); font-size: 12px; cursor: pointer; flex-shrink: 0; }
-.q-exit-toggle.exit-a { border-color: #3a3a42; }
-.q-exit-toggle.exit-b { border-color: #46424a; color: var(--ink); }
-.q-lane-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
-.q-lane-badge { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--line); font-family: var(--mono); font-size: 11px; color: var(--ink-dim); }
-.q-lane-arrow { color: var(--ink-faint); font-size: 12px; }
-.q-branch-list { display: flex; flex-direction: column; gap: 6px; }
-.q-branch-list .q-text { font-size: 14px; }
-.q-branch-add { margin-top: 4px; align-self: flex-start; background: none; border: none; color: var(--ink-faint); font-family: var(--mono); font-size: 12px; cursor: pointer; }
-.q-branch-add:hover { color: var(--ink-dim); }
-.q-branch-compact { margin: 2px 0 6px 12px; padding: 5px 10px; font-family: var(--mono); font-size: 12px; color: var(--ink-faint);
-  border-left: 1px solid var(--line); }
+.t-options { margin: 2px 0 6px 30px; padding-left: 14px; border-left: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
+.t-opt { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.t-opt-label { flex: 1; min-width: 0; max-width: 220px; background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; color: var(--ink); font-family: var(--mono); font-size: 13px; outline: none; }
+.t-opt-label:focus { border-color: #35343a; }
+.t-terminal-badge { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); border: 1px dashed var(--line); border-radius: 6px; padding: 4px 8px; }
+.t-endhere { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-faint); background: none; border: 1px solid var(--line); border-radius: 6px; padding: 4px 7px; cursor: pointer; }
+.t-endhere:hover { color: var(--ink-dim); border-color: #35343a; }
+.t-opt-addfirst {
+  display: flex; align-items: center; gap: 6px; align-self: flex-start; background: none; border: none; color: var(--ink-faint);
+  font-family: var(--mono); font-size: 12px; cursor: pointer; padding: 4px 2px; transition: color .2s;
+}
+.t-opt-addfirst svg { width: 12px; height: 12px; }
+.t-opt-addfirst:hover { color: var(--ink-dim); }
+.t-opt-add-new { margin-top: 2px; align-self: flex-start; background: none; border: none; color: var(--ink-faint); font-family: var(--mono); font-size: 12px; cursor: pointer; }
+.t-opt-add-new:hover { color: var(--ink-dim); }
+.t-opt-note { font-family: var(--mono); font-size: 10.5px; color: var(--ink-faint); font-style: italic; }
+
+.tree-io-row { display: flex; gap: 14px; margin-top: 14px; padding-top: 10px; }
+
+.paste-tree-modal { position: fixed; inset: 0; z-index: 70; display: none; align-items: center; justify-content: center; background: rgba(6,6,7,.7); backdrop-filter: blur(2px); padding: 20px; }
+.paste-tree-modal.on { display: flex; animation: screenIn .2s var(--ease); }
+.paste-tree-inner { width: 100%; max-width: 480px; background: #101012; border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+.paste-tree-label { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); margin-bottom: 10px; }
+.paste-tree-area { width: 100%; min-height: 220px; resize: vertical; background: #0d0d0e; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font-family: var(--mono); font-size: 13px; line-height: 1.5; padding: 12px; outline: none; }
+.paste-tree-area:focus { border-color: #35343a; }
+.paste-tree-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
 
 /* ---------- unavailable ---------- */
 .unavail-inner { margin: auto; text-align: center; }

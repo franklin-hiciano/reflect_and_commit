@@ -20,29 +20,24 @@ Don't write that down as a reminder — reminders do nothing. Turn it into a que
 
 > **Why didn't you share your work today? List every excuse.**
 
-Run that a few nights in a row and the recall feature stacks last week's excuses right in front of you. You stop staring at a blank page and start beating your own patterns one at a time. That move — a principle turned into an unavoidable question — is the entire craft. Learn it once and you can build a tree for anything: focus, money, the conversation you keep putting off.
+Turn recall on for that question (one tap) and it stacks last week's excuses right in front of you. You stop staring at a blank page and start beating your own patterns one at a time. That move — a principle turned into an unavoidable question — is the entire craft. Learn it once and you can build a tree for anything: focus, money, the conversation you keep putting off.
 
-## Your starter tree (paste this in)
+## Your starter tree
 
-Don't start from a blank canvas. Open the app, paste this into the editor, and press **reflect** (top right):
+Don't start from a blank canvas. Open the app and tap **+** four times to build this (or tap **paste tree** and drop in `starter-tree.txt` from this repo if you'd rather not type it out):
 
 ```
 What did you actually do with today? Hours, not vibes.
-  >> Did you move the thing that matters most right now?
 
-Did you move the thing that matters most right now?
-  yes >> What made today work? Name it so tomorrow can copy it.
-  no >> What did you avoid, and what were you afraid would happen?
-
-What made today work? Name it so tomorrow can copy it.
-  >> done
-
-What did you avoid, and what were you afraid would happen?
-  @[What did you avoid, and what were you afraid would happen?] [1,7d]
-  >> done
+* Did you move the thing that matters most right now?
+  yes
+    What made today work? Name it so tomorrow can copy it.
+  no
+    What did you avoid, and what were you afraid would happen?
+      recall
 ```
 
-Four nodes. It branches once on whether your day moved the needle, it surfaces your own answers from the past week (the `@[...]` line), and every path lands on the commitment screen. Run it tonight exactly as-is.
+Four questions. It branches once on whether your day moved the needle, it surfaces your own past answers on the "what did you avoid" question (that `recall` line — or just tap the ↺ icon instead of typing it), and either path lands on the commitment screen. The star marks the second question as tonight's minimum, so most nights that's as far as you need to go. Run it tonight exactly as-is.
 
 ## After a few nights
 

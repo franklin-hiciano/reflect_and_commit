@@ -22,15 +22,24 @@ devlog/roadmap:
 - [ ] make sure notis work
 - [ ] start using behavioral pattern detection
 
-how to use:
-```
-this is a multiple choice node. you mark the next node like this >>
-  option 1 >> this is a textbox node. oogabooga
-  option 2 >> yep, its really that simple. go make your wisdom tree
+how to use: tap **+** anywhere in the question list to drop in a new question, drag the `⋮⋮` handle to reorder, tap **+path** to split a question into yes/no, tap **↺** to make a question recall its own past answers, and tap the star to mark tonight's minimum (the reflection can stop there and offer to commit). None of that requires typing any syntax — the graph above the list redraws itself after every change so you can see the shape of the tree instead of holding it in your head.
 
-this is a textbox node. oogabooga
-  >> yep, its really that simple. go make your wisdom tree
+Under the hood every tree is still just plain text (this is what "paste tree" / "copy as text" round-trip), in case you ever want to write one somewhere else or keep a backup:
 
-yep, its really that simple. go make your wisdom tree
 ```
-then press test in the top right corner.
+# a question is a line. indent a line under it to branch.
+this is a multiple-choice question
+  option 1
+    this is what happens after option 1
+  option 2
+    this is what happens after option 2
+
+this is a plain question with one thing after it
+  this happens next
+
+this is a question with nothing after it — it just ends the reflection
+```
+
+Two things you don't need but exist if you want them: `label >> next question` on one line is shorthand for writing the label and its follow-up as two separate lines (handy for short trees), and `recall` on its own line under a question makes it recall its own past answers. A bare `>> done` (or just `done`) explicitly ends a path — you don't have to write it, since a path with nothing left just ends the same way, but it's there so you can say "this is supposed to stop here" and have it confirmed rather than re-derived.
+
+You'll basically never need any of this to actually use the app — it's an export format, not the main interface.

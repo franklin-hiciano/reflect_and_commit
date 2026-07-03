@@ -16,17 +16,15 @@ const LS_QLIST = "rc_questions_v4";
 const LS_SETTINGS = "rc_settings_v3";
 const LS_LASTNOTIF = "rc_last_notif_v3";
 
-let questions = [];
+var questions = []; // classic <script>, top-level var == window.questions — tree-editor.js reads/writes the same array via that name
 let settings = { notifyTime: "20:00" };
 let commitments = [];
-let editMode = false;
 let chatCollapsed = false;
 let draft = blankDraft();
 
 // phone = mobile UA, or a coarse-pointer device on a narrow screen. Used to
 // (a) gate structural branch-editing to desktop, (b) show the desktop nudge.
 function isPhone() { return isMobileUA() || (window.matchMedia("(pointer: coarse)").matches && window.innerWidth < 820); }
-function canBranchHere() { return !isPhone(); }
 
 function blankDraft() {
   return { active: false, phase: null, mode: "min", currentId: null, answers: {},
@@ -102,10 +100,19 @@ function siblingAfter(node) {
 function computeNext(node) {
   if (node.type === "choice") {
     const a = draft.answers[node.id];
+    // an option can be marked `terminal` (the DSL's ">> done") — chosen, it
+    // ends the reflection right there instead of falling into its branch or
+    // rejoining whatever comes after this question. Purely additive: options
+    // without this field behave exactly as they always have.
+    const optIndex = a && typeof a === "object" ? a.optIndex : null;
+    const opt = optIndex != null ? (node.options || [])[optIndex] : null;
+    if (opt && opt.terminal) return null;
     const exit = a && typeof a === "object" ? a.exit : null;
     if (exit != null && node.branches[exit] && node.branches[exit].length) return node.branches[exit][0];
     return siblingAfter(node);
   }
+  // same idea for a plain question explicitly marked as a hard stop.
+  if (node.terminal) return null;
   return siblingAfter(node);
 }
 function starNode() { return questions.find((q) => q.star) || null; }
@@ -122,21 +129,22 @@ window._onQuestionsUpdated = () => {
     // focused (not just text fields) — a full rebuild every ~500ms mid-edit
     // (each keystroke round-trips through the debounced Firestore write and
     // back through this listener) is what was reading as "flickering".
-    if (ae && ae.closest && ae.closest("#qList")) return;
+    if (ae && ae.closest && ae.closest("#treeEditor")) return;
     // also skip if this echo is identical to what's already on screen — an
     // idle Firestore round-trip (e.g. the server ack of your own last write)
     // otherwise rebuilds the whole list for no visible reason, which is what
     // reads as a flicker even while just hovering, not typing.
     const json = JSON.stringify(questions);
     if (json === lastRenderedQuestionsJSON) return;
-    renderQuestionEditor();
+    lastRenderedQuestionsJSON = json;
+    renderTreeEditor();
   }
 };
 window._onSettingsUpdated = () => { if (window._settings && window._settings.notifyTime) { settings = window._settings; saveLocalSettings(); renderSettings(); } };
 window._onCommitmentsUpdated = () => { commitments = window._commitments || []; };
 window._onDraftUpdated = () => { const rd = window._remoteDraft; if (rd && rd.active && !draft.active) { draft = { ...blankDraft(), ...rd }; localStorage.setItem(LS_DRAFT, JSON.stringify(draft)); } };
 window._onSignedIn = () => {
-  normalizeTree(questions); renderQuestionEditor(); renderSettings(); scheduleNotificationLoop();
+  normalizeTree(questions); renderTreeEditor(); renderSettings(); scheduleNotificationLoop();
   routeAfterAuth(); maybeOpenFromUrl();
   if ("Notification" in window && Notification.permission === "granted") window._registerPush && window._registerPush(deviceKind());
   window._claimActiveDevice && window._claimActiveDevice(deviceKind());
@@ -337,198 +345,49 @@ window.openTimePicker = (btn) => {
 };
 window.toggleSettingsPanel = () => { const p = document.getElementById("settingsPanel"); if (p) p.classList.toggle("on"); };
 
-// ---------- editor ----------
-window.toggleEditMode = () => {
-  editMode = !editMode;
-  const b = document.getElementById("editToggle"); if (b) b.classList.toggle("on", editMode);
-  const list = document.getElementById("qList"); if (list) list.classList.toggle("editing", editMode);
-  renderQuestionEditor();
+// ---------- tree editor ----------
+// The click-heavy list (drag handle + star + recall + delete + split/merge
+// icons behind a modal "edit mode") lived here before. It's now a block
+// editor (app/js/tree-editor.js) plus a read-only graph view
+// (app/js/dsl-graph.js) rendered above it — both operate directly on this
+// same `questions` array via window.renderTreeEditor()/persistQuestions(),
+// so nothing about save/sync/reflect changes, only how a tree gets authored.
+// A plain-text form of the same tree (app/js/dsl.js) is available as an
+// optional import/export path — "paste tree" / "copy as text" below — for
+// backup or writing a tree somewhere else; it's never required to use the app.
+window.openPasteTree = () => {
+  const m = document.getElementById("pasteTreeModal"); if (!m) return;
+  const ta = document.getElementById("pasteTreeArea"); if (ta) ta.value = "";
+  m.classList.add("on");
+  setTimeout(() => ta && ta.focus(), 60);
 };
-// stop-sign icon for "star" — the nightly minimum boundary
-function starIconSvg(on) {
-  return `<svg viewBox="0 0 24 24" fill="${on ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8.3 2.5h7.4L21 7.8v7.4L15.7 21H8.3L3 15.2V7.8L8.3 2.5z"/></svg>`;
-}
+window.closePasteTree = () => { const m = document.getElementById("pasteTreeModal"); if (m) m.classList.remove("on"); };
+window.confirmPasteTree = () => {
+  const ta = document.getElementById("pasteTreeArea");
+  const text = ta ? ta.value : "";
+  // opening this modal and hitting "replace" already IS the deliberate
+  // confirmation, so skip the (redundant) native confirm() inside pasteTreeFromText.
+  const warnings = window.pasteTreeFromText(text, true);
+  window.closePasteTree();
+  if (warnings && warnings.length) alert(warnings.join("\n"));
+};
+window.copyTreeButton = async (btn) => {
+  const text = await window.copyTreeAsText();
+  if (!text) return;
+  const b = btn && btn.currentTarget ? btn.currentTarget : btn;
+  if (b && "textContent" in b) {
+    const orig = b.textContent; b.textContent = "copied"; setTimeout(() => { b.textContent = orig; }, 1100);
+  }
+};
+window.toggleGraphPanel = () => {
+  const p = document.getElementById("treeGraph"); const b = document.getElementById("editToggle");
+  if (!p) return;
+  const collapsed = p.classList.toggle("collapsed");
+  if (b) b.classList.toggle("on", !collapsed);
+  localStorage.setItem("rc_graph_collapsed", collapsed ? "1" : "0");
+};
 function persistQuestions() { saveLocalQuestions(); window._saveQuestions && window._saveQuestions(questions); }
 function escapeHtml(s) { return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
-
-function iconBtn(txt, cls, title, fn) { const b = document.createElement("button"); b.className = "q-icon-btn " + cls; b.textContent = txt; if (title) b.title = title; b.onclick = fn; return b; }
-
-function renderQuestionEditor() {
-  const list = document.getElementById("qList"); if (!list) return;
-  normalizeTree(questions);
-  list.innerHTML = "";
-  questions.forEach((node, i) => list.appendChild(buildNode(node, questions, i, true)));
-  lastRenderedQuestionsJSON = JSON.stringify(questions);
-}
-
-function buildNode(node, siblings, index, isRoot) {
-  ensureShape(node, isRoot);
-  const wrap = document.createElement("div"); wrap.className = "q-node" + (node.type === "choice" ? " is-choice" : "");
-  wrap.dataset.dragIndex = index;
-  const row = document.createElement("div"); row.className = "q-row";
-
-  // drag-to-reorder is a light edit, always available — edit mode is reserved
-  // for the two heavier actions (star, delete) below.
-  const handle = document.createElement("button"); handle.className = "q-drag-handle"; handle.textContent = "⋮⋮"; handle.title = "drag to reorder";
-  wireDrag(handle, wrap, siblings, index);
-  row.appendChild(handle);
-
-  if (isRoot && editMode) {
-    const star = document.createElement("button");
-    star.className = "q-star" + (node.star ? " on" : "");
-    star.title = "nightly minimum — reflection can stop here";
-    star.innerHTML = starIconSvg(node.star);
-    star.onclick = () => { const was = node.star; questions.forEach((q) => (q.star = false)); node.star = !was; persistQuestions(); renderQuestionEditor(); };
-    row.appendChild(star);
-  }
-
-  const input = document.createElement("input"); input.className = "q-text"; input.value = node.text || ""; input.placeholder = "write a question…";
-  input.oninput = () => { node.text = input.value; persistQuestions(); };
-  row.appendChild(input);
-
-  const struct = canBranchHere(); // structural (branch) edits = desktop only, but the icon itself is always visible there
-  const icons = document.createElement("div"); icons.className = "q-icons";
-  if (isRoot && struct) {
-    if (node.type === "choice") icons.appendChild(iconBtn("⑂", "q-split", "merge — remove branches", () => mergeNode(node)));
-    else icons.appendChild(iconBtn("⑂", "q-split", "split into two branches", () => splitNode(node)));
-  }
-  if (editMode) icons.appendChild(iconBtn("↺", "q-recall-icon" + (node.recall ? " on" : ""), "recall past answers", () => { node.recall = !node.recall; persistQuestions(); renderQuestionEditor(); }));
-  if (editMode) icons.appendChild(iconBtn("✕", "q-del-icon", "remove", () => { siblings.splice(index, 1); persistQuestions(); renderQuestionEditor(); }));
-  row.appendChild(icons);
-  wrap.appendChild(row);
-
-  if (node.type === "choice") {
-    if (!struct) {
-      // structural edits are desktop-only regardless of edit mode — show a
-      // compact, read-only summary on phone
-      const compact = document.createElement("div"); compact.className = "q-branch-compact";
-      compact.textContent = node.options.map((o) => o.label || "…").join(" · ");
-      wrap.appendChild(compact);
-      return wrap;
-    }
-    // full choice editor (labels, exits, branch content) is always available
-    // on desktop — this is a light/normal edit now, NOT gated by edit mode
-    const box = document.createElement("div"); box.className = "q-branches";
-
-    // options: any number of labels, each pointing at exit A or B
-    const optsWrap = document.createElement("div"); optsWrap.className = "q-opts";
-    node.options.forEach((opt, oi) => {
-      const orow = document.createElement("div"); orow.className = "q-opt-row";
-      const lbl = document.createElement("input"); lbl.className = "q-opt-label"; lbl.value = opt.label || ""; lbl.placeholder = "option";
-      lbl.oninput = () => { opt.label = lbl.value; persistQuestions(); };
-      orow.appendChild(lbl);
-      const ex = document.createElement("button"); ex.className = "q-exit-toggle exit-" + (opt.exit === 1 ? "b" : "a"); ex.textContent = opt.exit === 1 ? "B" : "A"; ex.title = "which branch this leads to";
-      if (struct) ex.onclick = () => { opt.exit = opt.exit === 1 ? 0 : 1; persistQuestions(); renderQuestionEditor(); };
-      else ex.disabled = true;
-      orow.appendChild(ex);
-      if (struct && node.options.length > 1) {
-        const del = document.createElement("button"); del.className = "q-icon-btn q-del-icon"; del.textContent = "✕"; del.title = "remove option";
-        del.onclick = () => { node.options.splice(oi, 1); persistQuestions(); renderQuestionEditor(); };
-        orow.appendChild(del);
-      }
-      optsWrap.appendChild(orow);
-    });
-    if (struct) {
-      const addOpt = document.createElement("button"); addOpt.className = "q-branch-add"; addOpt.textContent = "+ option";
-      addOpt.onclick = () => { node.options.push({ label: "", exit: 0 }); persistQuestions(); renderQuestionEditor(); };
-      optsWrap.appendChild(addOpt);
-    }
-    box.appendChild(optsWrap);
-
-    // up to two branch lanes (A / B) — an unused lane just stays hidden.
-    [0, 1].forEach((bi) => {
-      const used = node.options.some((o) => (o.exit || 0) === bi);
-      if (!used) return;
-      const lane = document.createElement("div"); lane.className = "q-lane";
-      const head = document.createElement("div"); head.className = "q-lane-head";
-      const badge = document.createElement("span"); badge.className = "q-lane-badge exit-" + (bi === 1 ? "b" : "a"); badge.textContent = bi === 1 ? "B" : "A"; head.appendChild(badge);
-      const arrow = document.createElement("span"); arrow.className = "q-lane-arrow"; arrow.textContent = "→"; head.appendChild(arrow);
-      lane.appendChild(head);
-      const bl = document.createElement("div"); bl.className = "q-branch-list";
-      (node.branches[bi] || []).forEach((bn, xi) => bl.appendChild(buildNode(bn, node.branches[bi], xi, false)));
-      lane.appendChild(bl);
-      if (struct) {
-        const add = document.createElement("button"); add.className = "q-branch-add"; add.textContent = "+ follow-up";
-        add.onclick = () => { node.branches[bi].push({ id: "q_" + Date.now() + "_" + bi, text: "", recall: false, type: "text" }); persistQuestions(); renderQuestionEditor(); };
-        lane.appendChild(add);
-      }
-      box.appendChild(lane);
-    });
-    wrap.appendChild(box);
-  }
-  return wrap;
-}
-
-// drag-to-reorder: native HTML5 DnD, drag only starts from the ⋮⋮ handle
-// (dragstart is cancelled unless it originated there, so typing/clicking the
-// text field never triggers a drag). A hairline indicator shows where the
-// row will land; the array only reorders on drop, then everything fades
-// back in via the .q-node animation in CSS for a clean, non-janky settle.
-// Pointer Events, not native HTML5 drag-and-drop — native DnD starting from a
-// <button> handle is unreliable across browsers/trackpads (many swallow the
-// gesture for the button's own press state) and doesn't work on touch at all.
-// Pointer Events unify mouse, trackpad, and touch, so this is what actually
-// works everywhere. The dragged row floats and follows the pointer; other
-// rows stay put but show a hairline where it'll land; array reorders on release.
-function wireDrag(handle, wrap, list, index) {
-  handle.style.touchAction = "none";
-  let dragging = false, startY = 0, siblings = [], container = null;
-
-  const onMove = (e) => {
-    if (!dragging) return;
-    const dy = e.clientY - startY;
-    wrap.style.transform = `translateY(${dy}px)`;
-    document.querySelectorAll(".drag-over,.drag-over-below").forEach((n) => n.classList.remove("drag-over", "drag-over-below"));
-    for (const sib of siblings) {
-      if (sib === wrap) continue;
-      const rect = sib.getBoundingClientRect();
-      if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
-        sib.classList.add(e.clientY - rect.top < rect.height / 2 ? "drag-over" : "drag-over-below");
-        break;
-      }
-    }
-  };
-  const onUp = () => {
-    if (!dragging) return;
-    dragging = false;
-    document.removeEventListener("pointermove", onMove);
-    document.removeEventListener("pointerup", onUp);
-    wrap.style.transform = ""; wrap.classList.remove("dragging-active");
-    const target = document.querySelector(".drag-over,.drag-over-below");
-    let to = index;
-    if (target) {
-      const targetIndex = siblings.indexOf(target);
-      const before = target.classList.contains("drag-over");
-      to = targetIndex + (before ? 0 : 1);
-      if (to > index) to--;
-    }
-    document.querySelectorAll(".drag-over,.drag-over-below").forEach((n) => n.classList.remove("drag-over", "drag-over-below"));
-    if (to !== index) { const [moved] = list.splice(index, 1); list.splice(to, 0, moved); persistQuestions(); }
-    renderQuestionEditor();
-  };
-  handle.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
-    dragging = true; startY = e.clientY;
-    container = wrap.parentElement;
-    siblings = Array.from(container.children).filter((el) => el.classList.contains("q-node"));
-    wrap.classList.add("dragging-active");
-    document.addEventListener("pointermove", onMove);
-    document.addEventListener("pointerup", onUp);
-  });
-}
-function splitNode(node) { node.type = "choice"; node.options = [{ label: "yes", exit: 0 }, { label: "no", exit: 1 }]; node.branches = [[], []]; persistQuestions(); renderQuestionEditor(); }
-function mergeNode(node) {
-  const has = (node.branches || []).some((br) => (br || []).length);
-  if (has && !confirm("Remove both branches and their follow-up questions?")) return;
-  node.type = "text"; delete node.options; delete node.branches; persistQuestions(); renderQuestionEditor();
-}
-window.addQuestion = () => {
-  questions.push({ id: "q_" + Date.now(), text: "", recall: false, star: !questions.some((q) => q.star), type: "text" });
-  persistQuestions(); renderQuestionEditor();
-  const list = document.getElementById("qList");
-  const inputs = list.querySelectorAll(":scope > .q-node > .q-row > .q-text");
-  inputs[inputs.length - 1] && inputs[inputs.length - 1].focus();
-};
 
 // ---------- day-after check-in gate ----------
 function dueCommitment() { const today = new Date(); today.setHours(0, 0, 0, 0); return (commitments || []).find((c) => c.status === "active" && c.dueDate && new Date(c.dueDate) <= today); }
@@ -783,15 +642,26 @@ function wireHold(btnId, fillId, onComplete) {
 
 // ---------- voice (demoted: opt-in dictation via the mic button) ----------
 let recog = null, voiceField = null, voiceBase = "", listeningWanted = false, micActive = false;
+let voiceSilenceTimer = null, voiceHeardAnything = false;
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 window.toggleMic = () => {
   if (!SR) { alert("Voice dictation isn't supported in this browser — just type."); return; }
   if (micActive) stopVoice(); else startVoice(document.getElementById("answerField"));
 };
 function updateMicBtn() { const b = document.getElementById("micBtn"); if (b) { b.classList.toggle("active", micActive); b.style.display = SR ? "flex" : "none"; } }
+// SILENCE_MS existed as a defined-but-never-wired constant — this is that
+// wiring: once you've said something and then gone quiet for SILENCE_MS,
+// send it, same as if you'd tapped the send button. One less tap per
+// question when you're talking instead of typing.
+function armVoiceSilence() {
+  clearTimeout(voiceSilenceTimer);
+  voiceSilenceTimer = setTimeout(() => {
+    if (micActive && voiceHeardAnything && voiceField && voiceField.value.trim()) { stopVoice(); composerSend(); }
+  }, SILENCE_MS);
+}
 function startVoice(field) {
   if (!SR || !field) return;
-  stopVoice(); voiceField = field; voiceBase = field.value ? field.value + " " : "";
+  stopVoice(); voiceField = field; voiceBase = field.value ? field.value + " " : ""; voiceHeardAnything = false;
   try {
     recog = new SR(); recog.continuous = true; recog.interimResults = true; recog.lang = navigator.language || "en-US";
     recog.onresult = (e) => {
@@ -801,6 +671,7 @@ function startVoice(field) {
       voiceField.value = (voiceBase + interim).trimStart(); autoGrow(voiceField);
       const n = currentNode(); if (n) draft.answers[n.id] = voiceField.value;
       saveDraft();
+      if ((final || interim).trim()) { voiceHeardAnything = true; armVoiceSilence(); }
     };
     recog.onerror = () => {};
     recog.onend = () => { if (recog && listeningWanted) { try { recog.start(); } catch (_) {} } };
@@ -809,9 +680,16 @@ function startVoice(field) {
 }
 function stopVoice() {
   listeningWanted = false; micActive = false;
+  clearTimeout(voiceSilenceTimer);
   const b = document.getElementById("micBtn"); if (b) b.classList.remove("active");
   if (recog) { try { recog.onend = null; recog.stop(); } catch (_) {} recog = null; }
 }
 
 // ---------- boot ----------
-document.addEventListener("DOMContentLoaded", () => { normalizeTree(questions); renderQuestionEditor(); renderSettings(); });
+document.addEventListener("DOMContentLoaded", () => {
+  normalizeTree(questions); renderTreeEditor(); renderSettings();
+  const graphCollapsed = localStorage.getItem("rc_graph_collapsed") === "1";
+  const gp = document.getElementById("treeGraph"), gb = document.getElementById("editToggle");
+  if (gp) gp.classList.toggle("collapsed", graphCollapsed);
+  if (gb) gb.classList.toggle("on", !graphCollapsed);
+});

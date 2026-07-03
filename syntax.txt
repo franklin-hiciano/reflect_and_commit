@@ -1,0 +1,16 @@
+node1
+  node2
+  
+node2
+  yes > node3
+  no > node4
+
+node3
+  node5
+
+node4'
+  recall node3
+  node5
+
+node5
+  done

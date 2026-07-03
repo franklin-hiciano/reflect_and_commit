@@ -1,18 +1,17 @@
 # ── starter tree ──────────────────────────────────────────────
-# a node is a line. its answers are indented under it.
-# end every path with ">> done". press reflect (top right) to run it.
-# rewrite any line to fit your life — this is scaffolding, not scripture.
+# Tap "paste tree" in the app and drop this in — or just read it as a model
+# and build your own with the + button. Either way you end up with the same
+# four questions.
+#
+# a question is a line. indent a line under it to branch. that's the whole
+# syntax — see app/README.md for the full grammar (recall, star, and the
+# rare cases that need an explicit ">>").
 
 What did you actually do with today? Hours, not vibes.
-  >> Did you move the thing that matters most right now?
 
-Did you move the thing that matters most right now?
-  yes >> What made today work? Name it so tomorrow can copy it.
-  no >> What did you avoid, and what were you afraid would happen?
-
-What made today work? Name it so tomorrow can copy it.
-  >> done
-
-What did you avoid, and what were you afraid would happen?
-  @[What did you avoid, and what were you afraid would happen?] [1,7d]
-  >> done
+* Did you move the thing that matters most right now?
+  yes
+    What made today work? Name it so tomorrow can copy it.
+  no
+    What did you avoid, and what were you afraid would happen?
+      recall

@@ -1,0 +1,303 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Reflect &amp; Commit — entrance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<!-- display fonts are for the ENTRANCE only (theater). The app itself stays on
+     system fonts — this is the Hermès split: overdone doorway, silent interior. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=EB+Garamond:ital@0;1&family=Grenze+Gotisch:wght@400;500;600&display=swap" />
+<style>
+  :root{
+    --bg:#0a0a0b; --ink:#ededec; --ink-dim:#8f8f8d; --ink-faint:#5a5a58;
+    --gold:#c9a25e; --gold-dim:#8f7440;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;margin:0;}
+  body{
+    background:var(--bg); color:var(--ink); overflow:hidden;
+    font-family:"EB Garamond",Georgia,serif;
+    background-image:radial-gradient(120% 90% at 50% 42%, #16130e 0%, #0b0a0a 46%, #050505 100%);
+  }
+  /* candlelight — a warm breath behind the wordmark */
+  .candle{position:fixed;inset:0;pointer-events:none;z-index:1;
+    background:radial-gradient(46% 38% at 50% 44%, rgba(201,162,94,.14) 0%, rgba(201,162,94,.05) 34%, transparent 66%);
+    animation:flicker 5.5s ease-in-out infinite;}
+  @keyframes flicker{0%,100%{opacity:.85;}45%{opacity:1;}62%{opacity:.72;}78%{opacity:.94;}}
+  /* film grain — kills flat OLED black */
+  body::after{content:"";position:fixed;inset:0;z-index:6;pointer-events:none;opacity:.05;mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+
+  /* the vines live here, densest at the edges, faded away from the centre so
+     the wordmark always stays legible no matter how the growth lands */
+  #vines{position:fixed;inset:0;z-index:2;pointer-events:none;
+    -webkit-mask-image:radial-gradient(125% 105% at 50% 47%, transparent 17%, #000 62%);
+    mask-image:radial-gradient(125% 105% at 50% 47%, transparent 17%, #000 62%);}
+
+  /* engraved inset frame */
+  .frame{position:fixed;inset:20px;z-index:3;pointer-events:none;
+    border:1px solid rgba(201,162,94,.14);}
+  .frame::before{content:"";position:absolute;inset:5px;border:1px solid rgba(201,162,94,.07);}
+  .corner{position:fixed;z-index:4;width:74px;height:74px;pointer-events:none;opacity:0;transition:opacity 1.2s ease 1.1s;}
+  .corner.tl{top:14px;left:14px;}
+  .corner.tr{top:14px;right:14px;transform:scaleX(-1);}
+  .corner.bl{bottom:14px;left:14px;transform:scaleY(-1);}
+  .corner.br{bottom:14px;right:14px;transform:scale(-1,-1);}
+  .lit .corner{opacity:1;}
+
+  .stage{position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;padding:0 30px;}
+
+  .crest{font-size:15px;color:var(--gold);letter-spacing:.42em;text-transform:uppercase;
+    font-family:"Cinzel",serif;font-weight:500;opacity:0;transform:translateY(6px);
+    animation:rise .9s ease .35s forwards;}
+  .crest .fl{color:var(--gold-dim);margin:0 .5em;}
+
+  .wordmark{font-family:"Grenze Gotisch","UnifrakturCook",Georgia,serif;font-weight:500;
+    font-size:clamp(56px,12.5vw,120px);line-height:.9;margin:.08em 0 .02em;
+    color:#efe6d6;letter-spacing:.015em;
+    text-shadow:0 1px 0 #000, 0 0 34px rgba(201,162,94,.24);
+    opacity:0;transform:translateY(14px) scale(.985);
+    animation:rise 1.1s cubic-bezier(.2,.7,.3,1) .5s forwards;}
+  .wordmark .amp{color:var(--gold);font-size:.72em;vertical-align:.02em;padding:0 .04em;
+    text-shadow:0 0 26px rgba(201,162,94,.5);}
+
+  .rule{display:flex;align-items:center;gap:14px;margin:8px 0 4px;color:var(--gold-dim);
+    opacity:0;animation:rise .9s ease .8s forwards;}
+  .rule i{display:block;width:70px;height:1px;background:linear-gradient(90deg,transparent,var(--gold-dim));}
+  .rule i.r{background:linear-gradient(90deg,var(--gold-dim),transparent);}
+  .rule .knot{font-size:14px;color:var(--gold);}
+
+  .tag{font-style:italic;font-size:clamp(16px,2.4vw,21px);color:var(--ink-dim);
+    letter-spacing:.02em;margin:6px 0 34px;opacity:0;animation:rise .9s ease .95s forwards;}
+
+  .seal{position:relative;background:transparent;color:#efe6d6;cursor:pointer;
+    font-family:"Cinzel",serif;font-weight:600;font-size:14px;letter-spacing:.24em;
+    text-transform:uppercase;padding:16px 34px;border:1px solid rgba(201,162,94,.4);
+    border-radius:2px;opacity:0;animation:rise .9s ease 1.15s forwards;transition:all .35s ease;
+    background-image:linear-gradient(rgba(201,162,94,.05),rgba(201,162,94,.02));}
+  .seal:hover{border-color:var(--gold);color:#fff;box-shadow:0 0 34px rgba(201,162,94,.22),inset 0 0 22px rgba(201,162,94,.06);}
+  .seal::before,.seal::after{content:"\2766";color:var(--gold);position:absolute;top:50%;transform:translateY(-50%);font-size:11px;opacity:.75;}
+  .seal::before{left:13px;} .seal::after{right:13px;}
+
+  .sub{margin-top:20px;font-size:13px;color:var(--ink-faint);letter-spacing:.03em;
+    opacity:0;animation:rise .9s ease 1.35s forwards;}
+  .sub b{color:var(--gold-dim);font-weight:400;font-style:italic;}
+
+  @keyframes rise{to{opacity:1;transform:none;}}
+
+  /* a corner-flourish path, reused four times */
+  .replay{position:fixed;bottom:26px;right:32px;z-index:7;font-family:"Cinzel",serif;
+    font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-faint);
+    background:none;border:none;cursor:pointer;opacity:.5;transition:opacity .3s;}
+  .replay:hover{opacity:1;color:var(--gold-dim);}
+</style>
+</head>
+<body>
+  <div class="candle"></div>
+  <svg id="vines" preserveAspectRatio="none"></svg>
+  <div class="frame"></div>
+
+  <svg class="corner tl" viewBox="0 0 74 74" fill="none" stroke="#c9a25e" stroke-width="1" stroke-linecap="round">
+    <path d="M2 30 C2 12 12 2 30 2" opacity=".5"/>
+    <path d="M8 26 C8 15 15 8 26 8"/>
+    <path d="M8 26 C16 22 21 17 26 8" opacity=".55"/>
+    <circle cx="26" cy="8" r="1.6" fill="#c9a25e" stroke="none"/>
+    <circle cx="8" cy="26" r="1.6" fill="#c9a25e" stroke="none"/>
+    <path d="M14 14 l5 -3 M14 14 l-3 5" opacity=".5"/>
+  </svg>
+  <svg class="corner tr" viewBox="0 0 74 74" fill="none" stroke="#c9a25e" stroke-width="1" stroke-linecap="round">
+    <path d="M2 30 C2 12 12 2 30 2" opacity=".5"/><path d="M8 26 C8 15 15 8 26 8"/>
+    <path d="M8 26 C16 22 21 17 26 8" opacity=".55"/><circle cx="26" cy="8" r="1.6" fill="#c9a25e" stroke="none"/>
+    <circle cx="8" cy="26" r="1.6" fill="#c9a25e" stroke="none"/><path d="M14 14 l5 -3 M14 14 l-3 5" opacity=".5"/>
+  </svg>
+  <svg class="corner bl" viewBox="0 0 74 74" fill="none" stroke="#c9a25e" stroke-width="1" stroke-linecap="round">
+    <path d="M2 30 C2 12 12 2 30 2" opacity=".5"/><path d="M8 26 C8 15 15 8 26 8"/>
+    <path d="M8 26 C16 22 21 17 26 8" opacity=".55"/><circle cx="26" cy="8" r="1.6" fill="#c9a25e" stroke="none"/>
+    <circle cx="8" cy="26" r="1.6" fill="#c9a25e" stroke="none"/><path d="M14 14 l5 -3 M14 14 l-3 5" opacity=".5"/>
+  </svg>
+  <svg class="corner br" viewBox="0 0 74 74" fill="none" stroke="#c9a25e" stroke-width="1" stroke-linecap="round">
+    <path d="M2 30 C2 12 12 2 30 2" opacity=".5"/><path d="M8 26 C8 15 15 8 26 8"/>
+    <path d="M8 26 C16 22 21 17 26 8" opacity=".55"/><circle cx="26" cy="8" r="1.6" fill="#c9a25e" stroke="none"/>
+    <circle cx="8" cy="26" r="1.6" fill="#c9a25e" stroke="none"/><path d="M14 14 l5 -3 M14 14 l-3 5" opacity=".5"/>
+  </svg>
+
+  <div class="stage">
+    <div class="crest"><span class="fl">&#10086;</span> nightly rite <span class="fl">&#10087;</span></div>
+    <div class="wordmark">Reflect <span class="amp">&amp;</span> Commit</div>
+    <div class="rule"><i></i><span class="knot">&#10070;</span><i class="r"></i></div>
+    <div class="tag">one question a night. &nbsp;one move.</div>
+    <button class="seal">Get started</button>
+    <div class="sub">scan with your phone to install &nbsp;·&nbsp; <b>mobile &amp; desktop</b></div>
+  </div>
+
+  <button class="replay">&#10227; regrow</button>
+
+<script>
+// ---- seeded PRNG so the growth is stable & tunable ----
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+const NS="http://www.w3.org/2000/svg";
+const svg=document.getElementById("vines");
+
+function el(tag,attrs){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);return e;}
+
+// Catmull-Rom -> smooth cubic path through points
+function smooth(pts){
+  if(pts.length<2)return"";
+  let d=`M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  for(let i=0;i<pts.length-1;i++){
+    const p0=pts[i-1]||pts[i],p1=pts[i],p2=pts[i+1],p3=pts[i+2]||p2;
+    const c1x=p1.x+(p2.x-p0.x)/6,c1y=p1.y+(p2.y-p0.y)/6;
+    const c2x=p2.x-(p3.x-p1.x)/6,c2y=p2.y-(p3.y-p1.y)/6;
+    d+=` C ${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+
+function animateDraw(path,len,delay,dur){
+  path.style.strokeDasharray=len;
+  path.style.strokeDashoffset=len;
+  path.animate([{strokeDashoffset:len},{strokeDashoffset:0}],
+    {duration:dur,delay:delay,easing:"ease-out",fill:"forwards"});
+}
+function animatePop(node,delay){
+  node.style.opacity=0;
+  node.animate([{opacity:0,transform:node.getAttribute("data-tf")+" scale(0)"},
+                {opacity:1,transform:node.getAttribute("data-tf")+" scale(1)"}],
+    {duration:520,delay:delay,easing:"cubic-bezier(.2,.9,.3,1.2)",fill:"forwards"});
+}
+
+let rnd;
+function stroke(hueDark){
+  // vines drift from a cool graphite to a faint candlelit brass
+  const g=Math.floor(58+rnd()*46);
+  const warm=rnd()<.22;
+  return warm?`rgb(${g+34},${g+22},${g-4})`:`rgb(${g},${g},${g+4})`;
+}
+
+function leafPath(x,y,ang,size){
+  const tx=x+Math.cos(ang)*size,ty=y+Math.sin(ang)*size;
+  const p=ang+Math.PI/2,w=size*.5;
+  const b1x=x+Math.cos(p)*w,b1y=y+Math.sin(p)*w;
+  const b2x=x-Math.cos(p)*w,b2y=y-Math.sin(p)*w;
+  return `M ${x.toFixed(1)} ${y.toFixed(1)} Q ${b1x.toFixed(1)} ${b1y.toFixed(1)} ${tx.toFixed(1)} ${ty.toFixed(1)} Q ${b2x.toFixed(1)} ${b2y.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)} Z`;
+}
+
+// grow one vine; spawns leaves, thorns, tendrils, child branches, a rare bloom
+function grow(x,y,ang,len,width,depth,t0){
+  const steps=Math.max(6,Math.min(34,Math.round(len/15)));
+  const seg=len/steps;
+  let angVel=(rnd()-.5)*.14, curveBias=(rnd()-.5)*.05;
+  const pts=[{x,y}];
+  const marks=[];
+  let px=x,py=y,a=ang;
+  for(let i=1;i<=steps;i++){
+    angVel+=(rnd()-.5)*.09+curveBias;
+    angVel=Math.max(-.32,Math.min(.32,angVel));
+    a+=angVel;
+    px+=Math.cos(a)*seg; py+=Math.sin(a)*seg;
+    pts.push({x:px,y:py});
+    const frac=i/steps;
+    marks.push({x:px,y:py,a,frac});
+  }
+  const d=smooth(pts);
+  const path=el("path",{d,fill:"none",stroke:stroke(),"stroke-width":width.toFixed(2),"stroke-linecap":"round","opacity":(0.5+depth*0.14).toFixed(2)});
+  svg.appendChild(path);
+  // approximate length for dash anim
+  let len2=0;for(let i=1;i<pts.length;i++){len2+=Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y);}
+  const dur=520+len2*2.1;
+  animateDraw(path,Math.round(len2*1.15),t0,dur);
+
+  let side=1;
+  for(const m of marks){
+    const appear=t0+dur*m.frac;
+    // leaves
+    if(depth<3 && rnd()<.34 && m.frac>.12 && m.frac<.96){
+      const lsize=(9+rnd()*11)*(1-depth*.16);
+      const la=m.a+side*(0.7+rnd()*0.5);
+      const lp=el("path",{d:leafPath(m.x,m.y,la,lsize),fill:stroke(),stroke:"none",opacity:(.32+rnd()*.22).toFixed(2)});
+      lp.setAttribute("data-tf",`rotate(0 ${m.x} ${m.y})`);
+      // veined leaf: overlay a faint centre line
+      svg.appendChild(lp); animatePop(lp,appear);
+      const vx=m.x+Math.cos(la)*lsize,vy=m.y+Math.sin(la)*lsize;
+      const vein=el("path",{d:`M ${m.x.toFixed(1)} ${m.y.toFixed(1)} L ${vx.toFixed(1)} ${vy.toFixed(1)}`,stroke:"rgba(10,10,11,.5)",fill:"none","stroke-width":".7"});
+      vein.setAttribute("data-tf","");svg.appendChild(vein);animatePop(vein,appear+40);
+      side*=-1;
+    }
+    // thorns
+    if(rnd()<.28 && m.frac<.9){
+      const ta=m.a+side*1.9, tl=4+rnd()*5;
+      const tx=m.x+Math.cos(ta)*tl,ty=m.y+Math.sin(ta)*tl;
+      const th=el("path",{d:`M ${m.x.toFixed(1)} ${m.y.toFixed(1)} L ${tx.toFixed(1)} ${ty.toFixed(1)}`,stroke:stroke(),fill:"none","stroke-width":(width*.7).toFixed(2),"stroke-linecap":"round",opacity:".5"});
+      svg.appendChild(th);animateDraw(th,tl,appear,220);
+    }
+    // tendril curls
+    if(depth<2 && rnd()<.12 && m.frac>.3){
+      let td=`M ${m.x.toFixed(1)} ${m.y.toFixed(1)}`;
+      const dir=rnd()<.5?1:-1, tsz=8+rnd()*8; let ca=m.a;
+      let cx=m.x,cy=m.y;
+      for(let k=1;k<=16;k++){const tt=k/16;ca+=dir*.42;const r=tsz*(1-tt*.6)*.28;cx+=Math.cos(ca)*r;cy+=Math.sin(ca)*r;td+=` L ${cx.toFixed(1)} ${cy.toFixed(1)}`;}
+      const tc=el("path",{d:td,fill:"none",stroke:stroke(),"stroke-width":(width*.55).toFixed(2),"stroke-linecap":"round",opacity:".45"});
+      svg.appendChild(tc);animateDraw(tc,tsz*3,appear,420);
+    }
+    // child branch
+    if(depth<2 && rnd()<.22 && m.frac>.25 && m.frac<.85){
+      const ba=m.a+(rnd()<.5?1:-1)*(0.5+rnd()*0.6);
+      grow(m.x,m.y,ba,len*(.42+rnd()*.22),width*.66,depth+1,appear);
+    }
+  }
+  // bloom at the tip, rarely
+  const tip=pts[pts.length-1];
+  if(depth===0 && rnd()<.5){
+    const petals=5+Math.floor(rnd()*2), psz=7+rnd()*4;
+    for(let k=0;k<petals;k++){
+      const pa=(k/petals)*Math.PI*2;
+      const bp=el("path",{d:leafPath(tip.x,tip.y,pa,psz),fill:"rgba(201,162,94,.5)",stroke:"none"});
+      bp.setAttribute("data-tf","");svg.appendChild(bp);animatePop(bp,t0+dur+k*40);
+    }
+    const core=el("circle",{cx:tip.x.toFixed(1),cy:tip.y.toFixed(1),r:3,fill:"#e8c877"});
+    core.setAttribute("data-tf","");svg.appendChild(core);animatePop(core,t0+dur+petals*40);
+  }
+}
+
+function plant(){
+  const W=window.innerWidth,H=window.innerHeight;
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  svg.setAttribute("width",W);svg.setAttribute("height",H);
+  svg.innerHTML="";
+  rnd=mulberry32(20260703);
+  const W_=W,H_=H;
+  // seed vines: heavy at the four corners, plus a couple mid-edge, all growing
+  // inward. denser corners = the "overdecorated" density; the centre mask keeps
+  // the wordmark clear.
+  const seeds=[
+    {x:0,y:0,a:0.55,len:H_*0.62},
+    {x:0,y:0,a:0.95,len:W_*0.42},
+    {x:W_,y:0,a:Math.PI-0.55,len:H_*0.62},
+    {x:W_,y:0,a:Math.PI-0.95,len:W_*0.42},
+    {x:0,y:H_,a:-0.55,len:H_*0.62},
+    {x:0,y:H_,a:-0.95,len:W_*0.4},
+    {x:W_,y:H_,a:Math.PI+0.55,len:H_*0.62},
+    {x:W_,y:H_,a:Math.PI+0.95,len:W_*0.4},
+    {x:W_*0.5,y:0,a:1.9,len:H_*0.34},
+    {x:W_*0.5,y:H_,a:-1.9,len:H_*0.34},
+    {x:0,y:H_*0.5,a:0.1,len:W_*0.3},
+    {x:W_,y:H_*0.5,a:Math.PI-0.1,len:W_*0.3},
+  ];
+  seeds.forEach((s,i)=>{
+    const t0=(i%4)*90 + Math.floor(i/4)*140;
+    grow(s.x,s.y,s.a,s.len,2.1,0,t0);
+    grow(s.x,s.y,s.a+(rnd()-.5)*.5,s.len*.7,1.5,0,t0+180);
+  });
+  document.body.classList.add("lit");
+}
+
+plant();
+let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(plant,250);});
+document.querySelector(".replay").addEventListener("click",plant);
+</script>
+</body>
+</html>

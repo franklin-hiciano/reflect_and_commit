@@ -119,6 +119,23 @@ onAuthStateChanged(auth, async (user) => {
       window._onHandoffUpdated && window._onHandoffUpdated();
     }, () => {});
 
+    // only one device is ever "active" — every other open device shades
+    // itself (app.js renders the overlay) until it explicitly takes over.
+    onSnapshot(uDoc("state", "activeDevice"), (snap) => {
+      window._activeDevice = snap.exists() ? snap.data() : null;
+      window._onActiveDeviceUpdated && window._onActiveDeviceUpdated();
+    }, () => {});
+
+    // cross-device install-gate onboarding — a persistent, one-way record of
+    // "a mobile device has signed in" / "a desktop device has signed in",
+    // never cleared. This is what lets the install gate auto-advance the
+    // instant the OTHER device signs in, independent of whichever device is
+    // currently "active".
+    onSnapshot(uDoc("state", "onboarding"), (snap) => {
+      window._onboarding = snap.exists() ? snap.data() : {};
+      window._onOnboardingUpdated && window._onOnboardingUpdated();
+    }, () => {});
+
     window._onSignedIn && window._onSignedIn();
   } else {
     uid = null;
@@ -224,6 +241,29 @@ window._requestHandoff = async function () {
 window._consumeHandoff = async function () {
   if (!uid) return;
   try { await setDoc(uDoc("state", "handoff"), { consumed: true }, { merge: true }); } catch (e) {}
+};
+
+// a direct one-time read, not the cached onSnapshot value — resuming a
+// session (opening a reflection at all, or consuming a hand-off) needs the
+// TRUE current draft, not whatever a background listener happened to have
+// merged last, which is a race two separate listeners can lose.
+window._fetchLatestDraft = async function () {
+  if (!uid) return null;
+  try { const snap = await getDoc(uDoc("state", "draft")); return snap.exists() ? snap.data() : null; } catch (e) { return null; }
+};
+
+// -- device exclusivity: only one device is ever "active" at a time --
+window._deviceId = deviceId();
+window._claimActiveDevice = async function (kind) {
+  if (!uid) return;
+  try { await setDoc(uDoc("state", "activeDevice"), { deviceId: window._deviceId, kind, claimedAt: serverTimestamp() }); } catch (e) {}
+};
+
+// -- install-gate onboarding: a one-way "this kind of device has signed in
+// at least once" flag, merged so mobile and desktop never clobber each other --
+window._markDeviceSeen = async function (kind) {
+  if (!uid) return;
+  try { await setDoc(uDoc("state", "onboarding"), { [kind + "SeenAt"]: serverTimestamp() }, { merge: true }); } catch (e) {}
 };
 
 window._fbReady = true;

@@ -25,13 +25,31 @@ let draft = blankDraft();
 
 // phone = mobile UA, or a coarse-pointer device on a narrow screen. Used to
 // (a) gate structural branch-editing to desktop, (b) show the desktop nudge.
-function isPhone() { return isMobileUA() || (window.matchMedia("(pointer: coarse)").matches && window.innerWidth < 820); }
-function canBranchHere() { return !isPhone(); }
+function isPhone() {
+  return (
+    isMobileUA() ||
+    (window.matchMedia("(pointer: coarse)").matches && window.innerWidth < 820)
+  );
+}
+function canBranchHere() {
+  return !isPhone();
+}
 
 function blankDraft() {
-  return { active: false, phase: null, mode: "min", currentId: null, answers: {},
-           history: [], checkinId: null, resumeId: null, lastQuestionId: null,
-           commitText: "", commitDue: "", committed: false };
+  return {
+    active: false,
+    phase: null,
+    mode: "min",
+    currentId: null,
+    answers: {},
+    history: [],
+    checkinId: null,
+    resumeId: null,
+    lastQuestionId: null,
+    commitText: "",
+    commitDue: "",
+    committed: false,
+  };
 }
 
 const SILENCE_MS = 1900;
@@ -39,13 +57,27 @@ const HOLD_MS = 1000;
 
 // ---------- local persistence ----------
 function loadLocal() {
-  try { questions = JSON.parse(localStorage.getItem(LS_QLIST) || "[]"); } catch (_) {}
-  try { settings = JSON.parse(localStorage.getItem(LS_SETTINGS) || "null") || settings; } catch (_) {}
-  try { draft = JSON.parse(localStorage.getItem(LS_DRAFT) || "null") || draft; } catch (_) {}
+  try {
+    questions = JSON.parse(localStorage.getItem(LS_QLIST) || "[]");
+  } catch (_) {}
+  try {
+    settings =
+      JSON.parse(localStorage.getItem(LS_SETTINGS) || "null") || settings;
+  } catch (_) {}
+  try {
+    draft = JSON.parse(localStorage.getItem(LS_DRAFT) || "null") || draft;
+  } catch (_) {}
 }
-function saveLocalQuestions() { localStorage.setItem(LS_QLIST, JSON.stringify(questions)); }
-function saveLocalSettings() { localStorage.setItem(LS_SETTINGS, JSON.stringify(settings)); }
-function saveDraft() { localStorage.setItem(LS_DRAFT, JSON.stringify(draft)); window._saveDraft && window._saveDraft(draft); }
+function saveLocalQuestions() {
+  localStorage.setItem(LS_QLIST, JSON.stringify(questions));
+}
+function saveLocalSettings() {
+  localStorage.setItem(LS_SETTINGS, JSON.stringify(settings));
+}
+function saveDraft() {
+  localStorage.setItem(LS_DRAFT, JSON.stringify(draft));
+  window._saveDraft && window._saveDraft(draft);
+}
 loadLocal();
 
 // ---------- tree helpers ----------
@@ -56,19 +88,42 @@ function ensureShape(node, isRoot) {
   if (node.type === "choice") {
     // migrate the old shape (each option owned its own branch) to the new one:
     // any number of options, each pointing at one of (at most) two branches A/B.
-    if (node.options && node.options[0] && node.options[0].branch && !node.branches) {
+    if (
+      node.options &&
+      node.options[0] &&
+      node.options[0].branch &&
+      !node.branches
+    ) {
       node.branches = node.options.map((o) => o.branch || []).slice(0, 2);
-      node.options = node.options.map((o, i) => ({ label: o.label || "", exit: Math.min(i, 1) }));
+      node.options = node.options.map((o, i) => ({
+        label: o.label || "",
+        exit: Math.min(i, 1),
+      }));
     }
-    node.options = node.options && node.options.length ? node.options : [{ label: "yes", exit: 0 }, { label: "no", exit: 1 }];
-    node.branches = node.branches && node.branches.length ? node.branches.slice(0, 2) : [[], []];
+    node.options =
+      node.options && node.options.length
+        ? node.options
+        : [
+            { label: "yes", exit: 0 },
+            { label: "no", exit: 1 },
+          ];
+    node.branches =
+      node.branches && node.branches.length
+        ? node.branches.slice(0, 2)
+        : [[], []];
     while (node.branches.length < 2) node.branches.push([]);
-    node.options.forEach((o) => { o.label = o.label || ""; o.exit = o.exit === 1 ? 1 : 0; });
+    node.options.forEach((o) => {
+      o.label = o.label || "";
+      o.exit = o.exit === 1 ? 1 : 0;
+    });
     node.branches.forEach((br) => br.forEach((b) => ensureShape(b, false)));
   }
   return node;
 }
-function normalizeTree(list) { (list || []).forEach((n) => ensureShape(n, true)); return list || []; }
+function normalizeTree(list) {
+  (list || []).forEach((n) => ensureShape(n, true));
+  return list || [];
+}
 
 // External index — NEVER attach runtime fields (list/owner refs) onto the
 // question objects themselves. That was the earlier bug: a node's _owner
@@ -80,10 +135,16 @@ let nodeIndex = new Map(); // id -> { list, i, ownerId (choice node id), exit }
 function indexTree(list, ownerId, exit) {
   list.forEach((n, i) => {
     nodeIndex.set(n.id, { list, i, ownerId: ownerId || null, exit });
-    if (n.type === "choice" && n.branches) n.branches.forEach((br, bi) => indexTree(br || (n.branches[bi] = []), n.id, bi));
+    if (n.type === "choice" && n.branches)
+      n.branches.forEach((br, bi) =>
+        indexTree(br || (n.branches[bi] = []), n.id, bi),
+      );
   });
 }
-function reindex() { nodeIndex = new Map(); indexTree(questions, null); }
+function reindex() {
+  nodeIndex = new Map();
+  indexTree(questions, null);
+}
 function findNode(id) {
   const meta = nodeIndex.get(id);
   return meta ? meta.list[meta.i] : null;
@@ -99,15 +160,21 @@ function computeNext(node) {
   if (node.type === "choice") {
     const a = draft.answers[node.id];
     const exit = a && typeof a === "object" ? a.exit : null;
-    if (exit != null && node.branches[exit] && node.branches[exit].length) return node.branches[exit][0];
+    if (exit != null && node.branches[exit] && node.branches[exit].length)
+      return node.branches[exit][0];
     return siblingAfter(node);
   }
   return siblingAfter(node);
 }
-function starNode() { return questions.find((q) => q.star) || null; }
-function currentNode() { return findNode(draft.currentId); }
+function starNode() {
+  return questions.find((q) => q.star) || null;
+}
+function currentNode() {
+  return findNode(draft.currentId);
+}
 
 // ---------- firestore hooks ----------
+let lastRenderedQuestionsJSON = null;
 window._onQuestionsUpdated = () => {
   if (window._questions && window._questions.length) {
     questions = normalizeTree(window._questions);
@@ -118,34 +185,160 @@ window._onQuestionsUpdated = () => {
     // (each keystroke round-trips through the debounced Firestore write and
     // back through this listener) is what was reading as "flickering".
     if (ae && ae.closest && ae.closest("#qList")) return;
+    // also skip if this echo is identical to what's already on screen — an
+    // idle Firestore round-trip (e.g. the server ack of your own last write)
+    // otherwise rebuilds the whole list for no visible reason, which is what
+    // reads as a flicker even while just hovering, not typing.
+    const json = JSON.stringify(questions);
+    if (json === lastRenderedQuestionsJSON) return;
     renderQuestionEditor();
   }
 };
-window._onSettingsUpdated = () => { if (window._settings && window._settings.notifyTime) { settings = window._settings; saveLocalSettings(); renderSettings(); } };
-window._onCommitmentsUpdated = () => { commitments = window._commitments || []; };
-window._onDraftUpdated = () => { const rd = window._remoteDraft; if (rd && rd.active && !draft.active) { draft = { ...blankDraft(), ...rd }; localStorage.setItem(LS_DRAFT, JSON.stringify(draft)); } };
-window._onSignedIn = () => {
-  normalizeTree(questions); renderQuestionEditor(); renderSettings(); scheduleNotificationLoop();
-  routeAfterAuth(); maybeOpenFromUrl();
-  if ("Notification" in window && Notification.permission === "granted") window._registerPush && window._registerPush(deviceKind());
+window._onSettingsUpdated = () => {
+  if (window._settings && window._settings.notifyTime) {
+    settings = window._settings;
+    saveLocalSettings();
+    renderSettings();
+  }
 };
-function deviceKind() { return isPhone() ? "mobile" : "desktop"; }
+window._onCommitmentsUpdated = () => {
+  commitments = window._commitments || [];
+};
+window._onDraftUpdated = () => {
+  const rd = window._remoteDraft;
+  if (rd && rd.active && !draft.active) {
+    draft = { ...blankDraft(), ...rd };
+    localStorage.setItem(LS_DRAFT, JSON.stringify(draft));
+  }
+};
+window._onSignedIn = () => {
+  normalizeTree(questions);
+  renderQuestionEditor();
+  renderSettings();
+  scheduleNotificationLoop();
+  routeAfterAuth();
+  maybeOpenFromUrl();
+  if ("Notification" in window && Notification.permission === "granted")
+    window._registerPush && window._registerPush(deviceKind());
+  window._claimActiveDevice && window._claimActiveDevice(deviceKind());
+  // a persistent, one-way "this kind of device has signed in at least once"
+  // record — this is what the install gate below watches for, independent
+  // of which device happens to be "active" right now.
+  window._markDeviceSeen && window._markDeviceSeen(deviceKind());
+};
+function deviceKind() {
+  return isPhone() ? "mobile" : "desktop";
+}
+// fires whenever the onboarding doc changes — this is how the OTHER device
+// signing in gets noticed live, with nothing to click or refresh.
+window._onOnboardingUpdated = () => {
+  const other = document.getElementById("landingStepOther");
+  if (!other || other.style.display === "none") return;
+  const need = isPhone() ? "desktopSeenAt" : "mobileSeenAt";
+  if (window._onboarding && window._onboarding[need])
+    window.onOtherDeviceDone();
+};
+// focusing this device is treated as "I'm using this one now" — claim it as
+// active so the other device shades itself.
+window.addEventListener("focus", () => {
+  if (window._uid)
+    window._claimActiveDevice && window._claimActiveDevice(deviceKind());
+});
 
 // ---------- routing ----------
-function showScreen(id) { document.querySelectorAll(".screen").forEach((s) => s.classList.remove("on")); document.getElementById(id).classList.add("on"); }
-function goHome() { stopVoice(); showScreen(isStandalone() ? "homeScreen" : "landingScreen"); }
-function isStandalone() { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; }
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach((s) => s.classList.remove("on"));
+  document.getElementById(id).classList.add("on");
+}
+function goHome() {
+  stopVoice();
+  showScreen(isStandalone() ? "homeScreen" : "landingScreen");
+  if (!isStandalone()) resetLandingToIntro();
+}
+function isStandalone() {
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true
+  );
+}
 // install is required on every device before use — phone AND desktop each
 // get their own install prompt the first time they sign in on that device.
-function routeAfterAuth() { showScreen(isStandalone() ? "homeScreen" : "landingScreen"); }
-function maybeOpenFromUrl() { const p = new URLSearchParams(location.search); if (p.get("reflect") === "1") { history.replaceState({}, "", location.pathname); openReflection(); } }
+function routeAfterAuth() {
+  showScreen(isStandalone() ? "homeScreen" : "landingScreen");
+  if (!isStandalone()) resetLandingToIntro();
+}
+
+// ---------- cross-device install gate ----------
+// whichever device you land on, it leads with getting the OTHER one
+// installed first — the point of this app is both devices staying in sync,
+// so the very first thing you do is set up the pair, not just the device
+// in front of you. Three sub-steps of #landingScreen, one visible at a time.
+const INSTALL_URL = "reflectandcommit.com/install";
+function resetLandingToIntro() {
+  const intro = document.getElementById("landingIntro");
+  const other = document.getElementById("landingStepOther");
+  const here = document.getElementById("landingStepHere");
+  if (!intro || !other || !here) return;
+  intro.style.display = "block";
+  other.style.display = "none";
+  here.style.display = "none";
+}
+window.goToInstallGate = () => {
+  document.getElementById("landingIntro").style.display = "none";
+  document.getElementById("landingStepOther").style.display = "flex";
+  const label = document.getElementById("otherDeviceLabel");
+  const qr = document.getElementById("landingQr");
+  const hint = document.getElementById("otherDeviceHint");
+  if (isPhone()) {
+    label.textContent = "Good reflections only happen on desktop.";
+    qr.style.display = "none";
+    hint.textContent = INSTALL_URL;
+  } else {
+    label.textContent = "Start reflecting on your phone.";
+    // higher error-correction + resolution so it scans instantly and holds
+    // up sharp even on a retina display, not the soft/low-density default
+    qr.src =
+      "https://api.qrserver.com/v1/create-qr-code/?size=320x320&ecc=H&data=" +
+      encodeURIComponent("https://" + INSTALL_URL);
+    qr.style.display = "block";
+    hint.textContent = INSTALL_URL;
+  }
+  // mark this device seen the moment it reaches the gate (in addition to on
+  // sign-in) and check immediately in case the other device already beat it here
+  window._markDeviceSeen && window._markDeviceSeen(deviceKind());
+  window._onOnboardingUpdated && window._onOnboardingUpdated();
+};
+window.onOtherDeviceDone = () => {
+  document.getElementById("landingStepOther").style.display = "none";
+  document.getElementById("landingStepHere").style.display = "block";
+};
+function maybeOpenFromUrl() {
+  const p = new URLSearchParams(location.search);
+  if (p.get("reflect") === "1") {
+    history.replaceState({}, "", location.pathname);
+    openReflection();
+  }
+}
 
 // ---------- install ----------
 let deferredInstallPrompt = null;
-window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferredInstallPrompt = e; });
-function isMobileUA() { return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.userAgentData && navigator.userAgentData.mobile); }
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+});
+function isMobileUA() {
+  return (
+    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.userAgentData && navigator.userAgentData.mobile)
+  );
+}
 window.onGetStarted = async () => {
-  if (deferredInstallPrompt) { deferredInstallPrompt.prompt(); await deferredInstallPrompt.userChoice; deferredInstallPrompt = null; return; }
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    return;
+  }
   document.getElementById("getStartedBtn").style.display = "none";
   document.getElementById("landingManual").style.display = "block";
   document.getElementById("landingManual").textContent = isMobileUA()
@@ -155,163 +348,396 @@ window.onGetStarted = async () => {
 
 // ---------- notification window ----------
 const REFLECT_WINDOW_MS = 2 * 60 * 60 * 1000;
-function getLastNotif() { try { return JSON.parse(localStorage.getItem(LS_LASTNOTIF) || "null"); } catch (_) { return null; } }
-function setLastNotif(src) { localStorage.setItem(LS_LASTNOTIF, JSON.stringify({ sentAt: Date.now(), source: src })); }
-function withinReflectWindow() { const n = getLastNotif(); return n ? Date.now() - n.sentAt < REFLECT_WINDOW_MS : false; }
+function getLastNotif() {
+  try {
+    return JSON.parse(localStorage.getItem(LS_LASTNOTIF) || "null");
+  } catch (_) {
+    return null;
+  }
+}
+function setLastNotif(src) {
+  localStorage.setItem(
+    LS_LASTNOTIF,
+    JSON.stringify({ sentAt: Date.now(), source: src }),
+  );
+}
+function withinReflectWindow() {
+  const n = getLastNotif();
+  return n ? Date.now() - n.sentAt < REFLECT_WINDOW_MS : false;
+}
 function nextScheduledLabel() {
   const [h, m] = (settings.notifyTime || "20:00").split(":").map(Number);
-  const now = new Date(), next = new Date(now); next.setHours(h, m, 0, 0);
+  const now = new Date(),
+    next = new Date(now);
+  next.setHours(h, m, 0, 0);
   if (next <= now) next.setDate(next.getDate() + 1);
-  return next.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" }).toLowerCase();
+  return next
+    .toLocaleString(undefined, {
+      weekday: "short",
+      hour: "numeric",
+      minute: "2-digit",
+    })
+    .toLowerCase();
 }
 
 // ---------- notifications ----------
 function fireNotification(src) {
   setLastNotif(src);
-  const title = "Time to reflect", body = "Your questions are ready.";
+  const title = "Time to reflect",
+    body = "Your questions are ready.";
   if (Notification.permission !== "granted") return;
-  if ("serviceWorker" in navigator) navigator.serviceWorker.ready.then((reg) => reg.showNotification(title, { body, tag: "reflect" })).catch(() => fallbackNotify(title, body));
+  if ("serviceWorker" in navigator)
+    navigator.serviceWorker.ready
+      .then((reg) => reg.showNotification(title, { body, tag: "reflect" }))
+      .catch(() => fallbackNotify(title, body));
   else fallbackNotify(title, body);
 }
-function fallbackNotify(title, body) { const n = new Notification(title, { body }); n.onclick = () => { window.focus(); openReflection(); n.close(); }; }
-async function requestNotifPermission() { if (!("Notification" in window)) return false; if (Notification.permission === "granted") return true; return (await Notification.requestPermission()) === "granted"; }
+function fallbackNotify(title, body) {
+  const n = new Notification(title, { body });
+  n.onclick = () => {
+    window.focus();
+    openReflection();
+    n.close();
+  };
+}
+async function requestNotifPermission() {
+  if (!("Notification" in window)) return false;
+  if (Notification.permission === "granted") return true;
+  return (await Notification.requestPermission()) === "granted";
+}
 window.sendSelfNotification = async () => {
   const ok = await requestNotifPermission();
-  if (!ok) { alert("Notifications are blocked — enable them in your browser/OS settings."); return; }
-  window._registerPush && window._registerPush(deviceKind()); fireNotification("manual"); alert("Sent. Valid for 2 hours.");
+  if (!ok) {
+    alert(
+      "Notifications are blocked — enable them in your browser/OS settings.",
+    );
+    return;
+  }
+  window._registerPush && window._registerPush(deviceKind());
+  fireNotification("manual");
+  alert("Sent. Valid for 2 hours.");
 };
 let lastFiredDateKey = localStorage.getItem("rc_last_fired_date") || "";
 function scheduleNotificationLoop() {
   setInterval(() => {
-    const now = new Date(); const [h, m] = (settings.notifyTime || "20:00").split(":").map(Number); const key = now.toDateString();
-    if (key !== lastFiredDateKey && now.getHours() === h && now.getMinutes() >= m && now.getMinutes() < m + 2) { lastFiredDateKey = key; localStorage.setItem("rc_last_fired_date", key); fireNotification("schedule"); }
+    const now = new Date();
+    const [h, m] = (settings.notifyTime || "20:00").split(":").map(Number);
+    const key = now.toDateString();
+    if (
+      key !== lastFiredDateKey &&
+      now.getHours() === h &&
+      now.getMinutes() >= m &&
+      now.getMinutes() < m + 2
+    ) {
+      lastFiredDateKey = key;
+      localStorage.setItem("rc_last_fired_date", key);
+      fireNotification("schedule");
+    }
   }, 30000);
 }
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js").catch(() => {});
-  navigator.serviceWorker.addEventListener("message", (e) => { if (e.data && e.data.type === "notif-confirmed") { setLastNotif("schedule"); openReflection(); } });
+  // resolve relative to THIS script's own location, not the page's — app.js
+  // now loads from both /app/index.html and the root index.html (which
+  // references app/js/app.js), and "sw.js" alone would resolve against
+  // whichever page loaded it, missing the file when served from root.
+  const swUrl = new URL("../sw.js", document.currentScript.src).href;
+  navigator.serviceWorker
+    .register(swUrl, { scope: new URL(".", swUrl).href })
+    .catch(() => {});
+  navigator.serviceWorker.addEventListener("message", (e) => {
+    if (e.data && e.data.type === "notif-confirmed") {
+      setLastNotif("schedule");
+      openReflection();
+    }
+  });
 }
 
 // ---------- HOME / settings ----------
-function renderSettings() { const el = document.getElementById("notifyTimeInput"); if (el) el.value = settings.notifyTime || "20:00"; renderNotifyLabel(); }
-function renderNotifyLabel() {
-  const el = document.getElementById("notifyCountdown"); if (!el) return;
-  const [h, m] = (settings.notifyTime || "20:00").split(":").map(Number);
-  const d = new Date(); d.setHours(h, m, 0, 0);
-  el.textContent = "reflects at " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: m ? "2-digit" : undefined });
+function renderSettings() {
+  const el = document.getElementById("notifyTimeInput");
+  if (el) el.value = settings.notifyTime || "20:00";
+  renderNotifyLabel();
 }
-window.onNotifyTimeChange = (v) => { settings.notifyTime = v; saveLocalSettings(); renderNotifyLabel(); window._saveSettings && window._saveSettings({ notifyTime: v }); };
-window.openTimePicker = () => { const el = document.getElementById("notifyTimeInput"); if (!el) return; if (el.showPicker) { try { el.showPicker(); return; } catch (_) {} } el.focus(); };
+function renderNotifyLabel() {
+  const el = document.getElementById("notifyCountdown");
+  if (!el) return;
+  const [h, m] = (settings.notifyTime || "20:00").split(":").map(Number);
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  // "reflect at 8pm" — no trailing s, no ":00", lowercase am/pm
+  let t = d
+    .toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: m ? "2-digit" : undefined,
+    })
+    .toLowerCase()
+    .replace(/\s+/g, "");
+  el.textContent = "reflect at " + t;
+}
+window.onNotifyTimeChange = (v) => {
+  settings.notifyTime = v;
+  saveLocalSettings();
+  renderNotifyLabel();
+  window._saveSettings && window._saveSettings({ notifyTime: v });
+};
+window.openTimePicker = () => {
+  const el = document.getElementById("notifyTimeInput");
+  if (!el) return;
+  if (el.showPicker) {
+    try {
+      el.showPicker();
+      return;
+    } catch (_) {}
+  }
+  el.focus();
+};
+window.toggleSettingsPanel = () => {
+  const p = document.getElementById("settingsPanel");
+  if (p) p.classList.toggle("on");
+};
 
 // ---------- editor ----------
 window.toggleEditMode = () => {
   editMode = !editMode;
-  const b = document.getElementById("editToggle"); if (b) b.textContent = editMode ? "done" : "edit";
-  const list = document.getElementById("qList"); if (list) list.classList.toggle("editing", editMode);
+  const b = document.getElementById("editToggle");
+  if (b) b.classList.toggle("on", editMode);
+  const list = document.getElementById("qList");
+  if (list) list.classList.toggle("editing", editMode);
   renderQuestionEditor();
 };
-function persistQuestions() { saveLocalQuestions(); window._saveQuestions && window._saveQuestions(questions); }
-function escapeHtml(s) { return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+// stop-sign icon for "star" — the nightly minimum boundary
+function starIconSvg(on) {
+  return `<svg viewBox="0 0 24 24" fill="${on ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8.3 2.5h7.4L21 7.8v7.4L15.7 21H8.3L3 15.2V7.8L8.3 2.5z"/></svg>`;
+}
+function persistQuestions() {
+  saveLocalQuestions();
+  window._saveQuestions && window._saveQuestions(questions);
+}
+function escapeHtml(s) {
+  return (s || "").replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ],
+  );
+}
 
-function iconBtn(txt, cls, title, fn) { const b = document.createElement("button"); b.className = "q-icon-btn " + cls; b.textContent = txt; if (title) b.title = title; b.onclick = fn; return b; }
+function iconBtn(txt, cls, title, fn) {
+  const b = document.createElement("button");
+  b.className = "q-icon-btn " + cls;
+  b.textContent = txt;
+  if (title) b.title = title;
+  b.onclick = fn;
+  return b;
+}
 
 function renderQuestionEditor() {
-  const list = document.getElementById("qList"); if (!list) return;
+  const list = document.getElementById("qList");
+  if (!list) return;
   normalizeTree(questions);
   const nudge = document.getElementById("desktopNudge");
   if (nudge) {
     nudge.style.display = isPhone() ? "block" : "none";
-    const u = document.getElementById("desktopUrl"); if (u) u.textContent = location.host + location.pathname.replace(/\/$/, "");
+    const u = document.getElementById("desktopUrl");
+    if (u) u.textContent = location.host + location.pathname.replace(/\/$/, "");
   }
   list.innerHTML = "";
-  questions.forEach((node, i) => list.appendChild(buildNode(node, questions, i, true)));
+  questions.forEach((node, i) =>
+    list.appendChild(buildNode(node, questions, i, true)),
+  );
+  lastRenderedQuestionsJSON = JSON.stringify(questions);
 }
 
 function buildNode(node, siblings, index, isRoot) {
   ensureShape(node, isRoot);
-  const wrap = document.createElement("div"); wrap.className = "q-node" + (node.type === "choice" ? " is-choice" : "");
+  const wrap = document.createElement("div");
+  wrap.className = "q-node" + (node.type === "choice" ? " is-choice" : "");
   wrap.dataset.dragIndex = index;
-  const row = document.createElement("div"); row.className = "q-row";
+  const row = document.createElement("div");
+  row.className = "q-row";
 
-  if (editMode) {
-    const handle = document.createElement("button"); handle.className = "q-drag-handle"; handle.textContent = "⋮⋮"; handle.title = "drag to reorder";
-    wireDrag(handle, wrap, siblings, index);
-    row.appendChild(handle);
-  }
+  // drag-to-reorder is a light edit, always available — edit mode is reserved
+  // for the two heavier actions (star, delete) below.
+  const handle = document.createElement("button");
+  handle.className = "q-drag-handle";
+  handle.textContent = "⋮⋮";
+  handle.title = "drag to reorder";
+  wireDrag(handle, wrap, siblings, index);
+  row.appendChild(handle);
 
   if (isRoot && editMode) {
     const star = document.createElement("button");
-    star.className = "q-star" + (node.star ? " on" : ""); star.textContent = node.star ? "★" : "☆"; star.title = "where your minimum ends";
-    star.onclick = () => { const was = node.star; questions.forEach((q) => (q.star = false)); node.star = !was; persistQuestions(); renderQuestionEditor(); };
+    star.className = "q-star" + (node.star ? " on" : "");
+    star.title = "nightly minimum — reflection can stop here";
+    star.innerHTML = starIconSvg(node.star);
+    star.onclick = () => {
+      const was = node.star;
+      questions.forEach((q) => (q.star = false));
+      node.star = !was;
+      persistQuestions();
+      renderQuestionEditor();
+    };
     row.appendChild(star);
   }
 
-  const input = document.createElement("input"); input.className = "q-text"; input.value = node.text || ""; input.placeholder = "write a question…";
-  input.oninput = () => { node.text = input.value; persistQuestions(); };
+  const input = document.createElement("input");
+  input.className = "q-text";
+  input.value = node.text || "";
+  input.placeholder = "write a question…";
+  input.oninput = () => {
+    node.text = input.value;
+    persistQuestions();
+  };
   row.appendChild(input);
 
   const struct = canBranchHere(); // structural (branch) edits = desktop only, but the icon itself is always visible there
-  const icons = document.createElement("div"); icons.className = "q-icons";
+  const icons = document.createElement("div");
+  icons.className = "q-icons";
   if (isRoot && struct) {
-    if (node.type === "choice") icons.appendChild(iconBtn("merge", "q-split", "remove branches", () => mergeNode(node)));
-    else icons.appendChild(iconBtn("split", "q-split", "branch into two", () => splitNode(node)));
+    if (node.type === "choice")
+      icons.appendChild(
+        iconBtn("⑂", "q-split", "merge — remove branches", () =>
+          mergeNode(node),
+        ),
+      );
+    else
+      icons.appendChild(
+        iconBtn("⑂", "q-split", "split into two branches", () =>
+          splitNode(node),
+        ),
+      );
   }
-  icons.appendChild(iconBtn("↺", "q-recall-icon" + (node.recall ? " on" : ""), "recall past answers", () => { node.recall = !node.recall; persistQuestions(); renderQuestionEditor(); }));
-  if (editMode) icons.appendChild(iconBtn("✕", "q-del-icon", "remove", () => { siblings.splice(index, 1); persistQuestions(); renderQuestionEditor(); }));
+  if (editMode)
+    icons.appendChild(
+      iconBtn(
+        "↺",
+        "q-recall-icon" + (node.recall ? " on" : ""),
+        "recall past answers",
+        () => {
+          node.recall = !node.recall;
+          persistQuestions();
+          renderQuestionEditor();
+        },
+      ),
+    );
+  if (editMode)
+    icons.appendChild(
+      iconBtn("✕", "q-del-icon", "remove", () => {
+        siblings.splice(index, 1);
+        persistQuestions();
+        renderQuestionEditor();
+      }),
+    );
   row.appendChild(icons);
   wrap.appendChild(row);
 
   if (node.type === "choice") {
-    if (!editMode) {
-      // compact, read-only summary outside edit mode
-      const compact = document.createElement("div"); compact.className = "q-branch-compact";
+    if (!struct) {
+      // structural edits are desktop-only regardless of edit mode — show a
+      // compact, read-only summary on phone
+      const compact = document.createElement("div");
+      compact.className = "q-branch-compact";
       compact.textContent = node.options.map((o) => o.label || "…").join(" · ");
       wrap.appendChild(compact);
       return wrap;
     }
-    const box = document.createElement("div"); box.className = "q-branches";
+    // full choice editor (labels, exits, branch content) is always available
+    // on desktop — this is a light/normal edit now, NOT gated by edit mode
+    const box = document.createElement("div");
+    box.className = "q-branches";
 
     // options: any number of labels, each pointing at exit A or B
-    const optsWrap = document.createElement("div"); optsWrap.className = "q-opts";
+    const optsWrap = document.createElement("div");
+    optsWrap.className = "q-opts";
     node.options.forEach((opt, oi) => {
-      const orow = document.createElement("div"); orow.className = "q-opt-row";
-      const lbl = document.createElement("input"); lbl.className = "q-opt-label"; lbl.value = opt.label || ""; lbl.placeholder = "option";
-      lbl.oninput = () => { opt.label = lbl.value; persistQuestions(); };
+      const orow = document.createElement("div");
+      orow.className = "q-opt-row";
+      const lbl = document.createElement("input");
+      lbl.className = "q-opt-label";
+      lbl.value = opt.label || "";
+      lbl.placeholder = "option";
+      lbl.oninput = () => {
+        opt.label = lbl.value;
+        persistQuestions();
+      };
       orow.appendChild(lbl);
-      const ex = document.createElement("button"); ex.className = "q-exit-toggle exit-" + (opt.exit === 1 ? "b" : "a"); ex.textContent = opt.exit === 1 ? "B" : "A"; ex.title = "which branch this leads to";
-      if (struct) ex.onclick = () => { opt.exit = opt.exit === 1 ? 0 : 1; persistQuestions(); renderQuestionEditor(); };
+      const ex = document.createElement("button");
+      ex.className = "q-exit-toggle exit-" + (opt.exit === 1 ? "b" : "a");
+      ex.textContent = opt.exit === 1 ? "B" : "A";
+      ex.title = "which branch this leads to";
+      if (struct)
+        ex.onclick = () => {
+          opt.exit = opt.exit === 1 ? 0 : 1;
+          persistQuestions();
+          renderQuestionEditor();
+        };
       else ex.disabled = true;
       orow.appendChild(ex);
       if (struct && node.options.length > 1) {
-        const del = document.createElement("button"); del.className = "q-icon-btn q-del-icon"; del.textContent = "✕"; del.title = "remove option";
-        del.onclick = () => { node.options.splice(oi, 1); persistQuestions(); renderQuestionEditor(); };
+        const del = document.createElement("button");
+        del.className = "q-icon-btn q-del-icon";
+        del.textContent = "✕";
+        del.title = "remove option";
+        del.onclick = () => {
+          node.options.splice(oi, 1);
+          persistQuestions();
+          renderQuestionEditor();
+        };
         orow.appendChild(del);
       }
       optsWrap.appendChild(orow);
     });
     if (struct) {
-      const addOpt = document.createElement("button"); addOpt.className = "q-branch-add"; addOpt.textContent = "+ option";
-      addOpt.onclick = () => { node.options.push({ label: "", exit: 0 }); persistQuestions(); renderQuestionEditor(); };
+      const addOpt = document.createElement("button");
+      addOpt.className = "q-branch-add";
+      addOpt.textContent = "+ option";
+      addOpt.onclick = () => {
+        node.options.push({ label: "", exit: 0 });
+        persistQuestions();
+        renderQuestionEditor();
+      };
       optsWrap.appendChild(addOpt);
     }
     box.appendChild(optsWrap);
-    if (editMode && !struct) { const note = document.createElement("div"); note.className = "q-desktop-note"; note.textContent = "branch structure edits on your computer"; box.appendChild(note); }
 
-    // up to two branch lanes (A / B). Outside edit mode, an unused lane is hidden.
+    // up to two branch lanes (A / B) — an unused lane just stays hidden.
     [0, 1].forEach((bi) => {
       const used = node.options.some((o) => (o.exit || 0) === bi);
-      if (!editMode && !used) return;
-      const lane = document.createElement("div"); lane.className = "q-lane";
-      const head = document.createElement("div"); head.className = "q-lane-head";
-      const badge = document.createElement("span"); badge.className = "q-lane-badge exit-" + (bi === 1 ? "b" : "a"); badge.textContent = bi === 1 ? "B" : "A"; head.appendChild(badge);
-      const arrow = document.createElement("span"); arrow.className = "q-lane-arrow"; arrow.textContent = "→"; head.appendChild(arrow);
+      if (!used) return;
+      const lane = document.createElement("div");
+      lane.className = "q-lane";
+      const head = document.createElement("div");
+      head.className = "q-lane-head";
+      const badge = document.createElement("span");
+      badge.className = "q-lane-badge exit-" + (bi === 1 ? "b" : "a");
+      badge.textContent = bi === 1 ? "B" : "A";
+      head.appendChild(badge);
+      const arrow = document.createElement("span");
+      arrow.className = "q-lane-arrow";
+      arrow.textContent = "→";
+      head.appendChild(arrow);
       lane.appendChild(head);
-      const bl = document.createElement("div"); bl.className = "q-branch-list";
-      (node.branches[bi] || []).forEach((bn, xi) => bl.appendChild(buildNode(bn, node.branches[bi], xi, false)));
+      const bl = document.createElement("div");
+      bl.className = "q-branch-list";
+      (node.branches[bi] || []).forEach((bn, xi) =>
+        bl.appendChild(buildNode(bn, node.branches[bi], xi, false)),
+      );
       lane.appendChild(bl);
       if (struct) {
-        const add = document.createElement("button"); add.className = "q-branch-add"; add.textContent = "+ follow-up";
-        add.onclick = () => { node.branches[bi].push({ id: "q_" + Date.now() + "_" + bi, text: "", recall: false, type: "text" }); persistQuestions(); renderQuestionEditor(); };
+        const add = document.createElement("button");
+        add.className = "q-branch-add";
+        add.textContent = "+ follow-up";
+        add.onclick = () => {
+          node.branches[bi].push({
+            id: "q_" + Date.now() + "_" + bi,
+            text: "",
+            recall: false,
+            type: "text",
+          });
+          persistQuestions();
+          renderQuestionEditor();
+        };
         lane.appendChild(add);
       }
       box.appendChild(lane);
@@ -326,69 +752,160 @@ function buildNode(node, siblings, index, isRoot) {
 // text field never triggers a drag). A hairline indicator shows where the
 // row will land; the array only reorders on drop, then everything fades
 // back in via the .q-node animation in CSS for a clean, non-janky settle.
+// Pointer Events, not native HTML5 drag-and-drop — native DnD starting from a
+// <button> handle is unreliable across browsers/trackpads (many swallow the
+// gesture for the button's own press state) and doesn't work on touch at all.
+// Pointer Events unify mouse, trackpad, and touch, so this is what actually
+// works everywhere. The dragged row floats and follows the pointer; other
+// rows stay put but show a hairline where it'll land; array reorders on release.
 function wireDrag(handle, wrap, list, index) {
-  wrap.draggable = true;
-  wrap.addEventListener("dragstart", (e) => {
-    if (e.target !== handle) { e.preventDefault(); return; }
-    wrap.classList.add("dragging");
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", String(index));
-    window._dragList = list; window._dragFrom = index;
-  });
-  wrap.addEventListener("dragend", () => {
-    wrap.classList.remove("dragging");
-    document.querySelectorAll(".drag-over,.drag-over-below").forEach((n) => n.classList.remove("drag-over", "drag-over-below"));
-  });
-  wrap.addEventListener("dragover", (e) => {
-    if (window._dragList !== list) return;
-    e.preventDefault();
-    const rect = wrap.getBoundingClientRect();
-    const before = e.clientY - rect.top < rect.height / 2;
-    document.querySelectorAll(".drag-over,.drag-over-below").forEach((n) => n.classList.remove("drag-over", "drag-over-below"));
-    wrap.classList.add(before ? "drag-over" : "drag-over-below");
-  });
-  wrap.addEventListener("drop", (e) => {
-    e.preventDefault();
-    if (window._dragList !== list) return;
-    const from = window._dragFrom;
-    const rect = wrap.getBoundingClientRect();
-    const before = e.clientY - rect.top < rect.height / 2;
-    let to = index + (before ? 0 : 1);
-    if (to > from) to--;
-    if (from !== to) { const [moved] = list.splice(from, 1); list.splice(to, 0, moved); persistQuestions(); }
+  handle.style.touchAction = "none";
+  let dragging = false,
+    startY = 0,
+    siblings = [],
+    container = null;
+
+  const onMove = (e) => {
+    if (!dragging) return;
+    const dy = e.clientY - startY;
+    wrap.style.transform = `translateY(${dy}px)`;
+    document
+      .querySelectorAll(".drag-over,.drag-over-below")
+      .forEach((n) => n.classList.remove("drag-over", "drag-over-below"));
+    for (const sib of siblings) {
+      if (sib === wrap) continue;
+      const rect = sib.getBoundingClientRect();
+      if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        sib.classList.add(
+          e.clientY - rect.top < rect.height / 2
+            ? "drag-over"
+            : "drag-over-below",
+        );
+        break;
+      }
+    }
+  };
+  const onUp = () => {
+    if (!dragging) return;
+    dragging = false;
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    wrap.style.transform = "";
+    wrap.classList.remove("dragging-active");
+    const target = document.querySelector(".drag-over,.drag-over-below");
+    let to = index;
+    if (target) {
+      const targetIndex = siblings.indexOf(target);
+      const before = target.classList.contains("drag-over");
+      to = targetIndex + (before ? 0 : 1);
+      if (to > index) to--;
+    }
+    document
+      .querySelectorAll(".drag-over,.drag-over-below")
+      .forEach((n) => n.classList.remove("drag-over", "drag-over-below"));
+    if (to !== index) {
+      const [moved] = list.splice(index, 1);
+      list.splice(to, 0, moved);
+      persistQuestions();
+    }
     renderQuestionEditor();
+  };
+  handle.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    dragging = true;
+    startY = e.clientY;
+    container = wrap.parentElement;
+    siblings = Array.from(container.children).filter((el) =>
+      el.classList.contains("q-node"),
+    );
+    wrap.classList.add("dragging-active");
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
   });
 }
-function splitNode(node) { node.type = "choice"; node.options = [{ label: "yes", exit: 0 }, { label: "no", exit: 1 }]; node.branches = [[], []]; persistQuestions(); renderQuestionEditor(); }
+function splitNode(node) {
+  node.type = "choice";
+  node.options = [
+    { label: "yes", exit: 0 },
+    { label: "no", exit: 1 },
+  ];
+  node.branches = [[], []];
+  persistQuestions();
+  renderQuestionEditor();
+}
 function mergeNode(node) {
   const has = (node.branches || []).some((br) => (br || []).length);
-  if (has && !confirm("Remove both branches and their follow-up questions?")) return;
-  node.type = "text"; delete node.options; delete node.branches; persistQuestions(); renderQuestionEditor();
+  if (has && !confirm("Remove both branches and their follow-up questions?"))
+    return;
+  node.type = "text";
+  delete node.options;
+  delete node.branches;
+  persistQuestions();
+  renderQuestionEditor();
 }
 window.addQuestion = () => {
-  questions.push({ id: "q_" + Date.now(), text: "", recall: false, star: !questions.some((q) => q.star), type: "text" });
-  persistQuestions(); renderQuestionEditor();
+  questions.push({
+    id: "q_" + Date.now(),
+    text: "",
+    recall: false,
+    star: !questions.some((q) => q.star),
+    type: "text",
+  });
+  persistQuestions();
+  renderQuestionEditor();
   const list = document.getElementById("qList");
   const inputs = list.querySelectorAll(":scope > .q-node > .q-row > .q-text");
   inputs[inputs.length - 1] && inputs[inputs.length - 1].focus();
 };
 
 // ---------- day-after check-in gate ----------
-function dueCommitment() { const today = new Date(); today.setHours(0, 0, 0, 0); return (commitments || []).find((c) => c.status === "active" && c.dueDate && new Date(c.dueDate) <= today); }
+function dueCommitment() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return (commitments || []).find(
+    (c) => c.status === "active" && c.dueDate && new Date(c.dueDate) <= today,
+  );
+}
 
 // ---------- reflection ----------
-function openReflection() {
-  if (!withinReflectWindow()) { document.getElementById("nextAvailLabel").textContent = nextScheduledLabel(); showScreen("unavailableScreen"); return; }
-  showScreen("reflectScreen"); reindex();
+async function openReflection() {
+  if (!withinReflectWindow()) {
+    document.getElementById("nextAvailLabel").textContent =
+      nextScheduledLabel();
+    showScreen("unavailableScreen");
+    return;
+  }
+  showScreen("reflectScreen");
+  reindex();
+  // always reconcile against the server's true draft before deciding whether
+  // to resume — trusting the locally-merged copy was the "starts over on the
+  // other device" bug: a background listener can race or simply not have
+  // fired yet by the moment you open a reflection.
+  const fresh = await (window._fetchLatestDraft
+    ? window._fetchLatestDraft()
+    : null);
+  if (fresh && fresh.active) {
+    draft = { ...blankDraft(), ...fresh };
+    localStorage.setItem(LS_DRAFT, JSON.stringify(draft));
+  }
   if (draft.active && draft.phase) return resumePhase();
-  draft = blankDraft(); draft.active = true;
+  draft = blankDraft();
+  draft.active = true;
   const due = dueCommitment();
-  if (due) { draft.phase = "checkin"; draft.checkinId = due.id; saveDraft(); return enterCheckin(due); }
+  if (due) {
+    draft.phase = "checkin";
+    draft.checkinId = due.id;
+    saveDraft();
+    return enterCheckin(due);
+  }
   startWalk();
 }
 function resumePhase() {
   reindex();
-  if (draft.phase === "checkin") { const due = dueCommitment(); return due ? enterCheckin(due) : startWalk(); }
+  if (draft.phase === "checkin") {
+    const due = dueCommitment();
+    return due ? enterCheckin(due) : startWalk();
+  }
   if (draft.phase === "question") return renderChat();
   if (draft.phase === "commit") return enterCommit();
   if (draft.phase === "done") return enterDone(draft.committed);
@@ -398,19 +915,44 @@ function startWalk() {
   reindex();
   const first = questions[0];
   if (!first) return enterCommit();
-  draft.phase = "question"; draft.currentId = first.id; draft.history = []; saveDraft();
+  draft.phase = "question";
+  draft.currentId = first.id;
+  draft.history = [];
+  saveDraft();
   renderChat();
 }
 
-function setPhase(id) { document.querySelectorAll(".phase").forEach((p) => p.classList.remove("on")); document.getElementById(id).classList.add("on"); }
-function setBackVisible(v) { const b = document.getElementById("reflectBack"); if (b) b.style.display = v ? "flex" : "none"; }
+function setPhase(id) {
+  document.querySelectorAll(".phase").forEach((p) => p.classList.remove("on"));
+  document.getElementById(id).classList.add("on");
+}
+function setBackVisible(v) {
+  const b = document.getElementById("reflectBack");
+  if (b) b.style.display = v ? "flex" : "none";
+}
 
 // -- check-in --
-function enterCheckin(cmt) { stopVoice(); setPhase("phaseCheckin"); setBackVisible(false); setCollapseVisible(false); document.getElementById("checkinText").textContent = cmt.text; wireHold("checkinHold", "checkinRingFill", () => resolveCheckin("done")); }
-window.resolveCheckin = (status) => { if (draft.checkinId) window._resolveCommitment && window._resolveCommitment(draft.checkinId, status); draft.checkinId = null; startWalk(); };
+function enterCheckin(cmt) {
+  stopVoice();
+  setPhase("phaseCheckin");
+  setBackVisible(false);
+  setCollapseVisible(false);
+  document.getElementById("checkinText").textContent = cmt.text;
+  wireHold("checkinHold", "checkinRingFill", () => resolveCheckin("done"));
+}
+window.resolveCheckin = (status) => {
+  if (draft.checkinId)
+    window._resolveCommitment &&
+      window._resolveCommitment(draft.checkinId, status);
+  draft.checkinId = null;
+  startWalk();
+};
 
 // -- questions rendered as a chat transcript --
-function setCollapseVisible(v) { const c = document.getElementById("reflectCollapse"); if (c) c.style.display = v ? "block" : "none"; }
+function setCollapseVisible(v) {
+  const c = document.getElementById("reflectCollapse");
+  if (c) c.style.display = v ? "block" : "none";
+}
 
 function renderChat() {
   reindex();
@@ -424,49 +966,86 @@ function renderChat() {
   scroll.classList.toggle("collapsed", chatCollapsed);
   scroll.innerHTML = "";
   draft.history.forEach((id) => {
-    const n = findNode(id); if (!n) return;
+    const n = findNode(id);
+    if (!n) return;
     const a = draft.answers[id];
-    const ans = a && typeof a === "object" ? a.label : (a || "");
-    const item = document.createElement("div"); item.className = "chat-item past";
+    const ans = a && typeof a === "object" ? a.label : a || "";
+    const item = document.createElement("div");
+    item.className = "chat-item past";
     item.innerHTML = `<div class="chat-q">${escapeHtml(n.text)}</div><div class="chat-a">${escapeHtml(ans)}</div>`;
     scroll.appendChild(item);
   });
-  const cur = document.createElement("div"); cur.className = "chat-item current";
+  const cur = document.createElement("div");
+  cur.className = "chat-item current";
   cur.innerHTML = `<div class="chat-q big">${escapeHtml(node.text)}</div>`;
   scroll.appendChild(cur);
   scroll.scrollTop = scroll.scrollHeight;
 
   const choices = document.getElementById("chatChoices");
   const bar = document.getElementById("composerBar");
-  const recall = document.getElementById("chatRecall"), rlist = document.getElementById("chatRecallList");
-  recall.classList.remove("open"); rlist.classList.remove("open"); rlist.innerHTML = "";
+  const recall = document.getElementById("chatRecall"),
+    rlist = document.getElementById("chatRecallList");
+  recall.classList.remove("open");
+  rlist.classList.remove("open");
+  rlist.innerHTML = "";
 
   if (node.type === "choice") {
     stopVoice();
-    bar.style.display = "none"; recall.style.display = "none";
-    choices.style.display = "flex"; choices.innerHTML = "";
+    bar.style.display = "none";
+    recall.style.display = "none";
+    choices.style.display = "flex";
+    choices.innerHTML = "";
     node.options.forEach((opt, k) => {
-      const b = document.createElement("button"); b.className = "q-choice"; b.textContent = opt.label || (k === 0 ? "yes" : "no");
-      b.onclick = () => { b.classList.add("chosen"); chooseOption(node, k); };
+      const b = document.createElement("button");
+      b.className = "q-choice";
+      b.textContent = opt.label || (k === 0 ? "yes" : "no");
+      b.onclick = () => {
+        b.classList.add("chosen");
+        chooseOption(node, k);
+      };
       choices.appendChild(b);
     });
   } else {
-    choices.style.display = "none"; bar.style.display = "flex";
+    choices.style.display = "none";
+    bar.style.display = "flex";
     const field = document.getElementById("answerField");
-    field.value = typeof draft.answers[node.id] === "string" ? draft.answers[node.id] : "";
+    field.value =
+      typeof draft.answers[node.id] === "string" ? draft.answers[node.id] : "";
     autoGrow(field);
-    field.oninput = () => { draft.answers[node.id] = field.value; autoGrow(field); saveDraft(); };
-    field.onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); composerSend(); } };
-    if (node.recall) { recall.style.display = "inline-flex"; recall.onclick = () => { const open = recall.classList.toggle("open"); rlist.classList.toggle("open", open); if (open) fillRecall(node, rlist); }; }
-    else recall.style.display = "none";
+    field.oninput = () => {
+      draft.answers[node.id] = field.value;
+      autoGrow(field);
+      saveDraft();
+    };
+    field.onkeydown = (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        composerSend();
+      }
+    };
+    if (node.recall) {
+      recall.style.display = "inline-flex";
+      recall.onclick = () => {
+        const open = recall.classList.toggle("open");
+        rlist.classList.toggle("open", open);
+        if (open) fillRecall(node, rlist);
+      };
+    } else recall.style.display = "none";
     updateMicBtn();
     setTimeout(() => field.focus(), 60);
   }
-  const cd = document.getElementById("continueDesktop"); if (cd) cd.style.display = isPhone() ? "block" : "none";
+  const cd = document.getElementById("continueDesktop");
+  if (cd) cd.style.display = isPhone() ? "block" : "none";
 }
 
-window.composerSend = () => { const n = currentNode(); if (n && n.type !== "choice") submitText(n); };
-window.toggleTranscript = () => { chatCollapsed = !chatCollapsed; renderChat(); };
+window.composerSend = () => {
+  const n = currentNode();
+  if (n && n.type !== "choice") submitText(n);
+};
+window.toggleTranscript = () => {
+  chatCollapsed = !chatCollapsed;
+  renderChat();
+};
 
 // ---------- hand-off to desktop ----------
 // The draft is already synced continuously (saveDraft -> _saveDraft), so the
@@ -478,154 +1057,405 @@ window.toggleTranscript = () => { chatCollapsed = !chatCollapsed; renderChat(); 
 window.showDesktopHint = () => {
   stopVoice();
   window._requestHandoff && window._requestHandoff();
-  setPhase("phaseParked"); setBackVisible(false); setCollapseVisible(false);
-  const u = document.getElementById("parkedUrl"); if (u) u.textContent = location.host + location.pathname.replace(/\/$/, "");
+  setPhase("phaseParked");
+  setBackVisible(false);
+  setCollapseVisible(false);
+  const u = document.getElementById("parkedUrl");
+  if (u) u.textContent = location.host + location.pathname.replace(/\/$/, "");
 };
-window.resumeHere = () => { renderChat(); };
+window.resumeHere = () => {
+  renderChat();
+};
 
-window._onHandoffUpdated = () => {
+window._onHandoffUpdated = async () => {
   const h = window._handoff;
   if (!h || h.consumed || isPhone()) return; // only a non-phone device ever consumes a hand-off
-  const requestedAt = h.requestedAt && h.requestedAt.toMillis ? h.requestedAt.toMillis() : (h.requestedAt ? new Date(h.requestedAt).getTime() : 0);
+  const requestedAt =
+    h.requestedAt && h.requestedAt.toMillis
+      ? h.requestedAt.toMillis()
+      : h.requestedAt
+        ? new Date(h.requestedAt).getTime()
+        : 0;
   if (requestedAt && Date.now() - requestedAt > 10 * 60 * 1000) return; // stale — ignore
   window._consumeHandoff && window._consumeHandoff();
   setLastNotif("handoff"); // deliberate continuation — always opens, regardless of the usual notification window
-  if (draft.active) { showScreen("reflectScreen"); reindex(); resumePhase(); }
-  else openReflection();
+  // same fix as openReflection: don't trust the locally-merged draft, go read
+  // the server's true copy at the moment we're consuming the hand-off.
+  const fresh = await (window._fetchLatestDraft
+    ? window._fetchLatestDraft()
+    : null);
+  if (fresh && fresh.active) {
+    draft = { ...blankDraft(), ...fresh };
+    localStorage.setItem(LS_DRAFT, JSON.stringify(draft));
+  }
+  window.takeOverDevice && window.takeOverDevice(); // consuming a hand-off is an explicit claim to be the active device
+  if (draft.active && draft.phase) {
+    showScreen("reflectScreen");
+    reindex();
+    resumePhase();
+  } else openReflection();
+};
+
+// ---------- cross-device active-device exclusivity ----------
+// Only one device is ever "active." Whichever device last claimed it (by
+// signing in, focusing the tab, or explicitly taking over) is active; every
+// other open device shades itself until the person explicitly asks to use it
+// instead. This is a UX guardrail only — data is always synced regardless.
+window._onActiveDeviceUpdated = () => {
+  const ad = window._activeDevice;
+  const shade = document.getElementById("deviceShade");
+  if (!shade) return;
+  const isOther = !!(
+    ad &&
+    ad.deviceId &&
+    window._deviceId &&
+    ad.deviceId !== window._deviceId
+  );
+  shade.classList.toggle("on", isOther);
+};
+window.takeOverDevice = () => {
+  window._claimActiveDevice && window._claimActiveDevice(deviceKind());
 };
 
 function submitText(node) {
   const ans = (draft.answers[node.id] || "").trim();
-  if (ans) { const k = "rc_answer_hist_" + node.id; let h = []; try { h = JSON.parse(localStorage.getItem(k) || "[]"); } catch (_) {} h.unshift({ a: ans, t: Date.now() }); localStorage.setItem(k, JSON.stringify(h.slice(0, 30))); }
+  if (ans) {
+    const k = "rc_answer_hist_" + node.id;
+    let h = [];
+    try {
+      h = JSON.parse(localStorage.getItem(k) || "[]");
+    } catch (_) {}
+    h.unshift({ a: ans, t: Date.now() });
+    localStorage.setItem(k, JSON.stringify(h.slice(0, 30)));
+  }
   advanceFrom(node);
 }
 function chooseOption(node, k) {
   const opt = node.options[k];
-  draft.answers[node.id] = { optIndex: k, label: opt.label, exit: opt.exit || 0 }; saveDraft();
+  draft.answers[node.id] = {
+    optIndex: k,
+    label: opt.label,
+    exit: opt.exit || 0,
+  };
+  saveDraft();
   advanceFrom(node);
 }
 function advanceFrom(node) {
-  stopVoice(); reindex();
+  stopVoice();
+  reindex();
   const fresh = findNode(node.id) || node;
   const star = starNode();
   if (draft.mode !== "full" && star && star.id === fresh.id) {
-    const nx = computeNext(fresh); draft.resumeId = nx ? nx.id : null; draft.lastQuestionId = fresh.id; saveDraft(); return enterCommit();
+    const nx = computeNext(fresh);
+    draft.resumeId = nx ? nx.id : null;
+    draft.lastQuestionId = fresh.id;
+    saveDraft();
+    return enterCommit();
   }
   const nx = computeNext(fresh);
-  if (!nx) { draft.lastQuestionId = fresh.id; draft.resumeId = null; saveDraft(); return afterQuestions(); }
-  draft.history.push(fresh.id); draft.currentId = nx.id; saveDraft(); renderChat();
+  if (!nx) {
+    draft.lastQuestionId = fresh.id;
+    draft.resumeId = null;
+    saveDraft();
+    return afterQuestions();
+  }
+  draft.history.push(fresh.id);
+  draft.currentId = nx.id;
+  saveDraft();
+  renderChat();
 }
-function afterQuestions() { stopVoice(); if (draft.mode === "full") return finishSession(); enterCommit(); }
+function afterQuestions() {
+  stopVoice();
+  if (draft.mode === "full") return finishSession();
+  enterCommit();
+}
 
 function fillRecall(node, el) {
-  let h = []; try { h = JSON.parse(localStorage.getItem("rc_answer_hist_" + node.id) || "[]"); } catch (_) {}
-  if (!h.length) { el.innerHTML = "<div class='recall-empty'>nothing here yet</div>"; return; }
-  el.innerHTML = h.slice(0, 10).map((x) => `<div class="recall-item"><span class="recall-date">${new Date(x.t).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>${escapeHtml(x.a)}</div>`).join("");
+  let h = [];
+  try {
+    h = JSON.parse(localStorage.getItem("rc_answer_hist_" + node.id) || "[]");
+  } catch (_) {}
+  if (!h.length) {
+    el.innerHTML = "<div class='recall-empty'>nothing here yet</div>";
+    return;
+  }
+  el.innerHTML = h
+    .slice(0, 10)
+    .map(
+      (x) =>
+        `<div class="recall-item"><span class="recall-date">${new Date(x.t).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>${escapeHtml(x.a)}</div>`,
+    )
+    .join("");
 }
 
 // -- back --
 window.goBackPhase = () => {
-  if (draft.phase === "question") { if (draft.history.length) { draft.currentId = draft.history.pop(); saveDraft(); renderChat(); } }
-  else if (draft.phase === "commit") {
+  if (draft.phase === "question") {
+    if (draft.history.length) {
+      draft.currentId = draft.history.pop();
+      saveDraft();
+      renderChat();
+    }
+  } else if (draft.phase === "commit") {
     reindex();
     // lastQuestionId should always be set on the way into commit, but fall
     // back to the last history entry (or the top of the list) rather than
     // silently doing nothing if it's ever missing.
-    const target = draft.lastQuestionId || draft.history[draft.history.length - 1] || (questions[0] && questions[0].id);
+    const target =
+      draft.lastQuestionId ||
+      draft.history[draft.history.length - 1] ||
+      (questions[0] && questions[0].id);
     if (!target) return;
-    draft.phase = "question"; draft.currentId = target; saveDraft(); renderChat();
+    draft.phase = "question";
+    draft.currentId = target;
+    saveDraft();
+    renderChat();
+  } else if (draft.phase === "done") {
+    enterCommit();
   }
-  else if (draft.phase === "done") { enterCommit(); }
 };
 
 // -- commit --
 function enterCommit() {
-  stopVoice(); draft.phase = "commit"; saveDraft(); setPhase("phaseCommit"); setBackVisible(true); setCollapseVisible(false);
+  stopVoice();
+  draft.phase = "commit";
+  saveDraft();
+  setPhase("phaseCommit");
+  setBackVisible(true);
+  setCollapseVisible(false);
   const field = document.getElementById("commitField");
-  field.value = draft.commitText || ""; autoGrow(field);
-  field.oninput = () => { draft.commitText = field.value; autoGrow(field); saveDraft(); };
-  field.onkeydown = (e) => { if (e.key === "Enter") e.preventDefault(); };
+  field.value = draft.commitText || "";
+  autoGrow(field);
+  field.oninput = () => {
+    draft.commitText = field.value;
+    autoGrow(field);
+    saveDraft();
+  };
+  field.onkeydown = (e) => {
+    if (e.key === "Enter") e.preventDefault();
+  };
   renderDueSelect();
   wireHold("commitHold", "commitRingFill", doCommit);
   setTimeout(() => field.focus(), 60);
 }
 function renderDueSelect() {
-  const sel = document.getElementById("commitDueSelect"); if (!sel) return;
+  const sel = document.getElementById("commitDueSelect");
+  if (!sel) return;
   sel.innerHTML = "";
   for (let i = 1; i <= 7; i++) {
-    const d = new Date(); d.setDate(d.getDate() + i);
-    const opt = document.createElement("option"); opt.value = d.toISOString().slice(0, 10);
-    opt.textContent = i === 1 ? "tomorrow" : d.toLocaleDateString(undefined, { weekday: "long" }).toLowerCase();
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const opt = document.createElement("option");
+    opt.value = d.toISOString().slice(0, 10);
+    opt.textContent =
+      i === 1
+        ? "tomorrow"
+        : d.toLocaleDateString(undefined, { weekday: "long" }).toLowerCase();
     sel.appendChild(opt);
   }
-  sel.value = draft.commitDue && sel.querySelector(`option[value="${draft.commitDue}"]`) ? draft.commitDue : sel.options[0].value;
-  draft.commitDue = sel.value; saveDraft();
+  sel.value =
+    draft.commitDue && sel.querySelector(`option[value="${draft.commitDue}"]`)
+      ? draft.commitDue
+      : sel.options[0].value;
+  draft.commitDue = sel.value;
+  saveDraft();
 }
-window.onCommitDueChange = (v) => { draft.commitDue = v; saveDraft(); };
-function doCommit() { const text = (draft.commitText || "").trim(); if (text) window._addCommitment && window._addCommitment({ text, dueDate: draft.commitDue }); if (navigator.vibrate) navigator.vibrate(12); draft.committed = true; enterDone(true); }
-window.skipCommit = () => { draft.committed = false; enterDone(false); };
+window.onCommitDueChange = (v) => {
+  draft.commitDue = v;
+  saveDraft();
+};
+function doCommit() {
+  const text = (draft.commitText || "").trim();
+  if (text)
+    window._addCommitment &&
+      window._addCommitment({ text, dueDate: draft.commitDue });
+  if (navigator.vibrate) navigator.vibrate(12);
+  draft.committed = true;
+  enterDone(true);
+}
+window.skipCommit = () => {
+  draft.committed = false;
+  enterDone(false);
+};
 
 // -- done --
 function enterDone(committed) {
-  stopVoice(); draft.phase = "done"; saveDraft(); setPhase("phaseDone"); setBackVisible(true); setCollapseVisible(false);
-  document.getElementById("doneText").textContent = committed ? "committed. see you tomorrow." : "logged. see you tomorrow.";
-  const kg = document.getElementById("keepGoingBtn"); kg.style.display = draft.resumeId ? "block" : "none";
+  stopVoice();
+  draft.phase = "done";
+  saveDraft();
+  setPhase("phaseDone");
+  setBackVisible(true);
+  setCollapseVisible(false);
+  document.getElementById("doneText").textContent = committed
+    ? "committed. see you tomorrow."
+    : "logged. see you tomorrow.";
+  const kg = document.getElementById("keepGoingBtn");
+  kg.style.display = draft.resumeId ? "block" : "none";
 }
-window.keepReflecting = () => { draft.mode = "full"; draft.commitText = ""; draft.history = []; draft.currentId = draft.resumeId; draft.phase = "question"; saveDraft(); renderChat(); };
+window.keepReflecting = () => {
+  draft.mode = "full";
+  draft.commitText = "";
+  draft.history = [];
+  draft.currentId = draft.resumeId;
+  draft.phase = "question";
+  saveDraft();
+  renderChat();
+};
 
-function finishSession() { window._saveSession && window._saveSession({ answers: draft.answers }); draft = blankDraft(); saveDraft(); window._clearDraft && window._clearDraft(); goHome(); }
-window.exitReflection = () => { stopVoice(); goHome(); };
+function finishSession() {
+  window._saveSession && window._saveSession({ answers: draft.answers });
+  draft = blankDraft();
+  saveDraft();
+  window._clearDraft && window._clearDraft();
+  goHome();
+}
+window.exitReflection = () => {
+  stopVoice();
+  goHome();
+};
 
 // textareas grow vertically; the single-line answer input instead scrolls
 // horizontally so a long answer runs off the right edge (and fades) rather
 // than wrapping onto a second line.
 function autoGrow(el) {
-  if (el.tagName === "TEXTAREA") { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; }
-  else { el.scrollLeft = el.scrollWidth; }
+  if (el.tagName === "TEXTAREA") {
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  } else {
+    el.scrollLeft = el.scrollWidth;
+  }
 }
 
 // ---------- hold-to-confirm ----------
 function wireHold(btnId, fillId, onComplete) {
-  const btn = document.getElementById(btnId), fill = document.getElementById(fillId);
-  const CIRC = 207.3; let raf = null, start = 0, done = false;
+  const btn = document.getElementById(btnId),
+    fill = document.getElementById(fillId);
+  const CIRC = 207.3;
+  let raf = null,
+    start = 0,
+    done = false;
   fill.style.strokeDashoffset = CIRC;
-  const tick = (ts) => { if (!start) start = ts; const p = Math.min((ts - start) / HOLD_MS, 1); fill.style.strokeDashoffset = CIRC * (1 - p); if (p >= 1) { done = true; btn.classList.add("done"); release(true); return; } raf = requestAnimationFrame(tick); };
-  const press = (e) => { e.preventDefault(); if (done) return; start = 0; raf = requestAnimationFrame(tick); };
-  const release = (complete) => { if (raf) cancelAnimationFrame(raf); raf = null; if (complete) onComplete(); else { fill.style.transition = "stroke-dashoffset .25s ease"; fill.style.strokeDashoffset = CIRC; setTimeout(() => (fill.style.transition = ""), 260); } };
-  btn.onpointerdown = press; btn.onpointerup = () => { if (!done) release(false); }; btn.onpointerleave = () => { if (!done) release(false); };
+  const tick = (ts) => {
+    if (!start) start = ts;
+    const p = Math.min((ts - start) / HOLD_MS, 1);
+    fill.style.strokeDashoffset = CIRC * (1 - p);
+    if (p >= 1) {
+      done = true;
+      btn.classList.add("done");
+      release(true);
+      return;
+    }
+    raf = requestAnimationFrame(tick);
+  };
+  const press = (e) => {
+    e.preventDefault();
+    if (done) return;
+    start = 0;
+    raf = requestAnimationFrame(tick);
+  };
+  const release = (complete) => {
+    if (raf) cancelAnimationFrame(raf);
+    raf = null;
+    if (complete) onComplete();
+    else {
+      fill.style.transition = "stroke-dashoffset .25s ease";
+      fill.style.strokeDashoffset = CIRC;
+      setTimeout(() => (fill.style.transition = ""), 260);
+    }
+  };
+  btn.onpointerdown = press;
+  btn.onpointerup = () => {
+    if (!done) release(false);
+  };
+  btn.onpointerleave = () => {
+    if (!done) release(false);
+  };
 }
 
 // ---------- voice (demoted: opt-in dictation via the mic button) ----------
-let recog = null, voiceField = null, voiceBase = "", listeningWanted = false, micActive = false;
+let recog = null,
+  voiceField = null,
+  voiceBase = "",
+  listeningWanted = false,
+  micActive = false;
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 window.toggleMic = () => {
-  if (!SR) { alert("Voice dictation isn't supported in this browser — just type."); return; }
-  if (micActive) stopVoice(); else startVoice(document.getElementById("answerField"));
+  if (!SR) {
+    alert("Voice dictation isn't supported in this browser — just type.");
+    return;
+  }
+  if (micActive) stopVoice();
+  else startVoice(document.getElementById("answerField"));
 };
-function updateMicBtn() { const b = document.getElementById("micBtn"); if (b) { b.classList.toggle("active", micActive); b.style.display = SR ? "flex" : "none"; } }
+function updateMicBtn() {
+  const b = document.getElementById("micBtn");
+  if (b) {
+    b.classList.toggle("active", micActive);
+    b.style.display = SR ? "flex" : "none";
+  }
+}
 function startVoice(field) {
   if (!SR || !field) return;
-  stopVoice(); voiceField = field; voiceBase = field.value ? field.value + " " : "";
+  stopVoice();
+  voiceField = field;
+  voiceBase = field.value ? field.value + " " : "";
   try {
-    recog = new SR(); recog.continuous = true; recog.interimResults = true; recog.lang = navigator.language || "en-US";
+    recog = new SR();
+    recog.continuous = true;
+    recog.interimResults = true;
+    recog.lang = navigator.language || "en-US";
     recog.onresult = (e) => {
-      let interim = "", final = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) { const t = e.results[i][0].transcript; if (e.results[i].isFinal) final += t; else interim += t; }
-      if (final) voiceBase = (voiceBase + final).replace(/\s+/g, " ").replace(/^\s/, "") + " ";
-      voiceField.value = (voiceBase + interim).trimStart(); autoGrow(voiceField);
-      const n = currentNode(); if (n) draft.answers[n.id] = voiceField.value;
+      let interim = "",
+        final = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) final += t;
+        else interim += t;
+      }
+      if (final)
+        voiceBase =
+          (voiceBase + final).replace(/\s+/g, " ").replace(/^\s/, "") + " ";
+      voiceField.value = (voiceBase + interim).trimStart();
+      autoGrow(voiceField);
+      const n = currentNode();
+      if (n) draft.answers[n.id] = voiceField.value;
       saveDraft();
     };
     recog.onerror = () => {};
-    recog.onend = () => { if (recog && listeningWanted) { try { recog.start(); } catch (_) {} } };
-    listeningWanted = true; micActive = true; recog.start(); updateMicBtn(); field.focus();
-  } catch (_) { micActive = false; updateMicBtn(); }
+    recog.onend = () => {
+      if (recog && listeningWanted) {
+        try {
+          recog.start();
+        } catch (_) {}
+      }
+    };
+    listeningWanted = true;
+    micActive = true;
+    recog.start();
+    updateMicBtn();
+    field.focus();
+  } catch (_) {
+    micActive = false;
+    updateMicBtn();
+  }
 }
 function stopVoice() {
-  listeningWanted = false; micActive = false;
-  const b = document.getElementById("micBtn"); if (b) b.classList.remove("active");
-  if (recog) { try { recog.onend = null; recog.stop(); } catch (_) {} recog = null; }
+  listeningWanted = false;
+  micActive = false;
+  const b = document.getElementById("micBtn");
+  if (b) b.classList.remove("active");
+  if (recog) {
+    try {
+      recog.onend = null;
+      recog.stop();
+    } catch (_) {}
+    recog = null;
+  }
 }
 
 // ---------- boot ----------
-document.addEventListener("DOMContentLoaded", () => { normalizeTree(questions); renderQuestionEditor(); renderSettings(); });
+document.addEventListener("DOMContentLoaded", () => {
+  normalizeTree(questions);
+  renderQuestionEditor();
+  renderSettings();
+});

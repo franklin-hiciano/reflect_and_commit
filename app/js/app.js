@@ -84,8 +84,14 @@ function computeNext(block) {
 // ── writes: the ONE entry point that ever changes the tree. Editor UI
 // (js/dsl-editor.js) always calls this instead of touching `dslText`
 // directly, so persistence + re-render always happen together. ──────────
-window.setDslText = function (newText, selRange) {
+window.setDslText = function (newText, selRange, snapshotWeight) {
+  const oldText = dslText;
   dslText = newText || "";
+  // was defined in dsl-editor.js but never actually called from here —
+  // version history never accumulated anything past the initial blank
+  // snapshot, which is why it read as "too strict": it wasn't strict, it
+  // was just never fed a single edit.
+  window._noteDslSnapshot && window._noteDslSnapshot(oldText, dslText, snapshotWeight || 0);
   saveLocalTree();
   window._saveTree && window._saveTree(dslText);
   window.renderDslEditor();
@@ -168,12 +174,34 @@ function enterHome() {
     const here = document.getElementById("landingStepHere");
     if (intro && here) { intro.style.display = "none"; here.style.display = "block"; }
     const explainer = document.getElementById("onboardingExplainer");
-    if (explainer) explainer.textContent = "Almost there — open Reflect & Commit from your home screen (not this browser tab) to finish.";
+    // desktop Chrome PWAs never land on a "home screen" — that's mobile-only.
+    // On desktop, clicking install a second time (e.g. Chrome silently
+    // thinks it's already installed from earlier testing) just does
+    // nothing, so the real fix is removing the stale install via
+    // chrome://apps and trying again, not hunting for a home-screen icon
+    // that was never going to exist.
+    if (explainer) {
+      explainer.textContent = isPhone()
+        ? "Almost there — open Reflect & Commit from your home screen (not this browser tab) to finish."
+        : "Almost there — open the installed Reflect & Commit app (not this browser tab) to finish. If installing didn't seem to do anything, it may already be installed — go to chrome://apps, remove Reflect & Commit, then try again.";
+    }
     return;
   }
   showScreen("homeScreen");
+  renderUserMenu();
   maybeShowOtherDeviceGate();
   applyMobileEditRestriction();
+}
+// account menu trigger (top right) — avatar + name from the signed-in
+// Google account, same source as the cross-device gate's avatar.
+function renderUserMenu() {
+  const avatar = document.getElementById("userMenuAvatar");
+  const name = document.getElementById("userMenuName");
+  if (avatar) {
+    if (window._userPhoto) { avatar.src = window._userPhoto; avatar.style.display = "block"; }
+    else avatar.style.display = "none";
+  }
+  if (name) name.textContent = window._userName || "";
 }
 function goHome() { stopVoice(); if (isStandalone()) { enterHome(); } else { showScreen("landingScreen"); resetLandingToIntro(); } }
 function isStandalone() { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; }
@@ -286,6 +314,18 @@ window.maybeShowOtherDeviceGate = function () {
   gate.classList.add("on");
   return true;
 };
+// the *SeenAt flags are permanent by design (see comment above) — without
+// this, an account that's ever fully paired once has no way back to a
+// fresh "waiting for the other device" state, e.g. to actually re-pair a
+// replacement phone, or (what was reading as "this gate is buggy, it
+// instantly disappears") when the flags were already satisfied from a much
+// earlier session and the gate hides itself the instant real data arrives.
+window.resetPairing = async () => {
+  if (!confirm("Reset device pairing? Both devices will need to be marked installed again.")) return;
+  await (window._resetPairing && window._resetPairing());
+  window._onboarding = {};
+  maybeShowOtherDeviceGate();
+};
 
 
 // ---------- install ----------
@@ -351,7 +391,29 @@ if ("serviceWorker" in navigator) {
   // references app/js/app.js), and "sw.js" alone would resolve against
   // whichever page loaded it, missing the file when served from root.
   const swUrl = new URL("../sw.js", document.currentScript.src).href;
-  navigator.serviceWorker.register(swUrl, { scope: new URL(".", swUrl).href }).catch(() => {});
+  navigator.serviceWorker.register(swUrl, { scope: new URL(".", swUrl).href }).then((reg) => {
+    // the browser only checks for a new sw.js at most once every ~24h on its
+    // own — for a PWA that mostly gets opened once a day right at reflection
+    // time, that reads as "a new deploy never shows up unless I delete and
+    // reinstall the app." Force a check on load and every time the (already
+    // open/installed) app becomes visible again, so a Vercel deploy actually
+    // reaches you within a session or two instead of sitting stale for a day.
+    reg.update().catch(() => {});
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
+  }).catch(() => {});
+  // sw.js calls skipWaiting()+clients.claim() on every update, so a new
+  // worker takes over control almost immediately — but the ALREADY-OPEN page
+  // keeps running the old HTML/JS it already loaded regardless (service
+  // workers only affect future navigations). Reloading once the controller
+  // actually switches is what makes a deploy visible without a manual
+  // reinstall — this is the actual fix for "I shouldn't have to delete the
+  // PWA, it should update itself."
+  let _swReloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (_swReloaded) return;
+    _swReloaded = true;
+    location.reload();
+  });
   navigator.serviceWorker.addEventListener("message", (e) => { if (e.data && e.data.type === "notif-confirmed") { setLastNotif("schedule"); openReflection(); } });
 }
 

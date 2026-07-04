@@ -318,16 +318,34 @@ function reorderBlock(text, name, beforeName) {
   return joinLines(merged);
 }
 
-// rewrite every bare/label/recall reference to `oldName` (except the header
-// line itself, at `skipRawLine`) to `newName` — keeps existing references
-// alive when you edit a question's own title instead of silently orphaning
-// them (which is otherwise an inherent risk of "the text IS the identity").
-function renameReferences(text, oldName, newName, skipRawLine) {
+// pull the referenced title out of a body line, if it even IS shaped like a
+// reference (recall X / label > X / bare X) — returns null for "done" and
+// other non-reference lines, so a caller can tell "not a link" from "a link
+// to something that doesn't exist." Same per-line target logic parse() uses
+// for a block's own next/options, exposed so other code (the reference-edit
+// cascade below) doesn't have to re-derive it.
+function referenceTargetOf(lineTrimmed) {
+  const rm = recallMatch(lineTrimmed);
+  if (rm) return rm[1].trim();
+  const { after } = splitArrow(lineTrimmed);
+  if (after != null) return isDoneText(after) ? null : after.trim();
+  if (isDoneText(lineTrimmed)) return null;
+  return lineTrimmed.trim() || null;
+}
+
+// rewrite every bare/label/recall reference to `oldName` (except the lines
+// at `skipRawLines` — the header when cascading FROM a title edit, or the
+// reference line itself when cascading FROM a reference edit) to `newName`.
+// Keeps every other mention alive when you edit either the declaration or
+// any one reference — "the text IS the identity" otherwise risks silently
+// orphaning everything else that pointed at the old name.
+function renameReferences(text, oldName, newName, skipRawLines) {
+  const skip = new Set(Array.isArray(skipRawLines) ? skipRawLines : [skipRawLines]);
   const lines = linesOf(text);
   const oldKey = norm(oldName);
   if (!oldKey) return text;
   for (let i = 0; i < lines.length; i++) {
-    if (i === skipRawLine) continue;
+    if (skip.has(i)) continue;
     const raw = lines[i];
     const trimmed = raw.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
@@ -341,6 +359,30 @@ function renameReferences(text, oldName, newName, skipRawLine) {
     if (norm(trimmed) === oldKey) lines[i] = raw.slice(0, indentM[1].length) + newName;
   }
   return joinLines(lines);
+}
+
+// renaming a block's title directly (e.g. clicking a canvas card's text and
+// typing) needs the same reference-cascade as editing the header line in the
+// textarea — this is that same operation, callable from anywhere a caller
+// already knows which block it means to rename rather than having to infer
+// it from a cursor position (see app.js's _cascadeRenameIfHeaderEdited,
+// which is the textarea-specific wrapper around the same renameReferences).
+function renameBlockTitle(text, oldName, newName, extraSkipRawLine) {
+  const parsed = parse(text);
+  const block = resolveName(parsed, oldName);
+  newName = (newName || "").trim();
+  if (!block || !newName || norm(oldName) === norm(newName)) return text;
+  const lines = linesOf(text);
+  // re-derive the header's own star/terminal-mark from its raw text (not
+  // block.terminal, which is also true for a plain "done" body line and
+  // would wrongly append a trailing ' here if trusted directly)
+  let t0 = (lines[block.rawLine] || "").trim();
+  const starM = t0.match(/^\*\s+(.*)$/);
+  if (starM) t0 = starM[1];
+  const hadApostrophe = t0.endsWith("'");
+  lines[block.rawLine] = (block.star ? "* " : "") + newName + (hadApostrophe ? "'" : "");
+  const skips = extraSkipRawLine != null ? [block.rawLine, extraSkipRawLine] : block.rawLine;
+  return renameReferences(joinLines(lines), oldName, newName, skips);
 }
 
 function findDuplicateTitles(parsed) {
@@ -438,7 +480,7 @@ function moveLine(text, fromRawLine, toRawLine) {
 const TreeModel = {
   parse, resolveName, buildGraph,
   appendNewBlock, addConnectedChild, connectExisting, deleteBlock,
-  setStar, setRecall, reorderBlock, insertBodyLine, renameReferences,
+  setStar, setRecall, reorderBlock, insertBodyLine, renameReferences, renameBlockTitle, referenceTargetOf,
   findDuplicateTitles, findMultipleRoots, uniqueName,
   sourceInfoAt, dropContext, moveLine,
   isDoneText, norm,

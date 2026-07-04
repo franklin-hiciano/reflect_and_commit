@@ -38,14 +38,6 @@ const gProvider = new GoogleAuthProvider();
 
 let uid = null;
 
-const DEFAULT_TREE =
-  "* Did you move the thing that matters most right now?\n" +
-  "\n" +
-  "What did you actually do with today? Hours, not vibes.\n" +
-  "\n" +
-  "What did you avoid, and what were you afraid would happen?\n" +
-  "  recall What did you avoid, and what were you afraid would happen?\n";
-
 function uDoc(...s) {
   return doc(db, "users", uid, ...s);
 }
@@ -91,19 +83,6 @@ onAuthStateChanged(auth, async (user) => {
     window._userEmail = user.email || "";
     document.getElementById("authScreen").classList.add("hidden");
     setSyncDot("syncing");
-
-    // seed a default tree if none exists yet
-    try {
-      const tSnap = await getDoc(uDoc("state", "tree"));
-      if (!tSnap.exists() || typeof tSnap.data().text !== "string" || !tSnap.data().text.trim()) {
-        await setDoc(uDoc("state", "tree"), {
-          text: DEFAULT_TREE,
-          updatedAt: serverTimestamp(),
-        });
-      }
-    } catch (e) {
-      console.error(e);
-    }
 
     unsubscribers.push(onSnapshot(uDoc("state", "tree"), (snap) => {
       window._tree = snap.exists() ? (snap.data().text || "") : "";
@@ -287,6 +266,13 @@ window._claimActiveDevice = async function (kind) {
 window._markDeviceSeen = async function (kind) {
   if (!uid) return;
   try { await setDoc(uDoc("state", "onboarding"), { [kind + "SeenAt"]: serverTimestamp() }, { merge: true }); } catch (e) {}
+};
+// these flags are permanent by design (see above) — the only way back to a
+// fresh "waiting for the other device" state, e.g. re-pairing a new phone
+// or replaying the onboarding flow, is wiping them outright.
+window._resetPairing = async function () {
+  if (!uid) return;
+  try { await setDoc(uDoc("state", "onboarding"), {}); } catch (e) {}
 };
 
 window._fbReady = true;

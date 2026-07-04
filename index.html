@@ -7,11 +7,11 @@
             content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"
         />
         <title>Reflect &amp; Commit</title>
-        <link rel="stylesheet" href="app/style.css" />
-        <link rel="manifest" href="app/manifest.json" />
+        <link rel="stylesheet" href="style.css" />
+        <link rel="manifest" href="manifest.json" />
         <meta name="theme-color" content="#0a0a0b" />
-        <link rel="apple-touch-icon" href="app/icons/apple-touch-icon.png" />
-        <link rel="icon" href="app/icons/icon-192.png" />
+        <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+        <link rel="icon" href="icons/icon-192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta
             name="apple-mobile-web-app-status-bar-style"
@@ -36,40 +36,20 @@
         </div>
 
         <!-- LANDING — same near-black, same fonts as the app itself. Just a
-         quiet doorway, not a separate world. Three sub-steps, one visible
-         at a time: intro (tagline lives ONLY here) → cross-device install
-         gate (clean, centered, nothing else on screen) → this device's
-         own install. -->
+         quiet doorway, not a separate world. Two sub-steps, one visible at a
+         time: intro (tagline lives ONLY here) → install THIS device. The
+         cross-device ask ("now get the other one too") happens afterwards,
+         as an overlay on top of the home screen (#otherDeviceGate below) —
+         not before you've even installed the device in front of you. -->
         <div class="screen" id="landingScreen">
             <div class="landing-inner" id="landingIntro">
                 <div class="auth-logo">
                     Reflect <span class="amp">&amp;</span> Commit
                 </div>
-                <div class="landing-tag">
-                    Design yourself questions that encourage future you to live
-                    by your principles.
-                </div>
+                <div class="landing-tag">Take more risks.</div>
                 <button class="btn-ghost" onclick="goToInstallGate()">
                     Get started
                 </button>
-            </div>
-
-            <!-- this app is only worth it synced across both devices, so the
-           first ask is always "get the OTHER one installed too" — advances
-           automatically once that device signs in, no button to press -->
-            <div
-                class="install-gate"
-                id="landingStepOther"
-                style="display: none"
-            >
-                <div class="install-gate-headline" id="otherDeviceLabel"></div>
-                <img
-                    id="landingQr"
-                    class="landing-qr-img"
-                    style="display: none"
-                    alt="scan to install on your phone"
-                />
-                <div class="install-gate-url" id="otherDeviceHint"></div>
             </div>
 
             <div
@@ -112,25 +92,6 @@
         <div class="screen" id="homeScreen">
             <div class="home-topbar">
                 <button
-                    class="icon-btn edit-toggle"
-                    id="editToggle"
-                    onclick="toggleGraphPanel()"
-                    title="show / hide the tree graph"
-                >
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="1.6"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <path
-                            d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 3 21l.5-4.5L17 3z"
-                        />
-                    </svg>
-                </button>
-                <button
                     class="icon-btn"
                     onclick="sendSelfNotification()"
                     title="send yourself a test notification"
@@ -171,8 +132,11 @@
                 </button>
             </div>
             <div class="home-body">
-                <div id="treeGraph" class="tree-graph"></div>
-                <div id="treeEditor" class="tree-editor"></div>
+                <!-- js/dsl-editor.js builds everything inside here: the
+             duplicate/multi-root warning banner, the mobile pane switcher,
+             the dsl-editor + node-canvas split, and the version-history
+             slider. See js/tree-model.js for the DSL grammar itself. -->
+                <div id="dslHome" class="dsl-home"></div>
                 <div class="tree-io-row">
                     <button class="btn-quiet" onclick="openPasteTree()">
                         paste tree
@@ -220,11 +184,21 @@
                     <button class="btn-quiet" onclick="doSignOut()">
                         sign out
                     </button>
+                    <button
+                        class="btn-quiet"
+                        id="otherDeviceSettingsBtn"
+                        style="display: none"
+                        onclick="maybeShowOtherDeviceGate()"
+                    >
+                        install on your other device
+                    </button>
                 </div>
             </div>
 
             <!-- questions are meant to be written on desktop; mobile can still
-           edit, it just asks first every time, until dismissed for good -->
+           edit, it just asks first every time, until dismissed for good.
+           Only relevant once the pairing below is actually done — while the
+           other device is still missing, otherDeviceGate takes priority. -->
             <div class="mobile-edit-gate" id="mobileEditGate">
                 <div class="mobile-edit-gate-inner">
                     <div class="mobile-edit-gate-text">
@@ -242,6 +216,37 @@
                         onclick="dismissMobileEditGate(true)"
                     >
                         Don't show this again
+                    </button>
+                </div>
+            </div>
+
+            <!-- cross-device pairing nudge — shown over the home screen (not
+           gating it) whenever THIS device is installed but the other kind
+           has never signed in from a real install. Desktop's copy asks you
+           to install mobile too and come back; mobile's copy sends you to
+           desktop with no round-trip, since the phone's own job (tonight's
+           notification) still happens right here regardless. Dismissing
+           just closes it for now — it reappears next time you open the app,
+           or after your next commitment, until the pairing is done. -->
+            <div class="mobile-edit-gate" id="otherDeviceGate">
+                <div class="install-gate">
+                    <div
+                        class="install-gate-headline"
+                        id="otherDeviceLabel"
+                    ></div>
+                    <img
+                        id="landingQr"
+                        class="landing-qr-img"
+                        style="display: none"
+                        alt="scan to install on your phone"
+                    />
+                    <div class="install-gate-url" id="otherDeviceHint"></div>
+                    <button
+                        class="btn-quiet"
+                        style="margin-top: 22px"
+                        onclick="dismissOtherDeviceGate()"
+                    >
+                        Not now
                     </button>
                 </div>
             </div>
@@ -477,10 +482,9 @@
             </div>
         </div>
 
-        <script type="module" src="app/firebase-init.js?v=16"></script>
-        <script src="app/js/dsl.js?v=16"></script>
-        <script src="app/js/dsl-graph.js?v=16"></script>
-        <script src="app/js/tree-editor.js?v=16"></script>
-        <script src="app/js/app.js?v=16"></script>
+        <script type="module" src="firebase-init.js?v=17"></script>
+        <script src="js/tree-model.js?v=17"></script>
+        <script src="js/dsl-editor.js?v=17"></script>
+        <script src="js/app.js?v=17"></script>
     </body>
 </html>

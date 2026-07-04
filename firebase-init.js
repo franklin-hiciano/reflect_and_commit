@@ -19,8 +19,10 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { registerForPush } from "./firebase-messaging-setup.js";
 
-// same firebase project as before — schema is new/simplified, old collections
-// (trees/runs/commitments) are just left alone and unused now.
+// same firebase project as before — schema is new/simplified again: the
+// question tree is now stored as its own DSL TEXT (state/tree {text}),
+// replacing the old state/questions {list: [...]} array. Old doc is just
+// left alone and unused now.
 const cfg = {
   apiKey: "AIzaSyBZQvIOvSOsmkW100IoZVsOiclEeAYm-V8",
   authDomain: "wisdom-tree-29e66.firebaseapp.com",
@@ -36,11 +38,13 @@ const gProvider = new GoogleAuthProvider();
 
 let uid = null;
 
-const DEFAULT_QUESTIONS = [
-  { id: "q_" + Date.now() + "_1", text: "Did you move the thing that matters most right now?", recall: false, star: true },
-  { id: "q_" + Date.now() + "_2", text: "What did you actually do with today? Hours, not vibes.", recall: false, star: false },
-  { id: "q_" + Date.now() + "_3", text: "What did you avoid, and what were you afraid would happen?", recall: true, star: false },
-];
+const DEFAULT_TREE =
+  "* Did you move the thing that matters most right now?\n" +
+  "\n" +
+  "What did you actually do with today? Hours, not vibes.\n" +
+  "\n" +
+  "What did you avoid, and what were you afraid would happen?\n" +
+  "  recall What did you avoid, and what were you afraid would happen?\n";
 
 function uDoc(...s) {
   return doc(db, "users", uid, ...s);
@@ -72,12 +76,12 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById("authScreen").classList.add("hidden");
     setSyncDot("syncing");
 
-    // seed default question list if none exists yet
+    // seed a default tree if none exists yet
     try {
-      const qSnap = await getDoc(uDoc("state", "questions"));
-      if (!qSnap.exists() || !(qSnap.data().list || []).length) {
-        await setDoc(uDoc("state", "questions"), {
-          list: DEFAULT_QUESTIONS,
+      const tSnap = await getDoc(uDoc("state", "tree"));
+      if (!tSnap.exists() || typeof tSnap.data().text !== "string" || !tSnap.data().text.trim()) {
+        await setDoc(uDoc("state", "tree"), {
+          text: DEFAULT_TREE,
           updatedAt: serverTimestamp(),
         });
       }
@@ -85,9 +89,9 @@ onAuthStateChanged(auth, async (user) => {
       console.error(e);
     }
 
-    onSnapshot(uDoc("state", "questions"), (snap) => {
-      window._questions = snap.exists() ? snap.data().list || [] : [];
-      window._onQuestionsUpdated && window._onQuestionsUpdated();
+    onSnapshot(uDoc("state", "tree"), (snap) => {
+      window._tree = snap.exists() ? (snap.data().text || "") : "";
+      window._onTreeUpdated && window._onTreeUpdated();
       setSyncDot("ok");
     }, () => setSyncDot("err"));
 
@@ -145,17 +149,17 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
-let qSaveTimer = null;
-window._saveQuestions = function (list) {
+let treeSaveTimer = null;
+window._saveTree = function (text) {
   if (!uid) return;
   // debounced: writing on every keystroke round-trips through the onSnapshot
-  // listener fast enough to rebuild the question list mid-type and steal focus
-  // (the mobile keyboard-closing bug). Batch rapid edits into one write.
-  clearTimeout(qSaveTimer);
-  qSaveTimer = setTimeout(async () => {
+  // listener fast enough to rebuild the editor mid-type and steal focus (the
+  // mobile keyboard-closing bug). Batch rapid edits into one write.
+  clearTimeout(treeSaveTimer);
+  treeSaveTimer = setTimeout(async () => {
     setSyncDot("syncing");
     try {
-      await setDoc(uDoc("state", "questions"), { list, updatedAt: serverTimestamp() });
+      await setDoc(uDoc("state", "tree"), { text, updatedAt: serverTimestamp() });
       setSyncDot("ok");
     } catch (e) {
       setSyncDot("err");

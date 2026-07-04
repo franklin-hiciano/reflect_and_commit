@@ -1,22 +1,29 @@
 // Reflect & Commit — voice-first, low-attention, with bounded branching.
 //
-// The question list is a tree walked top-to-bottom. Most nodes are free-text
-// (voice or type; a pause advances). A node can be a 2-way CHOICE: the question
-// shows two tap options, each leading into its own short branch of follow-ups.
-// Branches rejoin the main line automatically (DFS over the tree). Branching is
-// one level deep by design — enough for "did you meet it? → why / why not".
+// The question tree is authored as plain DSL text (js/tree-model.js) — that
+// text IS the tree; there's no separate array schema to keep in sync (see
+// js/dsl-editor.js for the editor + node canvas that write it). Most nodes
+// are free-text (voice or type; a pause advances). A node can be a CHOICE:
+// the question shows tap-able options, each leading into its own follow-up.
 //
-// The star marks where the nightly MINIMUM ends: the walk starts at the top and,
-// on answering the starred node, offers commit (with "keep reflecting" to go on).
+// The star marks where the nightly MINIMUM ends: the walk starts at the top
+// and, on answering the starred node, offers commit (with "keep reflecting"
+// to go on).
 //
-// Everything autosaves so a half-finished night resumes exactly where you left it.
+// Any question can recall any OTHER question's past answers (set via the
+// node canvas's recall icon, or by writing `recall <title>` under it) —
+// answers are logged locally per question title as they're given, so a
+// recall target doesn't need to have been asked earlier in THIS session.
+//
+// Everything autosaves so a half-finished night resumes exactly where you
+// left it.
 
-const LS_DRAFT = "rc_draft_v4";
-const LS_QLIST = "rc_questions_v4";
+const LS_TREE = "rc_tree_v1";
+const LS_DRAFT = "rc_draft_v5";
 const LS_SETTINGS = "rc_settings_v3";
 const LS_LASTNOTIF = "rc_last_notif_v3";
 
-var questions = []; // classic <script>, top-level var == window.questions — tree-editor.js reads/writes the same array via that name
+var dslText = ""; // classic <script>, top-level var == window.dslText — dsl-editor.js reads/writes the same string via that name
 let settings = { notifyTime: "20:00" };
 let commitments = [];
 let chatCollapsed = false;
@@ -27,8 +34,8 @@ let draft = blankDraft();
 function isPhone() { return isMobileUA() || (window.matchMedia("(pointer: coarse)").matches && window.innerWidth < 820); }
 
 function blankDraft() {
-  return { active: false, phase: null, mode: "min", currentId: null, answers: {},
-           history: [], checkinId: null, resumeId: null, lastQuestionId: null,
+  return { active: false, phase: null, mode: "min", currentName: null, answers: {},
+           history: [], checkinId: null, resumeName: null, lastQuestionName: null,
            commitText: "", commitDue: "", committed: false, day: null };
 }
 // the calendar day a draft belongs to — a draft left over from a PREVIOUS day
@@ -41,110 +48,71 @@ const HOLD_MS = 1000;
 
 // ---------- local persistence ----------
 function loadLocal() {
-  try { questions = JSON.parse(localStorage.getItem(LS_QLIST) || "[]"); } catch (_) {}
+  try { dslText = localStorage.getItem(LS_TREE) || ""; } catch (_) {}
   try { settings = JSON.parse(localStorage.getItem(LS_SETTINGS) || "null") || settings; } catch (_) {}
   try { draft = JSON.parse(localStorage.getItem(LS_DRAFT) || "null") || draft; } catch (_) {}
 }
-function saveLocalQuestions() { localStorage.setItem(LS_QLIST, JSON.stringify(questions)); }
+function saveLocalTree() { localStorage.setItem(LS_TREE, dslText || ""); }
 function saveLocalSettings() { localStorage.setItem(LS_SETTINGS, JSON.stringify(settings)); }
 function saveDraft() { localStorage.setItem(LS_DRAFT, JSON.stringify(draft)); window._saveDraft && window._saveDraft(draft); }
 loadLocal();
 
-// ---------- tree helpers ----------
-function ensureShape(node, isRoot) {
-  node.type = node.type || "text";
-  if (node.recall === undefined) node.recall = false;
-  if (isRoot && node.star === undefined) node.star = false;
-  if (node.type === "choice") {
-    // migrate the old shape (each option owned its own branch) to the new one:
-    // any number of options, each pointing at one of (at most) two branches A/B.
-    if (node.options && node.options[0] && node.options[0].branch && !node.branches) {
-      node.branches = node.options.map((o) => o.branch || []).slice(0, 2);
-      node.options = node.options.map((o, i) => ({ label: o.label || "", exit: Math.min(i, 1) }));
-    }
-    node.options = node.options && node.options.length ? node.options : [{ label: "yes", exit: 0 }, { label: "no", exit: 1 }];
-    node.branches = node.branches && node.branches.length ? node.branches.slice(0, 2) : [[], []];
-    while (node.branches.length < 2) node.branches.push([]);
-    node.options.forEach((o) => { o.label = o.label || ""; o.exit = o.exit === 1 ? 1 : 0; });
-    node.branches.forEach((br) => br.forEach((b) => ensureShape(b, false)));
+// ---------- tree access — everything derives fresh off dslText via
+// TreeModel; there's no id-keyed index to keep in sync (see the old
+// nodeIndex/ensureShape/normalizeTree this replaced). Trees here are small
+// (a handful of questions), so re-parsing on each call is cheap. ──────────
+function getParsed() { return window.TreeModel.parse(dslText); }
+function resolveBlock(name) { return window.TreeModel.resolveName(getParsed(), name); }
+function starBlock() { return (getParsed().blocks || []).find((b) => b.star) || null; }
+function currentNode() { return resolveBlock(draft.currentName); }
+function computeNext(block) {
+  const TM = window.TreeModel;
+  const parsed = getParsed();
+  if (!block) return null;
+  if (block.type === "text") {
+    if (block.terminal || (block.next && block.next.isDone)) return null;
+    if (block.next) return TM.resolveName(parsed, block.next.target) || null;
+    return null;
   }
-  return node;
-}
-function normalizeTree(list) { (list || []).forEach((n) => ensureShape(n, true)); return list || []; }
-
-// External index — NEVER attach runtime fields (list/owner refs) onto the
-// question objects themselves. That was the earlier bug: a node's _owner
-// pointed at its parent choice node, which itself carried a _list pointing
-// back down — a genuine circular structure, so JSON.stringify(questions)
-// (every save) threw, silently killing whatever ran after it (the "+" button
-// and drag-drop both call persistQuestions() first, so they looked dead).
-let nodeIndex = new Map(); // id -> { list, i, ownerId (choice node id), exit }
-function indexTree(list, ownerId, exit) {
-  list.forEach((n, i) => {
-    nodeIndex.set(n.id, { list, i, ownerId: ownerId || null, exit });
-    if (n.type === "choice" && n.branches) n.branches.forEach((br, bi) => indexTree(br || (n.branches[bi] = []), n.id, bi));
-  });
-}
-function reindex() { nodeIndex = new Map(); indexTree(questions, null); }
-function findNode(id) {
-  const meta = nodeIndex.get(id);
-  return meta ? meta.list[meta.i] : null;
-}
-function siblingAfter(node) {
-  const meta = nodeIndex.get(node.id);
-  if (!meta) return null;
-  if (meta.list[meta.i + 1]) return meta.list[meta.i + 1];
-  if (meta.ownerId) return siblingAfter(findNode(meta.ownerId));
+  const ans = draft.answers[block.name];
+  const opt = ans && block.options ? block.options[ans.optIndex] : null;
+  if (!opt || opt.isDone) return null;
+  if (opt.target) return TM.resolveName(parsed, opt.target) || null;
   return null;
 }
-function computeNext(node) {
-  if (node.type === "choice") {
-    const a = draft.answers[node.id];
-    // an option can be marked `terminal` (the DSL's ">> done") — chosen, it
-    // ends the reflection right there instead of falling into its branch or
-    // rejoining whatever comes after this question. Purely additive: options
-    // without this field behave exactly as they always have.
-    const optIndex = a && typeof a === "object" ? a.optIndex : null;
-    const opt = optIndex != null ? (node.options || [])[optIndex] : null;
-    if (opt && opt.terminal) return null;
-    const exit = a && typeof a === "object" ? a.exit : null;
-    if (exit != null && node.branches[exit] && node.branches[exit].length) return node.branches[exit][0];
-    return siblingAfter(node);
-  }
-  // same idea for a plain question explicitly marked as a hard stop.
-  if (node.terminal) return null;
-  return siblingAfter(node);
-}
-function starNode() { return questions.find((q) => q.star) || null; }
-function currentNode() { return findNode(draft.currentId); }
+
+// ── writes: the ONE entry point that ever changes the tree. Editor UI
+// (js/dsl-editor.js) always calls this instead of touching `dslText`
+// directly, so persistence + re-render always happen together. ──────────
+window.setDslText = function (newText, selRange) {
+  dslText = newText || "";
+  saveLocalTree();
+  window._saveTree && window._saveTree(dslText);
+  window.renderDslEditor();
+  if (typeof window._renderTreeGraph === "function") window._renderTreeGraph();
+};
 
 // ---------- firestore hooks ----------
-let lastRenderedQuestionsJSON = null;
-window._onQuestionsUpdated = () => {
-  if (window._questions && window._questions.length) {
-    questions = normalizeTree(window._questions);
-    saveLocalQuestions();
+let lastRenderedTree = null;
+window._onTreeUpdated = () => {
+  if (typeof window._tree === "string") {
+    dslText = window._tree;
+    saveLocalTree();
+    // skip the rebuild entirely while the editor textarea is focused — a
+    // Firestore round-trip landing mid-keystroke would otherwise fight the
+    // cursor (same guard the old array-based editor used).
     const ae = document.activeElement;
-    // skip the rebuild entirely while any control inside the editor is
-    // focused (not just text fields) — a full rebuild every ~500ms mid-edit
-    // (each keystroke round-trips through the debounced Firestore write and
-    // back through this listener) is what was reading as "flickering".
-    if (ae && ae.closest && ae.closest("#treeEditor")) return;
-    // also skip if this echo is identical to what's already on screen — an
-    // idle Firestore round-trip (e.g. the server ack of your own last write)
-    // otherwise rebuilds the whole list for no visible reason, which is what
-    // reads as a flicker even while just hovering, not typing.
-    const json = JSON.stringify(questions);
-    if (json === lastRenderedQuestionsJSON) return;
-    lastRenderedQuestionsJSON = json;
-    renderTreeEditor();
+    if (ae && ae.id === "dslTextarea") return;
+    if (dslText === lastRenderedTree) return;
+    lastRenderedTree = dslText;
+    window.renderDslEditor();
   }
 };
 window._onSettingsUpdated = () => { if (window._settings && window._settings.notifyTime) { settings = window._settings; saveLocalSettings(); renderSettings(); } };
 window._onCommitmentsUpdated = () => { commitments = window._commitments || []; };
 window._onDraftUpdated = () => { const rd = window._remoteDraft; if (rd && rd.active && !draft.active) { draft = { ...blankDraft(), ...rd }; localStorage.setItem(LS_DRAFT, JSON.stringify(draft)); } };
 window._onSignedIn = () => {
-  normalizeTree(questions); renderTreeEditor(); renderSettings(); scheduleNotificationLoop();
+  window.renderDslEditor(); renderSettings(); scheduleNotificationLoop();
   routeAfterAuth(); maybeOpenFromUrl();
   if ("Notification" in window && Notification.permission === "granted") window._registerPush && window._registerPush(deviceKind());
   window._claimActiveDevice && window._claimActiveDevice(deviceKind());
@@ -251,8 +219,7 @@ function maybeOpenFromUrl() { const p = new URLSearchParams(location.search); if
 // back here; mobile's copy just sends you to desktop — no round-trip is
 // asked of the phone, since tonight's notification still lands here either
 // way. Dismissing ("Not now") only closes it for this visit: it reappears
-// next time you open the app, or after your next commitment (see
-// run-engine.js's endCommit), until the pairing is actually done.
+// next time you open the app, or after your next commitment (see doCommit).
 function otherKind() { return isPhone() ? "desktop" : "mobile"; }
 function otherDeviceSeen() { return !!(window._onboarding && window._onboarding[otherKind() + "SeenAt"]); }
 function qrSrcFor(url) {
@@ -393,16 +360,9 @@ window.openTimePicker = (btn) => {
 };
 window.toggleSettingsPanel = () => { const p = document.getElementById("settingsPanel"); if (p) p.classList.toggle("on"); };
 
-// ---------- tree editor ----------
-// The click-heavy list (drag handle + star + recall + delete + split/merge
-// icons behind a modal "edit mode") lived here before. It's now a block
-// editor (app/js/tree-editor.js) plus a read-only graph view
-// (app/js/dsl-graph.js) rendered above it — both operate directly on this
-// same `questions` array via window.renderTreeEditor()/persistQuestions(),
-// so nothing about save/sync/reflect changes, only how a tree gets authored.
-// A plain-text form of the same tree (app/js/dsl.js) is available as an
-// optional import/export path — "paste tree" / "copy as text" below — for
-// backup or writing a tree somewhere else; it's never required to use the app.
+// ---------- tree editor (js/dsl-editor.js) ----------
+// The DSL text IS the tree now — "paste tree" / "copy as text" just read or
+// replace that text directly, no separate import/export format needed.
 window.openPasteTree = () => {
   const m = document.getElementById("pasteTreeModal"); if (!m) return;
   const ta = document.getElementById("pasteTreeArea"); if (ta) ta.value = "";
@@ -412,29 +372,20 @@ window.openPasteTree = () => {
 window.closePasteTree = () => { const m = document.getElementById("pasteTreeModal"); if (m) m.classList.remove("on"); };
 window.confirmPasteTree = () => {
   const ta = document.getElementById("pasteTreeArea");
-  const text = ta ? ta.value : "";
+  const t = ta ? ta.value : "";
   // opening this modal and hitting "replace" already IS the deliberate
   // confirmation, so skip the (redundant) native confirm() inside pasteTreeFromText.
-  const warnings = window.pasteTreeFromText(text, true);
+  window.pasteTreeFromText(t, true);
   window.closePasteTree();
-  if (warnings && warnings.length) alert(warnings.join("\n"));
 };
 window.copyTreeButton = async (btn) => {
-  const text = await window.copyTreeAsText();
-  if (!text) return;
+  const t = await window.copyTreeAsText();
+  if (!t) return;
   const b = btn && btn.currentTarget ? btn.currentTarget : btn;
   if (b && "textContent" in b) {
     const orig = b.textContent; b.textContent = "copied"; setTimeout(() => { b.textContent = orig; }, 1100);
   }
 };
-window.toggleGraphPanel = () => {
-  const p = document.getElementById("treeGraph"); const b = document.getElementById("editToggle");
-  if (!p) return;
-  const collapsed = p.classList.toggle("collapsed");
-  if (b) b.classList.toggle("on", !collapsed);
-  localStorage.setItem("rc_graph_collapsed", collapsed ? "1" : "0");
-};
-function persistQuestions() { saveLocalQuestions(); window._saveQuestions && window._saveQuestions(questions); }
 function escapeHtml(s) { return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
 // ---------- day-after check-in gate ----------
@@ -443,7 +394,7 @@ function dueCommitment() { const today = new Date(); today.setHours(0, 0, 0, 0);
 // ---------- reflection ----------
 async function openReflection() {
   if (!withinReflectWindow()) { document.getElementById("nextAvailLabel").textContent = nextScheduledLabel(); showScreen("unavailableScreen"); return; }
-  showScreen("reflectScreen"); reindex();
+  showScreen("reflectScreen");
   // always reconcile against the server's true draft before deciding whether
   // to resume — trusting the locally-merged copy was the "starts over on the
   // other device" bug: a background listener can race or simply not have
@@ -461,7 +412,6 @@ async function openReflection() {
   startWalk();
 }
 function resumePhase() {
-  reindex();
   if (draft.phase === "checkin") { const due = dueCommitment(); return due ? enterCheckin(due) : startWalk(); }
   if (draft.phase === "question") return renderChat();
   if (draft.phase === "commit") return enterCommit();
@@ -469,10 +419,13 @@ function resumePhase() {
   startWalk();
 }
 function startWalk() {
-  reindex();
-  const first = questions[0];
+  const TM = window.TreeModel;
+  const parsed = getParsed();
+  const graph = TM.buildGraph(parsed);
+  const roots = graph.roots.slice().sort((a, b) => a.rawLine - b.rawLine);
+  const first = roots[0] || parsed.blocks[0];
   if (!first) return enterCommit();
-  draft.phase = "question"; draft.currentId = first.id; draft.history = []; saveDraft();
+  draft.phase = "question"; draft.currentName = first.name; draft.history = []; saveDraft();
   renderChat();
 }
 
@@ -487,7 +440,6 @@ window.resolveCheckin = (status) => { if (draft.checkinId) window._resolveCommit
 function setCollapseVisible(v) { const c = document.getElementById("reflectCollapse"); if (c) c.style.display = v ? "block" : "none"; }
 
 function renderChat() {
-  reindex();
   const node = currentNode();
   if (!node) return afterQuestions();
   setPhase("phaseChat");
@@ -497,16 +449,16 @@ function renderChat() {
   const scroll = document.getElementById("chatScroll");
   scroll.classList.toggle("collapsed", chatCollapsed);
   scroll.innerHTML = "";
-  draft.history.forEach((id) => {
-    const n = findNode(id); if (!n) return;
-    const a = draft.answers[id];
+  draft.history.forEach((name) => {
+    const n = resolveBlock(name); if (!n) return;
+    const a = draft.answers[name];
     const ans = a && typeof a === "object" ? a.label : (a || "");
     const item = document.createElement("div"); item.className = "chat-item past";
-    item.innerHTML = `<div class="chat-q">${escapeHtml(n.text)}</div><div class="chat-a">${escapeHtml(ans)}</div>`;
+    item.innerHTML = `<div class="chat-q">${escapeHtml(n.name)}</div><div class="chat-a">${escapeHtml(ans)}</div>`;
     scroll.appendChild(item);
   });
   const cur = document.createElement("div"); cur.className = "chat-item current";
-  cur.innerHTML = `<div class="chat-q big">${escapeHtml(node.text)}</div>`;
+  cur.innerHTML = `<div class="chat-q big">${escapeHtml(node.name)}</div>`;
   scroll.appendChild(cur);
   scroll.scrollTop = scroll.scrollHeight;
 
@@ -519,19 +471,19 @@ function renderChat() {
     stopVoice();
     bar.style.display = "none"; recall.style.display = "none";
     choices.style.display = "flex"; choices.innerHTML = "";
-    node.options.forEach((opt, k) => {
-      const b = document.createElement("button"); b.className = "q-choice"; b.textContent = opt.label || (k === 0 ? "yes" : "no");
+    (node.options || []).forEach((opt, k) => {
+      const b = document.createElement("button"); b.className = "q-choice"; b.textContent = opt.label || ("option " + (k + 1));
       b.onclick = () => { b.classList.add("chosen"); chooseOption(node, k); };
       choices.appendChild(b);
     });
   } else {
     choices.style.display = "none"; bar.style.display = "flex";
     const field = document.getElementById("answerField");
-    field.value = typeof draft.answers[node.id] === "string" ? draft.answers[node.id] : "";
+    field.value = typeof draft.answers[node.name] === "string" ? draft.answers[node.name] : "";
     autoGrow(field);
-    field.oninput = () => { draft.answers[node.id] = field.value; autoGrow(field); saveDraft(); };
+    field.oninput = () => { draft.answers[node.name] = field.value; autoGrow(field); saveDraft(); };
     field.onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); composerSend(); } };
-    if (node.recall) { recall.style.display = "inline-flex"; recall.onclick = () => { const open = recall.classList.toggle("open"); rlist.classList.toggle("open", open); if (open) fillRecall(node, rlist); }; }
+    if (node.recallTarget) { recall.style.display = "inline-flex"; recall.onclick = () => { const open = recall.classList.toggle("open"); rlist.classList.toggle("open", open); if (open) fillRecall(node, rlist); }; }
     else recall.style.display = "none";
     updateMicBtn();
     setTimeout(() => field.focus(), 60);
@@ -569,7 +521,7 @@ window._onHandoffUpdated = async () => {
   const fresh = await (window._fetchLatestDraft ? window._fetchLatestDraft() : null);
   if (fresh && fresh.active) { draft = { ...blankDraft(), ...fresh }; localStorage.setItem(LS_DRAFT, JSON.stringify(draft)); }
   window.takeOverDevice && window.takeOverDevice(); // consuming a hand-off is an explicit claim to be the active device
-  if (draft.active && draft.phase && draft.day === todayKey()) { showScreen("reflectScreen"); reindex(); resumePhase(); }
+  if (draft.active && draft.phase && draft.day === todayKey()) { showScreen("reflectScreen"); resumePhase(); }
   else openReflection();
 };
 
@@ -587,46 +539,56 @@ window._onActiveDeviceUpdated = () => {
 };
 window.takeOverDevice = () => { window._claimActiveDevice && window._claimActiveDevice(deviceKind()); };
 
+// answer history is logged per QUESTION TITLE (normalized), regardless of
+// whether that question itself recalls anything — any OTHER question can
+// later choose to recall it via the canvas's recall icon.
 function submitText(node) {
-  const ans = (draft.answers[node.id] || "").trim();
-  if (ans) { const k = "rc_answer_hist_" + node.id; let h = []; try { h = JSON.parse(localStorage.getItem(k) || "[]"); } catch (_) {} h.unshift({ a: ans, t: Date.now() }); localStorage.setItem(k, JSON.stringify(h.slice(0, 30))); }
+  const TM = window.TreeModel;
+  const ans = (draft.answers[node.name] || "").trim();
+  if (ans) { const k = "rc_answer_hist_" + TM.norm(node.name); let h = []; try { h = JSON.parse(localStorage.getItem(k) || "[]"); } catch (_) {} h.unshift({ a: ans, t: Date.now() }); localStorage.setItem(k, JSON.stringify(h.slice(0, 30))); }
   advanceFrom(node);
 }
 function chooseOption(node, k) {
-  const opt = node.options[k];
-  draft.answers[node.id] = { optIndex: k, label: opt.label, exit: opt.exit || 0 }; saveDraft();
+  const opt = (node.options || [])[k];
+  draft.answers[node.name] = { optIndex: k, label: opt.label }; saveDraft();
   advanceFrom(node);
 }
 function advanceFrom(node) {
-  stopVoice(); reindex();
-  const fresh = findNode(node.id) || node;
-  const star = starNode();
-  if (draft.mode !== "full" && star && star.id === fresh.id) {
-    const nx = computeNext(fresh); draft.resumeId = nx ? nx.id : null; draft.lastQuestionId = fresh.id; saveDraft(); return enterCommit();
+  stopVoice();
+  const fresh = resolveBlock(node.name) || node;
+  const star = starBlock();
+  if (draft.mode !== "full" && star && star.name === fresh.name) {
+    const nx = computeNext(fresh); draft.resumeName = nx ? nx.name : null; draft.lastQuestionName = fresh.name; saveDraft(); return enterCommit();
   }
   const nx = computeNext(fresh);
-  if (!nx) { draft.lastQuestionId = fresh.id; draft.resumeId = null; saveDraft(); return afterQuestions(); }
-  draft.history.push(fresh.id); draft.currentId = nx.id; saveDraft(); renderChat();
+  if (!nx) { draft.lastQuestionName = fresh.name; draft.resumeName = null; saveDraft(); return afterQuestions(); }
+  draft.history.push(fresh.name); draft.currentName = nx.name; saveDraft(); renderChat();
 }
 function afterQuestions() { stopVoice(); if (draft.mode === "full") return finishSession(); enterCommit(); }
 
+// `node.recallTarget` is a question TITLE this question recalls (may be a
+// different question, or itself) — resolved fresh each time in case titles
+// were edited since the recall link was made.
 function fillRecall(node, el) {
-  let h = []; try { h = JSON.parse(localStorage.getItem("rc_answer_hist_" + node.id) || "[]"); } catch (_) {}
+  const TM = window.TreeModel;
+  const target = TM.resolveName(getParsed(), node.recallTarget);
+  const key = "rc_answer_hist_" + TM.norm(target ? target.name : node.recallTarget);
+  let h = []; try { h = JSON.parse(localStorage.getItem(key) || "[]"); } catch (_) {}
   if (!h.length) { el.innerHTML = "<div class='recall-empty'>nothing here yet</div>"; return; }
   el.innerHTML = h.slice(0, 10).map((x) => `<div class="recall-item"><span class="recall-date">${new Date(x.t).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>${escapeHtml(x.a)}</div>`).join("");
 }
 
 // -- back --
 window.goBackPhase = () => {
-  if (draft.phase === "question") { if (draft.history.length) { draft.currentId = draft.history.pop(); saveDraft(); renderChat(); } }
+  if (draft.phase === "question") { if (draft.history.length) { draft.currentName = draft.history.pop(); saveDraft(); renderChat(); } }
   else if (draft.phase === "commit") {
-    reindex();
-    // lastQuestionId should always be set on the way into commit, but fall
+    // lastQuestionName should always be set on the way into commit, but fall
     // back to the last history entry (or the top of the list) rather than
     // silently doing nothing if it's ever missing.
-    const target = draft.lastQuestionId || draft.history[draft.history.length - 1] || (questions[0] && questions[0].id);
+    const parsed = getParsed();
+    const target = draft.lastQuestionName || draft.history[draft.history.length - 1] || (parsed.blocks[0] && parsed.blocks[0].name);
     if (!target) return;
-    draft.phase = "question"; draft.currentId = target; saveDraft(); renderChat();
+    draft.phase = "question"; draft.currentName = target; saveDraft(); renderChat();
   }
   else if (draft.phase === "done") { enterCommit(); }
 };
@@ -655,16 +617,26 @@ function renderDueSelect() {
   draft.commitDue = sel.value; saveDraft();
 }
 window.onCommitDueChange = (v) => { draft.commitDue = v; saveDraft(); };
-function doCommit() { const text = (draft.commitText || "").trim(); if (text) window._addCommitment && window._addCommitment({ text, dueDate: draft.commitDue }); if (navigator.vibrate) navigator.vibrate(12); draft.committed = true; enterDone(true); }
+function doCommit() {
+  const text = (draft.commitText || "").trim();
+  if (text) window._addCommitment && window._addCommitment({ text, dueDate: draft.commitDue });
+  if (navigator.vibrate) navigator.vibrate(12);
+  draft.committed = true;
+  enterDone(true);
+  // right after a real commitment is a good moment to nudge toward pairing
+  // the other device, if that hasn't happened yet — no-ops once both
+  // devices are installed.
+  window.maybeShowOtherDeviceGate && window.maybeShowOtherDeviceGate();
+}
 window.skipCommit = () => { draft.committed = false; enterDone(false); };
 
 // -- done --
 function enterDone(committed) {
   stopVoice(); draft.phase = "done"; saveDraft(); setPhase("phaseDone"); setBackVisible(true); setCollapseVisible(false);
   document.getElementById("doneText").textContent = committed ? "committed. see you tomorrow." : "logged. see you tomorrow.";
-  const kg = document.getElementById("keepGoingBtn"); kg.style.display = draft.resumeId ? "block" : "none";
+  const kg = document.getElementById("keepGoingBtn"); kg.style.display = draft.resumeName ? "block" : "none";
 }
-window.keepReflecting = () => { draft.mode = "full"; draft.commitText = ""; draft.history = []; draft.currentId = draft.resumeId; draft.phase = "question"; saveDraft(); renderChat(); };
+window.keepReflecting = () => { draft.mode = "full"; draft.commitText = ""; draft.history = []; draft.currentName = draft.resumeName; draft.phase = "question"; saveDraft(); renderChat(); };
 
 function finishSession() { window._saveSession && window._saveSession({ answers: draft.answers }); draft = blankDraft(); saveDraft(); window._clearDraft && window._clearDraft(); goHome(); }
 window.exitReflection = () => { stopVoice(); goHome(); };
@@ -697,10 +669,9 @@ window.toggleMic = () => {
   if (micActive) stopVoice(); else startVoice(document.getElementById("answerField"));
 };
 function updateMicBtn() { const b = document.getElementById("micBtn"); if (b) { b.classList.toggle("active", micActive); b.style.display = SR ? "flex" : "none"; } }
-// SILENCE_MS existed as a defined-but-never-wired constant — this is that
-// wiring: once you've said something and then gone quiet for SILENCE_MS,
-// send it, same as if you'd tapped the send button. One less tap per
-// question when you're talking instead of typing.
+// once you've said something and then gone quiet for SILENCE_MS, send it,
+// same as if you'd tapped the send button. One less tap per question when
+// you're talking instead of typing.
 function armVoiceSilence() {
   clearTimeout(voiceSilenceTimer);
   voiceSilenceTimer = setTimeout(() => {
@@ -717,7 +688,7 @@ function startVoice(field) {
       for (let i = e.resultIndex; i < e.results.length; i++) { const t = e.results[i][0].transcript; if (e.results[i].isFinal) final += t; else interim += t; }
       if (final) voiceBase = (voiceBase + final).replace(/\s+/g, " ").replace(/^\s/, "") + " ";
       voiceField.value = (voiceBase + interim).trimStart(); autoGrow(voiceField);
-      const n = currentNode(); if (n) draft.answers[n.id] = voiceField.value;
+      const n = currentNode(); if (n) draft.answers[n.name] = voiceField.value;
       saveDraft();
       if ((final || interim).trim()) { voiceHeardAnything = true; armVoiceSilence(); }
     };
@@ -735,9 +706,5 @@ function stopVoice() {
 
 // ---------- boot ----------
 document.addEventListener("DOMContentLoaded", () => {
-  normalizeTree(questions); renderTreeEditor(); renderSettings();
-  const graphCollapsed = localStorage.getItem("rc_graph_collapsed") === "1";
-  const gp = document.getElementById("treeGraph"), gb = document.getElementById("editToggle");
-  if (gp) gp.classList.toggle("collapsed", graphCollapsed);
-  if (gb) gb.classList.toggle("on", !graphCollapsed);
+  window.renderDslEditor(); renderSettings();
 });

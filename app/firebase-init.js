@@ -69,7 +69,16 @@ window.doSignOut = async () => {
   await fbSignOut(auth);
 };
 
+// every onSnapshot below is torn down on sign-out (and before re-subscribing
+// on sign-in) — otherwise signing out and back in in the same tab piles up a
+// second full set of listeners still bound to the PREVIOUS uid, racing the
+// new ones and randomly resurfacing stale tree/onboarding data over
+// whatever the new session just wrote.
+let unsubscribers = [];
+function teardownListeners() { unsubscribers.forEach((fn) => fn()); unsubscribers = []; }
+
 onAuthStateChanged(auth, async (user) => {
+  teardownListeners();
   if (user) {
     uid = user.uid;
     window._uid = uid;
@@ -96,56 +105,56 @@ onAuthStateChanged(auth, async (user) => {
       console.error(e);
     }
 
-    onSnapshot(uDoc("state", "tree"), (snap) => {
+    unsubscribers.push(onSnapshot(uDoc("state", "tree"), (snap) => {
       window._tree = snap.exists() ? (snap.data().text || "") : "";
       window._onTreeUpdated && window._onTreeUpdated();
       setSyncDot("ok");
-    }, () => setSyncDot("err"));
+    }, () => setSyncDot("err")));
 
-    onSnapshot(uDoc("state", "settings"), (snap) => {
+    unsubscribers.push(onSnapshot(uDoc("state", "settings"), (snap) => {
       window._settings = snap.exists() ? snap.data() : {};
       window._onSettingsUpdated && window._onSettingsUpdated();
-    }, () => {});
+    }, () => {}));
 
-    onSnapshot(uDoc("state", "draft"), (snap) => {
+    unsubscribers.push(onSnapshot(uDoc("state", "draft"), (snap) => {
       window._remoteDraft = snap.exists() ? snap.data() : null;
       window._onDraftUpdated && window._onDraftUpdated();
-    }, () => {});
+    }, () => {}));
 
-    onSnapshot(query(uCol("commitments"), orderBy("createdAt", "desc")), (snap) => {
+    unsubscribers.push(onSnapshot(query(uCol("commitments"), orderBy("createdAt", "desc")), (snap) => {
       window._commitments = snap.docs.map((d) => ({
         id: d.id,
         ...d.data(),
         createdAt: d.data().createdAt?.toDate?.()?.toISOString?.() ?? d.data().createdAt,
       }));
       window._onCommitmentsUpdated && window._onCommitmentsUpdated();
-    }, () => {});
+    }, () => {}));
 
     // hand-off signal: written when you tap "continue on your computer" on
     // one device. Any other device (that isn't itself a phone) listening in
     // real time picks it up instantly if it's already open — the push-based
     // fallback below is only needed when the target device isn't open.
-    onSnapshot(uDoc("state", "handoff"), (snap) => {
+    unsubscribers.push(onSnapshot(uDoc("state", "handoff"), (snap) => {
       window._handoff = snap.exists() ? snap.data() : null;
       window._onHandoffUpdated && window._onHandoffUpdated();
-    }, () => {});
+    }, () => {}));
 
     // only one device is ever "active" — every other open device shades
     // itself (app.js renders the overlay) until it explicitly takes over.
-    onSnapshot(uDoc("state", "activeDevice"), (snap) => {
+    unsubscribers.push(onSnapshot(uDoc("state", "activeDevice"), (snap) => {
       window._activeDevice = snap.exists() ? snap.data() : null;
       window._onActiveDeviceUpdated && window._onActiveDeviceUpdated();
-    }, () => {});
+    }, () => {}));
 
     // cross-device install-gate onboarding — a persistent, one-way record of
     // "a mobile device has signed in" / "a desktop device has signed in",
     // never cleared. This is what lets the install gate auto-advance the
     // instant the OTHER device signs in, independent of whichever device is
     // currently "active".
-    onSnapshot(uDoc("state", "onboarding"), (snap) => {
+    unsubscribers.push(onSnapshot(uDoc("state", "onboarding"), (snap) => {
       window._onboarding = snap.exists() ? snap.data() : {};
       window._onOnboardingUpdated && window._onOnboardingUpdated();
-    }, () => {});
+    }, () => {}));
 
     window._onSignedIn && window._onSignedIn();
   } else {

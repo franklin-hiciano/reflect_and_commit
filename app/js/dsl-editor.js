@@ -48,7 +48,7 @@
           '<div class="pane-label">dsl editor</div>' +
           '<div class="dsl-editor-wrap">' +
             '<div class="dsl-inner" id="dslInner">' +
-              '<textarea id="dslTextarea" class="dsl-textarea" spellcheck="false" placeholder="write your first question…"></textarea>' +
+              '<textarea id="dslTextarea" class="dsl-textarea" spellcheck="false" wrap="off" placeholder="write your first question…"></textarea>' +
             "</div>" +
           "</div>" +
         "</div>" +

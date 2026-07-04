@@ -7,11 +7,11 @@
             content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"
         />
         <title>Reflect &amp; Commit</title>
-        <link rel="stylesheet" href="app/style.css" />
-        <link rel="manifest" href="app/manifest.json" />
+        <link rel="stylesheet" href="style.css" />
+        <link rel="manifest" href="manifest.json" />
         <meta name="theme-color" content="#0a0a0b" />
-        <link rel="apple-touch-icon" href="app/icons/apple-touch-icon.png" />
-        <link rel="icon" href="app/icons/icon-192.png" />
+        <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+        <link rel="icon" href="icons/icon-192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta
             name="apple-mobile-web-app-status-bar-style"
@@ -36,10 +36,11 @@
         </div>
 
         <!-- LANDING — same near-black, same fonts as the app itself. Just a
-         quiet doorway, not a separate world. Three sub-steps, one visible
-         at a time: intro (tagline lives ONLY here) → cross-device install
-         gate (clean, centered, nothing else on screen) → this device's
-         own install. -->
+         quiet doorway, not a separate world. Two sub-steps, one visible at a
+         time: intro (tagline lives ONLY here) → install THIS device. The
+         cross-device ask ("now get the other one too") happens afterwards,
+         as an overlay on top of the home screen (#otherDeviceGate below) —
+         not before you've even installed the device in front of you. -->
         <div class="screen" id="landingScreen">
             <div class="landing-inner" id="landingIntro">
                 <div class="auth-logo">
@@ -141,10 +142,10 @@
                 </button>
             </div>
             <div class="home-body">
-                <!-- app/js/dsl-editor.js builds everything inside here: the
+                <!-- js/dsl-editor.js builds everything inside here: the
              duplicate/multi-root warning banner, the mobile pane switcher,
              the dsl-editor + node-canvas split, and the version-history
-             slider. See app/js/tree-model.js for the DSL grammar itself. -->
+             slider. See js/tree-model.js for the DSL grammar itself. -->
                 <div id="dslHome" class="dsl-home"></div>
                 <div class="tree-io-row">
                     <button class="btn-quiet" onclick="openPasteTree()">
@@ -197,7 +198,9 @@
             </div>
 
             <!-- questions are meant to be written on desktop; mobile can still
-           edit, it just asks first every time, until dismissed for good -->
+           edit, it just asks first every time, until dismissed for good.
+           Only relevant once the pairing below is actually done — while the
+           other device is still missing, otherDeviceGate takes priority. -->
             <div class="mobile-edit-gate" id="mobileEditGate">
                 <div class="mobile-edit-gate-inner">
                     <div class="mobile-edit-gate-text">
@@ -219,11 +222,14 @@
                 </div>
             </div>
 
-            <!-- cross-device pairing nudge overlay — same element app.js's
-           maybeShowOtherDeviceGate() drives on the app/ variant. Removed a
-           vestigial, never-wired "landingStepOther" step that used to sit
-           here (nothing in app.js — old or new — ever showed it or filled
-           it in; this overlay is the one that's actually functional). -->
+            <!-- cross-device pairing nudge — shown over the home screen (not
+           gating it) whenever THIS device is installed but the other kind
+           has never signed in from a real install. Desktop's copy asks you
+           to install mobile too and come back; mobile's copy sends you to
+           desktop with no round-trip, since the phone's own job (tonight's
+           notification) still happens right here regardless. Dismissing
+           just closes it for now — it reappears next time you open the app,
+           or after your next commitment, until the pairing is done. -->
             <div class="mobile-edit-gate" id="otherDeviceGate">
                 <div class="install-gate">
                     <div
@@ -471,9 +477,9 @@
             </div>
         </div>
 
-        <script type="module" src="app/firebase-init.js?v=17"></script>
-        <script src="app/js/tree-model.js?v=17"></script>
-        <script src="app/js/dsl-editor.js?v=17"></script>
-        <script src="app/js/app.js?v=17"></script>
+        <script type="module" src="firebase-init.js?v=17"></script>
+        <script src="js/tree-model.js?v=17"></script>
+        <script src="js/dsl-editor.js?v=17"></script>
+        <script src="js/app.js?v=17"></script>
     </body>
 </html>

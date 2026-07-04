@@ -155,7 +155,22 @@ function showScreen(id) { document.querySelectorAll(".screen").forEach((s) => s.
 // landing on the home screen: the cross-device nudge takes priority over the
 // (lower-stakes) "editing on phone" reminder — no point warning someone about
 // editing on their phone before they even have the option of a desktop.
+// Hard gate: the home screen (question editor + reflection) is only ever
+// reachable from an actually-installed, standalone launch — never a plain
+// browser tab, even mid-session. If it's not standalone yet, stay right on
+// the install step with a clear nudge — silently resetting all the way back
+// to the tagline screen (no explanation) is what read as "the button
+// doesn't work."
 function enterHome() {
+  if (!isStandalone()) {
+    showScreen("landingScreen");
+    const intro = document.getElementById("landingIntro");
+    const here = document.getElementById("landingStepHere");
+    if (intro && here) { intro.style.display = "none"; here.style.display = "block"; }
+    const explainer = document.getElementById("onboardingExplainer");
+    if (explainer) explainer.textContent = "Almost there — open Reflect & Commit from your home screen (not this browser tab) to finish.";
+    return;
+  }
   showScreen("homeScreen");
   if (!maybeShowOtherDeviceGate()) maybeShowMobileEditGate();
 }
@@ -195,10 +210,6 @@ function resetLandingToIntro() {
   const here = document.getElementById("landingStepHere");
   if (!intro || !here) return;
   intro.style.display = "block"; here.style.display = "none";
-  const btn = document.getElementById("getStartedBtn");
-  const manual = document.getElementById("landingManual");
-  if (btn) btn.style.display = "";
-  if (manual) { manual.style.display = "none"; manual.innerHTML = ""; }
 }
 window.goToInstallGate = () => {
   document.getElementById("landingIntro").style.display = "none";
@@ -210,16 +221,22 @@ window.goToInstallGate = () => {
       ? "You'll get a notification here when it's time to reflect."
       : "Write your questions here — you'll get a notification on your phone when it's time to reflect.";
   }
+  const steps = document.getElementById("landingManualSteps");
+  if (steps) {
+    steps.innerHTML = (isMobileUA()
+      ? ["Open this in Safari or Chrome.", "Tap Share (or ⋮) → Add to Home Screen."]
+      : ["Click the install icon (⊕) in your address bar,", "or ⋮ menu → Install Reflect & Commit."]
+    ).map((s) => "<div>· " + s + "</div>").join("");
+  }
 };
 function maybeOpenFromUrl() { const p = new URLSearchParams(location.search); if (p.get("reflect") === "1") { history.replaceState({}, "", location.pathname); openReflection(); } }
 
-// ---------- cross-device pairing nudge (over the home screen) ----------
+// ---------- cross-device HARD gate (no dismiss) ----------
 // Shown whenever THIS device is installed but the OTHER kind has never
-// actually installed. Desktop's copy asks you to add mobile too and come
-// back here; mobile's copy just sends you to desktop — no round-trip is
-// asked of the phone, since tonight's notification still lands here either
-// way. Dismissing ("Not now") only closes it for this visit: it reappears
-// next time you open the app, or after your next commitment (see doCommit).
+// actually installed. Unlike a dismissible nudge, there is no way past this
+// screen except the other device actually completing its own install —
+// this app is only worth using once both are paired, so it blocks rather
+// than nags.
 function otherKind() { return isPhone() ? "desktop" : "mobile"; }
 function otherDeviceSeen() { return !!(window._onboarding && window._onboarding[otherKind() + "SeenAt"]); }
 function qrSrcFor(url) {
@@ -247,10 +264,7 @@ window.maybeShowOtherDeviceGate = function () {
   gate.classList.add("on");
   return true;
 };
-window.dismissOtherDeviceGate = () => {
-  const gate = document.getElementById("otherDeviceGate");
-  if (gate) gate.classList.remove("on");
-};
+
 
 // ---------- install ----------
 let deferredInstallPrompt = null;
@@ -261,26 +275,19 @@ window.onGetStarted = async () => {
     deferredInstallPrompt.prompt();
     const choice = await deferredInstallPrompt.userChoice;
     deferredInstallPrompt = null;
-    // 'appinstalled' (above) also fires and marks this device seen; this just
-    // moves the screen along right away instead of waiting on that event.
-    if (choice && choice.outcome === "accepted") enterHome();
+    if (choice && choice.outcome === "accepted") { markDeviceSeenIfInstalled(); enterHome(); }
     return;
   }
-  document.getElementById("getStartedBtn").style.display = "none";
-  const manual = document.getElementById("landingManual");
-  manual.style.display = "block";
-  manual.innerHTML = (isMobileUA()
-    ? "tap ⋮ in your browser's toolbar, then Add to Home screen."
-    : "click the install icon (⊕) in your address bar, or ⋮ menu → Install Reflect & Commit.")
-    + '<button class="btn-quiet" style="margin-top:16px;display:block" onclick="onManualInstallDone()">I’ve done this — continue</button>';
+  // no native prompt available (iOS Safari, or install criteria not met in
+  // this environment) — there's no JS signal at all for a manual "Add to
+  // Home Screen", so this is the same best-effort trust the rest of the app
+  // already uses elsewhere: try to proceed. enterHome()'s own hard gate
+  // (isStandalone()) is the real enforcement — if this tab isn't actually
+  // running standalone, it bounces right back here instead of granting
+  // access to a plain browser tab.
+  markDeviceSeenIfInstalled();
+  enterHome();
 };
-// there's no JS signal at all for a manual "Add to Home Screen" (iOS Safari,
-// and anyone who ignores the native prompt and does it by hand) — this is a
-// best-effort "take my word for it and move on" continue button so people
-// aren't stuck on this screen forever. The real confirmation still happens
-// automatically on the NEXT launch, via markDeviceSeenIfInstalled() finding
-// isStandalone() true.
-window.onManualInstallDone = () => { markDeviceSeenIfInstalled(); enterHome(); };
 
 // ---------- notification window ----------
 const REFLECT_WINDOW_MS = 2 * 60 * 60 * 1000;
@@ -333,10 +340,6 @@ if ("serviceWorker" in navigator) {
 function renderSettings() {
   document.querySelectorAll(".notify-time-hidden").forEach((el) => { el.value = settings.notifyTime || "20:00"; });
   renderNotifyLabel();
-  // manual re-entry point for the cross-device nudge, once it's been
-  // dismissed with "Not now" — hidden entirely once the pair is done.
-  const otherBtn = document.getElementById("otherDeviceSettingsBtn");
-  if (otherBtn) otherBtn.style.display = (typeof otherDeviceSeen === "function" && otherDeviceSeen()) ? "none" : "";
 }
 function renderNotifyLabel() {
   const els = document.querySelectorAll(".notify-countdown"); if (!els.length) return;

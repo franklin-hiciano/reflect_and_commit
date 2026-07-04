@@ -79,6 +79,7 @@ onAuthStateChanged(auth, async (user) => {
     // never clearing), at a glance instead of digging through settings.
     window._userPhoto = user.photoURL || "";
     window._userName = user.displayName || user.email || "";
+    window._userEmail = user.email || "";
     document.getElementById("authScreen").classList.add("hidden");
     setSyncDot("syncing");
 
@@ -152,6 +153,7 @@ onAuthStateChanged(auth, async (user) => {
     window._uid = null;
     window._userPhoto = "";
     window._userName = "";
+    window._userEmail = "";
     document.getElementById("authScreen").classList.remove("hidden");
     setSyncDot("");
   }

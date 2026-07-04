@@ -184,16 +184,23 @@ function routeAfterAuth() { if (isStandalone()) { enterHome(); } else { showScre
 // ---------- mobile edit restriction ----------
 // questions are written on desktop only; the notification + reflecting still
 // happens on the phone, but the editor (and paste/copy-tree escape hatches)
-// are hidden there entirely rather than just discouraged.
+// are hidden there by default. A quiet "access editor anyway" escape hatch
+// (bottom-right) overrides this for the rest of the session — resets back to
+// hidden next time enterHome() runs (e.g. after leaving and coming back).
+let _mobileEditUnlocked = false;
 function applyMobileEditRestriction() {
   const editor = document.getElementById("dslHome");
   const io = document.getElementById("treeIoRow");
   const notice = document.getElementById("mobileEditNotice");
+  const anywayBtn = document.getElementById("accessEditorAnywayBtn");
   const phone = isPhone();
-  if (editor) editor.style.display = phone ? "none" : "";
-  if (io) io.style.display = phone ? "none" : "";
-  if (notice) notice.style.display = phone ? "block" : "none";
+  const hide = phone && !_mobileEditUnlocked;
+  if (editor) editor.style.display = hide ? "none" : "";
+  if (io) io.style.display = hide ? "none" : "";
+  if (notice) notice.style.display = hide ? "block" : "none";
+  if (anywayBtn) anywayBtn.style.display = hide ? "block" : "none";
 }
+window.accessEditorAnyway = () => { _mobileEditUnlocked = true; applyMobileEditRestriction(); };
 
 // ---------- local install (this device) ----------
 // "Get started" leads straight into installing THIS device — no detour
@@ -240,6 +247,14 @@ function qrSrcFor(url) {
   // sharp even on a retina display, not the soft/low-density default
   return "https://api.qrserver.com/v1/create-qr-code/?size=320x320&ecc=H&data=" + encodeURIComponent("https://" + url);
 }
+// the QR carries the signed-in account's email as a query param so /install
+// can show "this is being set up for you@x.com" BEFORE the phone signs in —
+// scanning is the one moment there's otherwise zero cross-device visibility
+// into which Google account is about to be used.
+function installUrlWithAccount() {
+  const email = window._userEmail || "";
+  return INSTALL_URL + (email ? "?acct=" + encodeURIComponent(email) : "");
+}
 window.maybeShowOtherDeviceGate = function () {
   const gate = document.getElementById("otherDeviceGate");
   if (!gate) return false;
@@ -260,8 +275,8 @@ window.maybeShowOtherDeviceGate = function () {
     qr.style.display = "none";
     hint.textContent = INSTALL_URL;
   } else {
-    label.textContent = "Now install it on your phone too. Come back here once you're done.";
-    qr.src = qrSrcFor(INSTALL_URL);
+    label.textContent = "Now install it on your phone too" + (window._userEmail ? (" as " + window._userEmail) : "") + ". Come back here once you're done.";
+    qr.src = qrSrcFor(installUrlWithAccount());
     qr.style.display = "block";
     hint.textContent = INSTALL_URL;
   }

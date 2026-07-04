@@ -32,6 +32,11 @@
       .amp { display: inline-block; font-family: var(--serif); font-style: italic; font-weight: 400;
         color: var(--ink-dim); font-size: 1.28em; line-height: 1; transform: translateY(.06em); padding: 0 .06em; }
       .pitch { margin-top: 12px; color: var(--ink-dim); font-size: 13px; }
+      .acct-hint {
+        display: none; margin-top: 18px; padding: 9px 14px; border: 1px solid var(--line); border-radius: 8px;
+        font-size: 12.5px; color: var(--ink-dim);
+      }
+      .acct-hint b { color: var(--ink); font-weight: 600; }
       .install-btn {
         display: none; width: 100%; margin-top: 30px; padding: 14px 20px; border-radius: 8px;
         background: none; border: 1px solid var(--line); color: var(--ink); cursor: pointer;
@@ -57,6 +62,7 @@
       <img class="icon" src="../app/icons/icon-192.png" alt="" />
       <div class="brand">Reflect <span class="amp">&amp;</span> Commit</div>
       <div class="pitch">Put it on your home screen so tonight's reflection is one tap away.</div>
+      <div class="acct-hint" id="acctHint"></div>
 
       <button class="install-btn" id="installBtn">Install app</button>
 
@@ -70,6 +76,18 @@
     </div>
 
     <script>
+      // The QR code on desktop's pairing screen encodes the signed-in
+      // account's email as ?acct= — surfacing it here, before sign-in even
+      // happens, is the only point where a mismatched Google account can
+      // still be caught (once both devices are separately signed in it's
+      // too late — they're already on two different Firestore docs).
+      const acct = new URLSearchParams(location.search).get("acct");
+      if (acct) {
+        const hint = document.getElementById("acctHint");
+        hint.innerHTML = "Set this device up with <b>" + acct.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])) + "</b> — sign in with that same account inside the app.";
+        hint.style.display = "block";
+      }
+
       // If this browser is willing to prompt natively, offer a real install button.
       let deferredPrompt = null;
       window.addEventListener("beforeinstallprompt", (e) => {

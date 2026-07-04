@@ -32,18 +32,13 @@
       .amp { display: inline-block; font-family: var(--serif); font-style: italic; font-weight: 400;
         color: var(--ink-dim); font-size: 1.28em; line-height: 1; transform: translateY(.06em); padding: 0 .06em; }
       .pitch { margin-top: 12px; color: var(--ink-dim); font-size: 13px; }
-      .open-btn {
-        display: block; width: 100%; margin-top: 30px; padding: 14px 20px; border-radius: 8px;
-        background: none; border: 1px solid var(--line); color: var(--ink); text-decoration: none;
-        font-family: var(--mono); font-size: 14px; letter-spacing: .02em; cursor: pointer;
+      .install-btn {
+        display: none; width: 100%; margin-top: 30px; padding: 14px 20px; border-radius: 8px;
+        background: none; border: 1px solid var(--line); color: var(--ink); cursor: pointer;
+        font-family: var(--mono); font-size: 14px; letter-spacing: .02em;
         transition: border-color .25s, background .25s;
       }
-      .open-btn:hover { border-color: #35343a; background: #101012; }
-      .install-btn {
-        display: none; width: 100%; margin-top: 12px; padding: 12px 20px; border-radius: 8px;
-        background: none; border: 1px solid var(--line); color: var(--ink-dim);
-        font-family: var(--mono); font-size: 13px; cursor: pointer; transition: border-color .25s, color .25s;
-      }
+      .install-btn:hover { border-color: #35343a; background: #101012; }
       .install-btn:hover { border-color: #35343a; color: var(--ink); }
       .steps {
         margin-top: 28px; text-align: left; border: 1px solid var(--line); border-radius: 10px;
@@ -63,14 +58,13 @@
       <div class="brand">Reflect <span class="amp">&amp;</span> Commit</div>
       <div class="pitch">Put it on your home screen so tonight's reflection is one tap away.</div>
 
-      <a class="open-btn" href="../app/">Open Reflect &amp; Commit</a>
       <button class="install-btn" id="installBtn">Install app</button>
 
       <div class="steps" id="steps">
-        <div class="lbl">then add it to your home screen</div>
+        <div class="lbl">add it to your home screen</div>
         <ol id="stepsList">
-          <li>Open the app using the button above.</li>
-          <li>Use your browser's menu to add it to your home screen.</li>
+          <li>Use the Install button above if it appears.</li>
+          <li>Otherwise, use your browser's menu to add it to your home screen.</li>
         </ol>
       </div>
     </div>
@@ -103,13 +97,11 @@
       if (stepsList) {
         if (isIOS) {
           stepsList.innerHTML =
-            "<li>Open the app using the button above (in Safari).</li>" +
             "<li>Tap the Share icon.</li>" +
             '<li>Tap "Add to Home Screen."</li>';
         } else if (isAndroid) {
           stepsList.innerHTML =
-            "<li>Open the app using the button above.</li>" +
-            '<li>Tap the browser menu (⋮) and choose "Add to Home screen" or "Install app" — or use the Install button above if it appears.</li>';
+            '<li>Use the Install button above if it appears, or tap the browser menu (⋮) and choose "Add to Home screen" / "Install app."</li>';
         }
       }
     </script>

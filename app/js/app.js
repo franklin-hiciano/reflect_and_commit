@@ -172,7 +172,8 @@ function enterHome() {
     return;
   }
   showScreen("homeScreen");
-  if (!maybeShowOtherDeviceGate()) maybeShowMobileEditGate();
+  maybeShowOtherDeviceGate();
+  applyMobileEditRestriction();
 }
 function goHome() { stopVoice(); if (isStandalone()) { enterHome(); } else { showScreen("landingScreen"); resetLandingToIntro(); } }
 function isStandalone() { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; }
@@ -180,24 +181,19 @@ function isStandalone() { return window.matchMedia("(display-mode: standalone)")
 // get their own install prompt the first time they sign in on that device.
 function routeAfterAuth() { if (isStandalone()) { enterHome(); } else { showScreen("landingScreen"); resetLandingToIntro(); } }
 
-// ---------- mobile edit confirmation ----------
-// questions are meant to be written on desktop; the notification + reflecting
-// happens on the phone, and if a good idea shows up you go write it properly
-// on desktop. mobile CAN still edit, but every time (until dismissed for
-// good) it asks first, rather than nagging with a permanent banner. This only
-// ever applies once desktop is actually installed — see maybeShowOtherDeviceGate.
-const LS_MOBILE_EDIT_ACK = "rc_mobile_edit_ack";
-function maybeShowMobileEditGate() {
-  const gate = document.getElementById("mobileEditGate");
-  if (!gate) return;
-  if (!isPhone() || localStorage.getItem(LS_MOBILE_EDIT_ACK)) { gate.classList.remove("on"); return; }
-  gate.classList.add("on");
+// ---------- mobile edit restriction ----------
+// questions are written on desktop only; the notification + reflecting still
+// happens on the phone, but the editor (and paste/copy-tree escape hatches)
+// are hidden there entirely rather than just discouraged.
+function applyMobileEditRestriction() {
+  const editor = document.getElementById("dslHome");
+  const io = document.getElementById("treeIoRow");
+  const notice = document.getElementById("mobileEditNotice");
+  const phone = isPhone();
+  if (editor) editor.style.display = phone ? "none" : "";
+  if (io) io.style.display = phone ? "none" : "";
+  if (notice) notice.style.display = phone ? "block" : "none";
 }
-window.dismissMobileEditGate = (forever) => {
-  if (forever) localStorage.setItem(LS_MOBILE_EDIT_ACK, "1");
-  const gate = document.getElementById("mobileEditGate");
-  if (gate) gate.classList.remove("on");
-};
 
 // ---------- local install (this device) ----------
 // "Get started" leads straight into installing THIS device — no detour
@@ -251,6 +247,14 @@ window.maybeShowOtherDeviceGate = function () {
   const label = document.getElementById("otherDeviceLabel");
   const qr = document.getElementById("landingQr");
   const hint = document.getElementById("otherDeviceHint");
+  // showing the signed-in account's avatar here (same on both devices) is
+  // the quickest way to catch two different Google accounts — by far the
+  // most common reason this gate never clears — without digging into settings.
+  const avatar = document.getElementById("otherDeviceAvatar");
+  if (avatar) {
+    if (window._userPhoto) { avatar.src = window._userPhoto; avatar.alt = window._userName || "signed-in account"; avatar.title = window._userName || ""; avatar.style.display = "block"; }
+    else avatar.style.display = "none";
+  }
   if (isPhone()) {
     label.textContent = "Go set up Reflect & Commit on your computer to write your questions — you'll still get tonight's reflection right here.";
     qr.style.display = "none";

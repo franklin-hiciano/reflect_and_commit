@@ -73,6 +73,12 @@ onAuthStateChanged(auth, async (user) => {
   if (user) {
     uid = user.uid;
     window._uid = uid;
+    // exposed so the cross-device pairing gate can show the signed-in
+    // account's avatar on both devices — the fastest way to catch "these are
+    // two different Google accounts" (the #1 real-world cause of the gate
+    // never clearing), at a glance instead of digging through settings.
+    window._userPhoto = user.photoURL || "";
+    window._userName = user.displayName || user.email || "";
     document.getElementById("authScreen").classList.add("hidden");
     setSyncDot("syncing");
 
@@ -144,6 +150,8 @@ onAuthStateChanged(auth, async (user) => {
   } else {
     uid = null;
     window._uid = null;
+    window._userPhoto = "";
+    window._userName = "";
     document.getElementById("authScreen").classList.remove("hidden");
     setSyncDot("");
   }

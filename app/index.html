@@ -145,15 +145,25 @@
                 <!-- js/dsl-editor.js builds everything inside here: the
              duplicate/multi-root warning banner, the mobile pane switcher,
              the dsl-editor + node-canvas split, and the version-history
-             slider. See js/tree-model.js for the DSL grammar itself. -->
+             slider. See js/tree-model.js for the DSL grammar itself.
+             Editing is desktop-only — app.js hides this whole block (and
+             shows #mobileEditNotice instead) whenever isPhone() is true. -->
                 <div id="dslHome" class="dsl-home"></div>
-                <div class="tree-io-row">
+                <div class="tree-io-row" id="treeIoRow">
                     <button class="btn-quiet" onclick="openPasteTree()">
                         paste tree
                     </button>
                     <button class="btn-quiet" onclick="copyTreeButton(event)">
                         copy as text
                     </button>
+                </div>
+                <div
+                    class="mobile-edit-notice"
+                    id="mobileEditNotice"
+                    style="display: none"
+                >
+                    Questions are written on desktop — open Reflect &amp;
+                    Commit there to edit.
                 </div>
             </div>
             <div class="paste-tree-modal" id="pasteTreeModal">
@@ -197,30 +207,6 @@
                 </div>
             </div>
 
-            <!-- questions are meant to be written on desktop; mobile can still
-           edit, it just asks first every time, until dismissed for good.
-           Only relevant once the pairing below is actually done — while the
-           other device is still missing, otherDeviceGate takes priority. -->
-            <div class="mobile-edit-gate" id="mobileEditGate">
-                <div class="mobile-edit-gate-inner">
-                    <div class="mobile-edit-gate-text">
-                        Questions work best written on desktop. You can still
-                        edit here on your phone if you need to.
-                    </div>
-                    <button
-                        class="btn-ghost"
-                        onclick="dismissMobileEditGate(false)"
-                    >
-                        Continue editing here
-                    </button>
-                    <button
-                        class="btn-quiet"
-                        onclick="dismissMobileEditGate(true)"
-                    >
-                        Don't show this again
-                    </button>
-                </div>
-            </div>
 
             <!-- cross-device pairing nudge — shown over the home screen (not
            gating it) whenever THIS device is installed but the other kind
@@ -232,6 +218,12 @@
            or after your next commitment, until the pairing is done. -->
             <div class="mobile-edit-gate" id="otherDeviceGate">
                 <div class="install-gate">
+                    <img
+                        id="otherDeviceAvatar"
+                        class="other-device-avatar"
+                        style="display: none"
+                        alt="signed-in account"
+                    />
                     <div
                         class="install-gate-headline"
                         id="otherDeviceLabel"
@@ -243,6 +235,12 @@
                         alt="scan to install on your phone"
                     />
                     <div class="install-gate-url" id="otherDeviceHint"></div>
+                    <div
+                        class="install-gate-reload-hint"
+                        id="otherDeviceReloadHint"
+                    >
+                        Finished on the other device? Reload this page.
+                    </div>
                 </div>
             </div>
         </div>

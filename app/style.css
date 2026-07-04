@@ -51,9 +51,11 @@ body::after {
 /* cross-device install gate — deliberately just three things, centered,
    nothing competing with them */
 .install-gate { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 28px; }
+.other-device-avatar { width: 44px; height: 44px; border-radius: 50%; margin-bottom: 14px; border: 1px solid var(--line); }
 .install-gate-headline { font-family: var(--serif); font-size: 20px; color: var(--ink); max-width: 300px; line-height: 1.4; margin-bottom: 26px; }
 .landing-qr-img { width: 190px; height: 190px; border-radius: 10px; display: block; background: #fff; padding: 10px; margin-bottom: 18px; }
 .install-gate-url { font-family: var(--mono); font-size: 14px; color: var(--ink-dim); letter-spacing: .01em; }
+.install-gate-reload-hint { font-family: var(--mono); font-size: 12px; color: var(--ink-faint); margin-top: 18px; }
 
 /* ---------- home ---------- */
 .notify-time-group { position: relative; }
@@ -94,6 +96,10 @@ body::after {
 .dsl-warning {
   margin-bottom: 14px; padding: 9px 14px; border: 1px solid #6b3a2a; background: #1c1210; border-radius: 8px;
   font-family: var(--mono); font-size: 12px; color: #e0937a;
+}
+.mobile-edit-notice {
+  padding: 24px 18px; text-align: center; font-family: var(--serif); font-size: 15px;
+  color: var(--ink-dim); line-height: 1.5;
 }
 .dsl-pane-switch { display: none; justify-content: center; gap: 6px; margin-bottom: 12px; }
 .dsl-pane-btn {
@@ -332,15 +338,12 @@ body::after {
 .device-shade-inner { text-align: center; }
 .device-shade-title { font-family: var(--mono); font-size: 13px; letter-spacing: .02em; color: var(--ink-dim); margin-bottom: 18px; }
 
-/* confirm-before-editing-on-mobile gate — asks every time until dismissed
-   for good, rather than a permanent nagging banner */
+/* full-screen hard-gate overlay — used by #otherDeviceGate (cross-device
+   pairing block); its content styling lives under .install-gate above */
 .mobile-edit-gate {
   position: fixed; inset: 0; z-index: 998; display: none;
   align-items: center; justify-content: center;
   background: rgba(6,6,7,.92); backdrop-filter: blur(6px);
 }
 .mobile-edit-gate.on { display: flex; }
-.mobile-edit-gate-inner { text-align: center; padding: 0 30px; max-width: 340px; }
-.mobile-edit-gate-text { font-family: var(--serif); font-size: 17px; color: var(--ink); line-height: 1.5; margin-bottom: 26px; }
-.mobile-edit-gate-inner .btn-ghost { display: block; width: 100%; margin-bottom: 12px; }
 

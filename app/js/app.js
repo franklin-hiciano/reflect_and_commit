@@ -183,20 +183,18 @@ function routeAfterAuth() { if (isStandalone()) { enterHome(); } else { showScre
 
 // ---------- mobile edit restriction ----------
 // questions are written on desktop only; the notification + reflecting still
-// happens on the phone, but the editor (and paste/copy-tree escape hatches)
-// are hidden there by default. A quiet "access editor anyway" escape hatch
-// (bottom-right) overrides this for the rest of the session — resets back to
-// hidden next time enterHome() runs (e.g. after leaving and coming back).
+// happens on the phone, but the editor is hidden there by default. A quiet
+// "access editor anyway" escape hatch (bottom-right) overrides this for the
+// rest of the session — resets back to hidden next time enterHome() runs
+// (e.g. after leaving and coming back).
 let _mobileEditUnlocked = false;
 function applyMobileEditRestriction() {
   const editor = document.getElementById("dslHome");
-  const io = document.getElementById("treeIoRow");
   const notice = document.getElementById("mobileEditNotice");
   const anywayBtn = document.getElementById("accessEditorAnywayBtn");
   const phone = isPhone();
   const hide = phone && !_mobileEditUnlocked;
   if (editor) editor.style.display = hide ? "none" : "";
-  if (io) io.style.display = hide ? "none" : "";
   if (notice) notice.style.display = hide ? "block" : "none";
   if (anywayBtn) anywayBtn.style.display = hide ? "block" : "none";
 }
@@ -224,6 +222,11 @@ window.goToInstallGate = () => {
       ? "You'll get a notification here when it's time to reflect."
       : "Write your questions here — you'll get a notification on your phone when it's time to reflect.";
   }
+  // the reflect-time picker only matters where the notification actually
+  // fires — the phone. Desktop never asks for notification permission and
+  // never shows this reminder, so it has nothing to set here.
+  const notifyGroup = document.getElementById("onboardingNotifyGroup");
+  if (notifyGroup) notifyGroup.style.display = isPhone() ? "block" : "none";
   const steps = document.getElementById("landingManualSteps");
   if (steps) {
     steps.innerHTML = (isMobileUA()
@@ -382,32 +385,6 @@ window.openTimePicker = (btn) => {
 };
 window.toggleSettingsPanel = () => { const p = document.getElementById("settingsPanel"); if (p) p.classList.toggle("on"); };
 
-// ---------- tree editor (js/dsl-editor.js) ----------
-// The DSL text IS the tree now — "paste tree" / "copy as text" just read or
-// replace that text directly, no separate import/export format needed.
-window.openPasteTree = () => {
-  const m = document.getElementById("pasteTreeModal"); if (!m) return;
-  const ta = document.getElementById("pasteTreeArea"); if (ta) ta.value = "";
-  m.classList.add("on");
-  setTimeout(() => ta && ta.focus(), 60);
-};
-window.closePasteTree = () => { const m = document.getElementById("pasteTreeModal"); if (m) m.classList.remove("on"); };
-window.confirmPasteTree = () => {
-  const ta = document.getElementById("pasteTreeArea");
-  const t = ta ? ta.value : "";
-  // opening this modal and hitting "replace" already IS the deliberate
-  // confirmation, so skip the (redundant) native confirm() inside pasteTreeFromText.
-  window.pasteTreeFromText(t, true);
-  window.closePasteTree();
-};
-window.copyTreeButton = async (btn) => {
-  const t = await window.copyTreeAsText();
-  if (!t) return;
-  const b = btn && btn.currentTarget ? btn.currentTarget : btn;
-  if (b && "textContent" in b) {
-    const orig = b.textContent; b.textContent = "copied"; setTimeout(() => { b.textContent = orig; }, 1100);
-  }
-};
 function escapeHtml(s) { return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
 // ---------- day-after check-in gate ----------

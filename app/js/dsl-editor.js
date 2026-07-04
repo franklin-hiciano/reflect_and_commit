@@ -485,15 +485,4 @@
     slider.max = Math.max(0, count - 1);
     slider.value = _snapIndex;
   }
-
-  // ── copy/paste-as-text — the editor already IS text, so these are trivial ──
-  window.copyTreeAsText = async function () {
-    try { await navigator.clipboard.writeText(text()); } catch (e) {}
-    return text();
-  };
-  window.pasteTreeFromText = function (t, skipConfirm) {
-    if (t == null) return;
-    if (!skipConfirm && text().trim() && !confirm("Replace your current questions with the pasted tree?")) return;
-    window.setDslText(t);
-  };
 })();

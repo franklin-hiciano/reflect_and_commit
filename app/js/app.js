@@ -137,6 +137,15 @@ function deviceKind() { return isPhone() ? "mobile" : "desktop"; }
 function isNotifValidated() { return !!(window._deviceData && window._deviceData.notifValidatedAt); }
 function isIOS() { return /iPhone|iPad|iPod/i.test(navigator.userAgent); }
 function isAndroid() { return /Android/i.test(navigator.userAgent); }
+function isChrome() { return /Chrome/.test(navigator.userAgent) && !/Edge|OPR/.test(navigator.userAgent); }
+function isEdge() { return /Edge/.test(navigator.userAgent); }
+function isSafari() { return /Safari/.test(navigator.userAgent) && !/Chrome|Edge|OPR/.test(navigator.userAgent); }
+function isSamsungInternet() { return /SamsungBrowser/.test(navigator.userAgent); }
+function isBrave() { return /Brave/.test(navigator.userAgent); }
+function isFirefox() { return /Firefox/.test(navigator.userAgent); }
+function isPWASupportedBrowser() {
+  return isChrome() || isEdge() || isSafari() || isSamsungInternet() || isBrave() || isFirefox();
+}
 // "seen" must mean genuinely INSTALLED, not just signed in — otherwise the
 // cross-device gate would skip itself the moment you sign in anywhere,
 // before you've actually installed there. Three ways we learn a real
@@ -212,6 +221,27 @@ function enterHome() {
     }
     return;
   }
+  
+  // Desktop: check mobile status before proceeding
+  if (!isPhone()) {
+    const mobileSeen = !!(window._onboarding && window._onboarding.mobileSeenAt);
+    const mobileNotifEnabled = !!(window._onboarding && window._onboarding.mobileNotifEnabledAt);
+    
+    if (!mobileSeen) {
+      // Mobile not installed, show pair mobile screen
+      showScreen("landingScreen");
+      showPairMobileScreen();
+      return;
+    }
+    
+    if (!mobileNotifEnabled) {
+      // Mobile installed but notifications not enabled, show waiting screen
+      showScreen("landingScreen");
+      showWaitingForMobileScreen();
+      return;
+    }
+  }
+  
   showScreen("homeScreen");
   renderUserMenu();
   maybeShowOtherDeviceGate();
@@ -232,7 +262,29 @@ function goHome() { stopVoice(); if (isStandalone()) { enterHome(); } else { sho
 function isStandalone() { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; }
 // install is required on every device before use — phone AND desktop each
 // get their own install prompt the first time they sign in on that device.
-function routeAfterAuth() { if (isStandalone()) { enterHome(); } else { showScreen("landingScreen"); resetLandingToIntro(); } }
+function routeAfterAuth() {
+  if (isStandalone()) {
+    // Mobile: check notification status before entering home
+    if (isPhone()) {
+      const notifValidated = isNotifValidated();
+      if (!notifValidated) {
+        // Show notification hard block
+        showScreen("landingScreen");
+        handlePermissionRequest();
+        return;
+      }
+    }
+    enterHome();
+  } else {
+    showScreen("landingScreen");
+    // Check browser support on desktop
+    if (!isPhone() && !isPWASupportedBrowser()) {
+      showUnsupportedBrowserScreen();
+    } else {
+      resetLandingToIntro();
+    }
+  }
+}
 
 // ---------- mobile edit restriction ----------
 // questions are written on desktop only; the notification + reflecting still
@@ -264,12 +316,18 @@ function resetLandingToIntro() {
   const here = document.getElementById("landingStepHere");
   const notifySetup = document.getElementById("landingNotifySetup");
   const denied = document.getElementById("landingPermissionDenied");
+  const unsupported = document.getElementById("landingUnsupportedBrowser");
+  const pairMobile = document.getElementById("landingPairMobile");
+  const waiting = document.getElementById("landingWaitingForMobile");
   const enableBtn = document.getElementById("enableNotifBtn");
   const getStartedBtn = document.getElementById("getStartedBtn");
   if (!intro || !here) return;
   intro.style.display = "block"; here.style.display = "none";
   if (notifySetup) notifySetup.style.display = "none";
   if (denied) denied.style.display = "none";
+  if (unsupported) unsupported.style.display = "none";
+  if (pairMobile) pairMobile.style.display = "none";
+  if (waiting) waiting.style.display = "none";
   
   // Show correct button based on device
   if (enableBtn && getStartedBtn) {
@@ -281,6 +339,36 @@ function resetLandingToIntro() {
       getStartedBtn.style.display = "block";
     }
   }
+}
+
+function showUnsupportedBrowserScreen() {
+  document.getElementById("landingIntro").style.display = "none";
+  const unsupported = document.getElementById("landingUnsupportedBrowser");
+  if (unsupported) unsupported.style.display = "block";
+}
+
+function showPairMobileScreen() {
+  document.getElementById("landingIntro").style.display = "none";
+  document.getElementById("landingStepHere").style.display = "none";
+  const pairMobile = document.getElementById("landingPairMobile");
+  if (pairMobile) pairMobile.style.display = "block";
+  
+  // Generate QR code with token
+  const qr = document.getElementById("pairQr");
+  if (qr && window._mintInstallToken) {
+    window._mintInstallToken().then((token) => {
+      const url = window.location.origin + "/?tok=" + token;
+      qr.src = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" + encodeURIComponent(url);
+    });
+  }
+}
+
+function showWaitingForMobileScreen() {
+  document.getElementById("landingIntro").style.display = "none";
+  document.getElementById("landingStepHere").style.display = "none";
+  document.getElementById("landingPairMobile").style.display = "none";
+  const waiting = document.getElementById("landingWaitingForMobile");
+  if (waiting) waiting.style.display = "block";
 }
 
 async function handlePermissionRequest() {
@@ -381,13 +469,33 @@ window.goToInstallGate = () => {
     const here = document.getElementById("landingStepHere");
     here.style.display = "block";
     const explainer = document.getElementById("onboardingExplainer");
-    if (explainer) {
-      explainer.textContent = "Write your questions here — you'll get a notification on your phone when it's time to reflect.";
-    }
+    const getStartedBtn = document.getElementById("getStartedBtn");
+    const pairMobileBtn = document.getElementById("pairMobileBtn");
     const steps = document.getElementById("landingManualSteps");
-    if (steps) {
-      steps.innerHTML = ["Click the install icon (⊕) in your address bar,", "or ⋮ menu → Install Reflect & Commit."]
-        .map((s) => "<div>· " + s + "</div>").join("");
+    
+    if (isStandalone()) {
+      // Desktop already installed, show pair mobile button
+      if (explainer) {
+        explainer.textContent = "Desktop installed! Now pair your phone to enable notifications.";
+      }
+      if (getStartedBtn) getStartedBtn.style.display = "none";
+      if (pairMobileBtn) pairMobileBtn.style.display = "block";
+      if (steps) steps.style.display = "none";
+    } else {
+      // Desktop not installed, show install button
+      if (explainer) {
+        explainer.textContent = "Write your questions here — you'll get a notification on your phone when it's time to reflect.";
+      }
+      if (getStartedBtn) getStartedBtn.style.display = "block";
+      if (pairMobileBtn) pairMobileBtn.style.display = "none";
+      if (steps) {
+        steps.style.display = "block";
+        steps.innerHTML = "Click install icon (⊕) in address bar";
+      }
+      const reinstallTroubleshooting = document.getElementById("reinstallTroubleshooting");
+      if (reinstallTroubleshooting && isChrome()) {
+        reinstallTroubleshooting.style.display = "inline";
+      }
     }
     return;
   }

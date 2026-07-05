@@ -171,6 +171,16 @@ onAuthStateChanged(auth, async (user) => {
       if (window.renderNotifyLabel) window.renderNotifyLabel();
     }, () => {}));
 
+    // handoff listener — desktop auto-redirects when mobile completes setup
+    if (!isPhone()) {
+      unsubscribers.push(onSnapshot(uDoc("state", "handoff"), (snap) => {
+        const handoff = snap.exists() ? snap.data() : {};
+        if (handoff.consumed && window.enterHome) {
+          window.enterHome();
+        }
+      }, () => {}));
+    }
+
     window._onSignedIn && window._onSignedIn();
   } else {
     uid = null;
@@ -276,6 +286,12 @@ window._markNotifValidated = async function () {
   if (!uid) return;
   try {
     await setDoc(uDoc("devices", deviceId()), { notifValidatedAt: serverTimestamp() }, { merge: true });
+    // Also mark mobile notification as enabled in onboarding state for desktop to detect
+    if (isPhone()) {
+      await setDoc(uDoc("state", "onboarding"), { mobileNotifEnabledAt: serverTimestamp() }, { merge: true });
+      // Trigger handoff to desktop
+      await window._consumeHandoff && window._consumeHandoff();
+    }
   } catch (e) {}
 };
 

@@ -27,6 +27,11 @@
   let _historyOpen = false;
   let _cardDrag = null; // { name, x, y } — dragging an existing card onto another to link it
   let _editingName = null; // block name currently being renamed inline on the canvas
+  // Paired Editing: when ON, renaming a declaration cascades to every
+  // reference and vice versa (already the default behaviour). When OFF, the
+  // cascade is suppressed so you can freely rename a single reference without
+  // touching the declaration or any other copy. Toggled from the corner button.
+  let _pairedEditing = true;
 
   function TM() { return window.TreeModel; }
   function text() { return window.dslText || ""; }
@@ -54,13 +59,16 @@
         '<div class="dsl-pane" id="dslPane">' +
           '<div class="dsl-editor-wrap">' +
             '<div class="squircle-corner-tools">' +
+              '<button class="squircle-corner-btn" id="pairedEditingBtn" title="paired editing — editing any reference or declaration also updates all other copies">' +
+                '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><rect x="9" y="3" width="12" height="12" rx="2"/></svg>' +
+              '</button>' +
               '<button class="squircle-corner-btn" id="canvasPreviewBtn" title="preview — walk through this tree right now, nothing saved">' +
                 '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>' +
-              "</button>" +
+              '</button>' +
               '<button class="squircle-corner-btn" id="historyToggleBtn" title="version history">' +
                 '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /><path d="M12 8v4l3 2" /></svg>' +
-              "</button>" +
-            "</div>" +
+              '</button>' +
+            '</div>' +
             '<div class="history-dropdown" id="historyDropdown">' +
               '<div class="history-snapshots" id="historySnapshots"></div>' +
             "</div>" +
@@ -85,13 +93,26 @@
     document.getElementById("paneBtnCanvas").onclick = () => setPane("canvas");
     document.getElementById("historyToggleBtn").onclick = toggleHistory;
     document.getElementById("canvasPreviewBtn").onclick = startPreview;
+    const pairedBtn = document.getElementById("pairedEditingBtn");
+    pairedBtn.classList.toggle("on", _pairedEditing);
+    pairedBtn.onclick = () => {
+      _pairedEditing = !_pairedEditing;
+      pairedBtn.classList.toggle("on", _pairedEditing);
+      pairedBtn.title = _pairedEditing
+        ? "paired editing ON — editing any reference or declaration also updates all copies"
+        : "paired editing OFF — edits are isolated to the line you type on";
+    };
 
     const el = ta();
     el.addEventListener("input", (e) => {
       const newText = e.target.value;
       const oldText = window.dslText || "";
       const cursor = e.target.selectionStart;
-      const finalText = window._cascadeRenameIfHeaderEdited(oldText, newText, cursor);
+      // only cascade renames to other lines when paired editing is enabled—
+      // typing with it OFF just changes this line alone (raw DSL text).
+      const finalText = _pairedEditing
+        ? window._cascadeRenameIfHeaderEdited(oldText, newText, cursor)
+        : newText;
       window.setDslText(finalText);
     });
     el.addEventListener("dragstart", onDslDragStart);
@@ -292,7 +313,7 @@
       btn.className = "dsl-gutter-btn";
       btn.title = "add what happens next";
       btn.textContent = "+";
-      btn.style.top = ((b.rawLine + 1) * LINE_H) + "px";
+      btn.style.top = ((b.rawLine + 1) * LINE_H + 1) + "px"; // +1px so it doesn't overlap the question text above
       btn.onclick = () => {
         const uniq = TM().uniqueName(parsed, "new question");
         const res = TM().addConnectedChild(text(), b.name, uniq);
@@ -526,8 +547,26 @@
         if (done) return; done = true;
         const val = input.value.trim();
         _editingName = null;
-        if (val && val !== n.name) mutate(TM().renameBlockTitle(text(), n.name, val));
-        else window.renderDslEditor();
+        if (val && val !== n.name) {
+          // renameBlockTitle updates the declaration + every reference;
+          // when paired editing is off, only update the declaration line
+          // (leaves references as-is, effectively detaching this rename).
+          if (_pairedEditing) {
+            mutate(TM().renameBlockTitle(text(), n.name, val));
+          } else {
+            // raw text replace of just the declaration line
+            const t = text();
+            const lines = t.split("\n");
+            const parsed = TM().parse(t);
+            const block = parsed.blocks.find(b => b.name === n.name);
+            if (block != null && lines[block.rawLine] != null) {
+              lines[block.rawLine] = lines[block.rawLine].replace(n.name, val);
+              mutate(lines.join("\n"));
+            } else {
+              mutate(TM().renameBlockTitle(t, n.name, val));
+            }
+          }
+        } else window.renderDslEditor();
       };
       const cancel = () => { if (done) return; done = true; _editingName = null; window.renderDslEditor(); };
       input.addEventListener("keydown", (e) => {
@@ -557,6 +596,21 @@
       del.className = "canvas-del-btn"; del.title = "delete"; del.textContent = "✕";
       del.onclick = (e) => { e.stopPropagation(); mutate(TM().deleteBlock(text(), n.name)); };
       card.appendChild(del);
+
+      // Right-click to delete (desktop), long-press to delete (mobile/touch)
+      let _holdTimer = null;
+      card.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        if (confirm('Delete "' + n.name + '"?')) mutate(TM().deleteBlock(text(), n.name));
+      });
+      card.addEventListener("touchstart", (e) => {
+        _holdTimer = setTimeout(() => {
+          _holdTimer = null;
+          if (confirm('Delete "' + n.name + '"?')) mutate(TM().deleteBlock(text(), n.name));
+        }, 700);
+      }, { passive: true });
+      card.addEventListener("touchend", () => { clearTimeout(_holdTimer); _holdTimer = null; }, { passive: true });
+      card.addEventListener("touchmove", () => { clearTimeout(_holdTimer); _holdTimer = null; }, { passive: true });
 
       const recall = document.createElement("button");
       recall.className = "canvas-recall-btn" + (n.recallTarget ? " on" : "");

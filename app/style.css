@@ -72,6 +72,16 @@ body::after {
   transition: color .3s, border-color .3s;
 }
 .notify-countdown:hover { color: var(--ink); border-color: #35343a; }
+.notify-countdown.warning {
+  border-color: #e8794a;
+  color: #e8794a;
+  background: rgba(232, 121, 74, 0.1);
+}
+.notify-countdown.warning:hover {
+  border-color: #f97316;
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.15);
+}
 .btn-quiet { background: none; border: none; color: var(--ink-faint); font-family: var(--mono); font-size: 12px; cursor: pointer; }
 .btn-quiet:hover { color: var(--ink-dim); }
 
@@ -134,8 +144,10 @@ body::after {
   text-underline-offset: 3px; flex-shrink: 0;
 }
 .mobile-edit-notice {
-  padding: 24px 18px; text-align: center; font-family: var(--serif); font-size: 15px;
-  color: var(--ink-dim); line-height: 1.5;
+  position: fixed; top: calc(60px + env(safe-area-inset-top)); right: 16px; z-index: 40;
+  max-width: 250px; background: #131315; border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px; text-align: right; font-family: var(--serif); font-size: 14px;
+  color: var(--ink-dim); line-height: 1.4;
 }
 /* bottom-LEFT, not bottom-right — the "⋯" home menu now lives there and the
    two would otherwise sit exactly on top of each other on mobile */
@@ -487,3 +499,19 @@ body::after {
 }
 .mobile-edit-gate.on { display: flex; }
 
+/* "Installing update..." overlay — appears while the new SW takes over */
+#installingOverlay {
+  position: fixed; inset: 0; z-index: 9999; background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+}
+.installing-inner { text-align: center; }
+.installing-spinner {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 2px solid var(--line); border-top-color: var(--ink-dim);
+  animation: spin .8s linear infinite; margin: 0 auto 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.installing-label {
+  font-family: var(--mono); font-size: 12px; color: var(--ink-faint);
+  letter-spacing: .04em;
+}

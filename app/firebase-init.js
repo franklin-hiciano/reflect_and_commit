@@ -3,6 +3,7 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithCustomToken,
   signOut as fbSignOut,
   onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -59,6 +60,35 @@ window.doSignIn = async () => {
 };
 window.doSignOut = async () => {
   await fbSignOut(auth);
+};
+
+// Mints a custom token by calling our /api/token endpoint so the QR code
+// can carry it — phones scanning the code auto-authenticate without a
+// second Google sign-in prompt.
+window._mintInstallToken = async function () {
+  if (!uid) return null;
+  try {
+    const res = await fetch('/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.token || null;
+  } catch (e) {
+    return null;
+  }
+};
+
+// Called on the phone after scanning the QR code: signs in with the
+// embedded custom token so the user doesn't need to tap "Continue with Google".
+window._autoSignInWithToken = async function (token) {
+  try {
+    await signInWithCustomToken(auth, token);
+  } catch (e) {
+    console.error('autoSignInWithToken:', e);
+  }
 };
 
 // every onSnapshot below is torn down on sign-out (and before re-subscribing
@@ -133,6 +163,12 @@ onAuthStateChanged(auth, async (user) => {
     unsubscribers.push(onSnapshot(uDoc("state", "onboarding"), (snap) => {
       window._onboarding = snap.exists() ? snap.data() : {};
       window._onOnboardingUpdated && window._onOnboardingUpdated();
+    }, () => {}));
+
+    // device data — tracks notification validation status per device
+    unsubscribers.push(onSnapshot(uDoc("devices", deviceId()), (snap) => {
+      window._deviceData = snap.exists() ? snap.data() : {};
+      if (window.renderNotifyLabel) window.renderNotifyLabel();
     }, () => {}));
 
     window._onSignedIn && window._onSignedIn();
@@ -230,9 +266,17 @@ window._registerPush = function (kind) {
   if (!uid) return;
   registerForPush(fbApp, uid, async (token, tzOffsetMin) => {
     try {
-      await setDoc(uDoc("devices", deviceId()), { token, kind: kind || "mobile", tzOffsetMin, updatedAt: serverTimestamp() });
+      window._fcmToken = token;
+      await setDoc(uDoc("devices", deviceId()), { token, kind: kind || "mobile", tzOffsetMin, updatedAt: serverTimestamp() }, { merge: true });
     } catch (e) {}
   });
+};
+
+window._markNotifValidated = async function () {
+  if (!uid) return;
+  try {
+    await setDoc(uDoc("devices", deviceId()), { notifValidatedAt: serverTimestamp() }, { merge: true });
+  } catch (e) {}
 };
 
 // -- hand-off: request / consume --
@@ -256,9 +300,9 @@ window._fetchLatestDraft = async function () {
 
 // -- device exclusivity: only one device is ever "active" at a time --
 window._deviceId = deviceId();
-window._claimActiveDevice = async function (kind) {
+window._claimActiveDevice = async function (kind, activityPhase) {
   if (!uid) return;
-  try { await setDoc(uDoc("state", "activeDevice"), { deviceId: window._deviceId, kind, claimedAt: serverTimestamp() }); } catch (e) {}
+  try { await setDoc(uDoc("state", "activeDevice"), { deviceId: window._deviceId, kind, activityPhase: activityPhase || "idle", claimedAt: serverTimestamp() }); } catch (e) {}
 };
 
 // -- install-gate onboarding: a one-way "this kind of device has signed in

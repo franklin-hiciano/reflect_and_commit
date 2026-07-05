@@ -57,6 +57,42 @@
 
             <div
                 class="landing-inner"
+                id="landingNotifySetup"
+                style="display: none; max-width: 340px; margin: 0 auto"
+            >
+                <div
+                    style="font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: 0.01em; margin-bottom: 6px"
+                >
+                    Reflect <span class="amp">&amp;</span> Commit
+                </div>
+                <div
+                    style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6"
+                >
+                    Set your reflection time and enable notifications.
+                </div>
+                <div class="notify-time-group">
+                    <button
+                        class="notify-countdown"
+                        onclick="openTimePicker(this)"
+                    ></button>
+                    <input
+                        type="time"
+                        class="notify-time-hidden"
+                        onchange="onNotifyTimeChange(this.value)"
+                        tabindex="-1"
+                    />
+                </div>
+                <button
+                    id="continueToInstallBtn"
+                    style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 16px"
+                    onclick="goToInstallGate()"
+                >
+                    Continue
+                </button>
+            </div>
+
+            <div
+                class="landing-inner"
                 id="landingStepHere"
                 style="display: none; max-width: 340px; margin: 0 auto"
             >
@@ -69,18 +105,6 @@
                     id="onboardingExplainer"
                     style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6"
                 ></div>
-                <div class="notify-time-group" id="onboardingNotifyGroup">
-                    <button
-                        class="notify-countdown"
-                        onclick="openTimePicker(this)"
-                    ></button>
-                    <input
-                        type="time"
-                        class="notify-time-hidden"
-                        onchange="onNotifyTimeChange(this.value)"
-                        tabindex="-1"
-                    />
-                </div>
                 <button
                     id="getStartedBtn"
                     style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 16px"
@@ -111,14 +135,6 @@
              Editing is desktop-only — app.js hides this whole block (and
              shows #mobileEditNotice instead) whenever isPhone() is true. -->
                 <div id="dslHome" class="dsl-home"></div>
-                <div
-                    class="mobile-edit-notice"
-                    id="mobileEditNotice"
-                    style="display: none"
-                >
-                    Questions are written on desktop — open Reflect &amp;
-                    Commit there to edit.
-                </div>
             </div>
             <button
                 class="access-editor-anyway-btn"
@@ -148,6 +164,14 @@
                 />
                 <span class="user-menu-name" id="userMenuName"></span>
             </button>
+            <div
+                class="mobile-edit-notice"
+                id="mobileEditNotice"
+                style="display: none"
+            >
+                Questions are written on desktop — open Reflect &amp;
+                Commit there to edit.
+            </div>
             <div class="settings-panel" id="settingsPanel">
                 <div class="settings-panel-inner">
                     <button

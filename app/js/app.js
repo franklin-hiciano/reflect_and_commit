@@ -114,7 +114,15 @@ window._onTreeUpdated = () => {
     window.renderDslEditor();
   }
 };
-window._onSettingsUpdated = () => { if (window._settings && window._settings.notifyTime) { settings = window._settings; saveLocalSettings(); renderSettings(); } };
+window._onSettingsUpdated = () => {
+  if (window._settings && window._settings.notifyTime) {
+    settings = window._settings; saveLocalSettings(); renderSettings();
+    if (window._fcmToken) {
+      const [h, m] = settings.notifyTime.split(":").map(Number);
+      scheduleNotificationOnBackend(h, m, window._fcmToken);
+    }
+  }
+};
 window._onCommitmentsUpdated = () => { commitments = window._commitments || []; };
 window._onDraftUpdated = () => { const rd = window._remoteDraft; if (rd && rd.active && !draft.active) { draft = { ...blankDraft(), ...rd }; localStorage.setItem(LS_DRAFT, JSON.stringify(draft)); } };
 window._onSignedIn = () => {
@@ -126,6 +134,7 @@ window._onSignedIn = () => {
   markDeviceSeenIfInstalled();
 };
 function deviceKind() { return isPhone() ? "mobile" : "desktop"; }
+function isNotifValidated() { return !!(window._deviceData && window._deviceData.notifValidatedAt); }
 // "seen" must mean genuinely INSTALLED, not just signed in — otherwise the
 // cross-device gate would skip itself the moment you sign in anywhere,
 // before you've actually installed there. Three ways we learn a real
@@ -154,10 +163,24 @@ window._onOnboardingUpdated = () => {
 };
 // focusing this device is treated as "I'm using this one now" — claim it as
 // active so the other device shades itself.
-window.addEventListener("focus", () => { if (window._uid) window._claimActiveDevice && window._claimActiveDevice(deviceKind()); });
+window.addEventListener("focus", () => { if (window._uid) window._claimActiveDevice && window._claimActiveDevice(deviceKind(), currentActivityPhase()); });
+
+function currentActivityPhase() {
+  const home = document.getElementById("homeScreen");
+  const reflect = document.getElementById("reflectScreen");
+  if (reflect && reflect.classList.contains("on")) return "reflecting";
+  if (home && home.classList.contains("on") && !isPhone()) return "editing";
+  return "idle";
+}
+
+function updateActivityPhase() {
+  if (window._uid && window._claimActiveDevice) {
+     window._claimActiveDevice(deviceKind(), currentActivityPhase());
+  }
+}
 
 // ---------- routing ----------
-function showScreen(id) { document.querySelectorAll(".screen").forEach((s) => s.classList.remove("on")); document.getElementById(id).classList.add("on"); }
+function showScreen(id) { document.querySelectorAll(".screen").forEach((s) => s.classList.remove("on")); document.getElementById(id).classList.add("on"); updateActivityPhase(); }
 // landing on the home screen: the cross-device nudge takes priority over the
 // (lower-stakes) "editing on phone" reminder — no point warning someone about
 // editing on their phone before they even have the option of a desktop.
@@ -240,8 +263,27 @@ function resetLandingToIntro() {
   if (!intro || !here) return;
   intro.style.display = "block"; here.style.display = "none";
 }
-window.goToInstallGate = () => {
+window.goToNotifySetup = async () => {
   document.getElementById("landingIntro").style.display = "none";
+  const notifySetup = document.getElementById("landingNotifySetup");
+  notifySetup.style.display = "block";
+  // Request notification permission immediately
+  await requestNotifPermission();
+  renderNotifyLabel();
+};
+
+window.goToInstallGate = () => {
+  // On phone, go through notify setup first. On desktop, skip to install.
+  if (isPhone()) {
+    const notifySetup = document.getElementById("landingNotifySetup");
+    if (notifySetup && notifySetup.style.display !== "block") {
+      window.goToNotifySetup();
+      return;
+    }
+  }
+
+  document.getElementById("landingIntro").style.display = "none";
+  document.getElementById("landingNotifySetup").style.display = "none";
   const here = document.getElementById("landingStepHere");
   here.style.display = "block";
   const explainer = document.getElementById("onboardingExplainer");
@@ -250,11 +292,6 @@ window.goToInstallGate = () => {
       ? "You'll get a notification here when it's time to reflect."
       : "Write your questions here — you'll get a notification on your phone when it's time to reflect.";
   }
-  // the reflect-time picker only matters where the notification actually
-  // fires — the phone. Desktop never asks for notification permission and
-  // never shows this reminder, so it has nothing to set here.
-  const notifyGroup = document.getElementById("onboardingNotifyGroup");
-  if (notifyGroup) notifyGroup.style.display = isPhone() ? "block" : "none";
   const steps = document.getElementById("landingManualSteps");
   if (steps) {
     steps.innerHTML = (isMobileUA()
@@ -263,7 +300,17 @@ window.goToInstallGate = () => {
     ).map((s) => "<div>· " + s + "</div>").join("");
   }
 };
-function maybeOpenFromUrl() { const p = new URLSearchParams(location.search); if (p.get("reflect") === "1") { history.replaceState({}, "", location.pathname); openReflection(); } }
+function maybeOpenFromUrl() {
+  const p = new URLSearchParams(location.search);
+  // ?tok= carries a Firebase custom token minted by the desktop QR code —
+  // auto-sign in so the phone never shows the "Continue with Google" button.
+  if (p.get("tok")) {
+    const tok = p.get("tok");
+    history.replaceState({}, "", location.pathname);
+    window._autoSignInWithToken && window._autoSignInWithToken(tok);
+  }
+  if (p.get("reflect") === "1") { history.replaceState({}, "", location.pathname); openReflection(); }
+}
 
 // ---------- cross-device HARD gate (no dismiss) ----------
 // Shown whenever THIS device is installed but the OTHER kind has never
@@ -278,13 +325,18 @@ function qrSrcFor(url) {
   // sharp even on a retina display, not the soft/low-density default
   return "https://api.qrserver.com/v1/create-qr-code/?size=320x320&ecc=H&data=" + encodeURIComponent("https://" + url);
 }
-// the QR carries the signed-in account's email as a query param so /install
-// can show "this is being set up for you@x.com" BEFORE the phone signs in —
-// scanning is the one moment there's otherwise zero cross-device visibility
-// into which Google account is about to be used.
-function installUrlWithAccount() {
+// the QR carries a Firebase custom token so the phone auto-authenticates
+// without a second Google sign-in. The token is minted on-demand by /api/token
+// (short-lived, scoped to this uid). Falls back to just the email hint if
+// minting fails (e.g. backend not reachable).
+async function installUrlWithAccount() {
   const email = window._userEmail || "";
-  return INSTALL_URL + (email ? "?acct=" + encodeURIComponent(email) : "");
+  const base = INSTALL_URL + (email ? "?acct=" + encodeURIComponent(email) : "");
+  try {
+    const tok = window._mintInstallToken ? await window._mintInstallToken() : null;
+    if (tok) return INSTALL_URL + "?tok=" + encodeURIComponent(tok) + (email ? "&acct=" + encodeURIComponent(email) : "");
+  } catch (_) {}
+  return base;
 }
 window.maybeShowOtherDeviceGate = function () {
   const gate = document.getElementById("otherDeviceGate");
@@ -307,7 +359,13 @@ window.maybeShowOtherDeviceGate = function () {
     hint.textContent = INSTALL_URL;
   } else {
     label.textContent = "Now install it on your phone too" + (window._userEmail ? (" as " + window._userEmail) : "") + ". Come back here once you're done.";
-    qr.src = qrSrcFor(installUrlWithAccount());
+    // mint a token asynchronously and update the QR when ready
+    installUrlWithAccount().then((url) => {
+      if (document.getElementById("otherDeviceGate") && document.getElementById("otherDeviceGate").classList.contains("on")) {
+        qr.src = qrSrcFor(url);
+      }
+    });
+    qr.src = qrSrcFor(INSTALL_URL); // show immediately with plain URL while token mints
     qr.style.display = "block";
     hint.textContent = INSTALL_URL;
   }
@@ -432,14 +490,44 @@ function renderNotifyLabel() {
   const d = new Date(); d.setHours(h, m, 0, 0);
   // "reflect at 8pm" — no trailing s, no ":00", lowercase am/pm
   let t = d.toLocaleTimeString(undefined, { hour: "numeric", minute: m ? "2-digit" : undefined }).toLowerCase().replace(/\s+/g, "");
-  els.forEach((el) => { el.textContent = "reflect at " + t; });
+  
+  const validated = isNotifValidated();
+  els.forEach((el) => {
+    if (validated) {
+      el.textContent = "reflect at " + t;
+      el.classList.remove("warning");
+    } else {
+      el.textContent = "tap to test notifications";
+      el.classList.add("warning");
+    }
+  });
 }
 window.onNotifyTimeChange = (v) => {
   settings.notifyTime = v; saveLocalSettings(); renderNotifyLabel();
   window._saveSettings && window._saveSettings({ notifyTime: v });
   document.querySelectorAll(".notify-time-hidden").forEach((el) => { el.value = v; });
+  if (window._fcmToken) {
+    const [h, m] = v.split(":").map(Number);
+    scheduleNotificationOnBackend(h, m, window._fcmToken);
+  }
 };
-window.openTimePicker = (btn) => {
+window.openTimePicker = async (btn) => {
+  // If notifications aren't validated, send a test notification instead
+  if (!isNotifValidated()) {
+    const ok = await requestNotifPermission();
+    if (!ok) {
+      alert("Notifications are blocked — enable them in your browser/OS settings.");
+      return;
+    }
+    window._registerPush && window._registerPush(deviceKind());
+    fireNotification("manual");
+    await window._markNotifValidated && window._markNotifValidated();
+    alert("Test notification sent! Notifications are now validated.");
+    renderNotifyLabel();
+    return;
+  }
+
+  // Normal time picker behavior
   const group = btn && btn.closest ? btn.closest(".notify-time-group") : null;
   const el = group ? group.querySelector(".notify-time-hidden") : document.querySelector(".notify-time-hidden");
   if (!el) return;
@@ -595,11 +683,26 @@ window._onHandoffUpdated = async () => {
 window._onActiveDeviceUpdated = () => {
   const ad = window._activeDevice;
   const shade = document.getElementById("deviceShade");
+  const shadeTitle = document.querySelector(".device-shade-title");
   if (!shade) return;
   const isOther = !!(ad && ad.deviceId && window._deviceId && ad.deviceId !== window._deviceId);
-  shade.classList.toggle("on", isOther);
+  
+  const myPhase = currentActivityPhase();
+  const theirPhase = ad ? (ad.activityPhase || "idle") : "idle";
+  
+  let shouldBlock = false;
+  if (isOther && myPhase !== "idle" && theirPhase !== "idle") {
+    shouldBlock = true;
+    if (shadeTitle) {
+      if (theirPhase === "editing") shadeTitle.textContent = "editing on your other device";
+      else if (theirPhase === "reflecting") shadeTitle.textContent = "reflecting on your other device";
+      else shadeTitle.textContent = "in use on your other device";
+    }
+  }
+  
+  shade.classList.toggle("on", shouldBlock);
 };
-window.takeOverDevice = () => { window._claimActiveDevice && window._claimActiveDevice(deviceKind()); };
+window.takeOverDevice = () => { window._claimActiveDevice && window._claimActiveDevice(deviceKind(), currentActivityPhase()); };
 
 // answer history is logged per QUESTION TITLE (normalized), regardless of
 // whether that question itself recalls anything — any OTHER question can
@@ -769,7 +872,49 @@ function stopVoice() {
 // ---------- boot ----------
 document.addEventListener("DOMContentLoaded", () => {
   window.renderDslEditor(); renderSettings();
+  // fire the token check immediately at boot — before the auth listener
+  // resolves — so the phone never has to sit through the "Continue with
+  // Google" button at all when it scanned a QR code with a token in it.
+  const _bootParams = new URLSearchParams(location.search);
+  if (_bootParams.get("tok")) {
+    const _tok = _bootParams.get("tok");
+    history.replaceState({}, "", location.pathname);
+    // firebase-init.js may not be ready yet; poll briefly then give up
+    let _attempts = 0;
+    const _trySignIn = () => {
+      if (window._autoSignInWithToken) {
+        window._autoSignInWithToken(_tok);
+      } else if (_attempts++ < 20) {
+        setTimeout(_trySignIn, 150);
+      }
+    };
+    _trySignIn();
+  }
 });
+
+// "Installing update…" overlay — shown between a SW controller change and
+// the subsequent page reload so the screen doesn't just go blank mid-session.
+(function () {
+  let _overlay = null;
+  function showInstallingOverlay() {
+    if (_overlay) return;
+    _overlay = document.createElement("div");
+    _overlay.id = "installingOverlay";
+    _overlay.innerHTML =
+      '<div class="installing-inner">' +
+        '<div class="installing-spinner"></div>' +
+        '<div class="installing-label">installing update\u2026</div>' +
+      '</div>';
+    document.body.appendChild(_overlay);
+  }
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      showInstallingOverlay();
+      // reload fires naturally right after this in the existing handler
+    });
+  }
+})();
+
 async function scheduleNotificationOnBackend(h, m, fcmToken) {
     if (!fcmToken) return;
 

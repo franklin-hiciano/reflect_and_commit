@@ -135,6 +135,8 @@ window._onSignedIn = () => {
 };
 function deviceKind() { return isPhone() ? "mobile" : "desktop"; }
 function isNotifValidated() { return !!(window._deviceData && window._deviceData.notifValidatedAt); }
+function isIOS() { return /iPhone|iPad|iPod/i.test(navigator.userAgent); }
+function isAndroid() { return /Android/i.test(navigator.userAgent); }
 // "seen" must mean genuinely INSTALLED, not just signed in — otherwise the
 // cross-device gate would skip itself the moment you sign in anywhere,
 // before you've actually installed there. Three ways we learn a real
@@ -260,44 +262,147 @@ const INSTALL_URL = "reflectandcommit.com/install";
 function resetLandingToIntro() {
   const intro = document.getElementById("landingIntro");
   const here = document.getElementById("landingStepHere");
+  const notifySetup = document.getElementById("landingNotifySetup");
+  const denied = document.getElementById("landingPermissionDenied");
+  const enableBtn = document.getElementById("enableNotifBtn");
+  const getStartedBtn = document.getElementById("getStartedBtn");
   if (!intro || !here) return;
   intro.style.display = "block"; here.style.display = "none";
+  if (notifySetup) notifySetup.style.display = "none";
+  if (denied) denied.style.display = "none";
+  
+  // Show correct button based on device
+  if (enableBtn && getStartedBtn) {
+    if (isPhone()) {
+      enableBtn.style.display = "block";
+      getStartedBtn.style.display = "none";
+    } else {
+      enableBtn.style.display = "none";
+      getStartedBtn.style.display = "block";
+    }
+  }
+}
+
+async function handlePermissionRequest() {
+  if (!("Notification" in window)) {
+    alert("This browser doesn't support notifications. Please use Chrome or Safari.");
+    return;
+  }
+
+  const permission = Notification.permission;
+  
+  if (permission === "granted") {
+    // Already granted, proceed to notify setup
+    window.goToNotifySetup();
+    return;
+  }
+
+  if (permission === "denied") {
+    // Already denied, show instructions
+    showPermissionDenied();
+    return;
+  }
+
+  // permission === "default", request it
+  const result = await Notification.requestPermission();
+  if (result === "granted") {
+    window.goToNotifySetup();
+  } else {
+    showPermissionDenied();
+  }
+}
+
+function showPermissionDenied() {
+  document.getElementById("landingIntro").style.display = "none";
+  document.getElementById("landingNotifySetup").style.display = "none";
+  document.getElementById("landingStepHere").style.display = "none";
+  const denied = document.getElementById("landingPermissionDenied");
+  denied.style.display = "block";
+
+  // Show platform-specific instructions
+  const instructions = document.getElementById("permissionInstructions");
+  if (isIOS()) {
+    if (isStandalone()) {
+      instructions.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 8px">iOS (Installed App):</div>
+        <div>1. Open Settings</div>
+        <div>2. Find Reflect & Commit</div>
+        <div>3. Tap Notifications</div>
+        <div>4. Enable "Allow Notifications"</div>
+      `;
+    } else {
+      instructions.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 8px">iOS (Safari):</div>
+        <div>1. Open Settings</div>
+        <div>2. Scroll to Safari</div>
+        <div>3. Tap Notifications</div>
+        <div>4. Find this site and enable notifications</div>
+      `;
+    }
+  } else if (isAndroid()) {
+    instructions.innerHTML = `
+      <div style="font-weight: 600; margin-bottom: 8px">Android (Chrome):</div>
+      <div>1. Tap Chrome menu (⋮)</div>
+      <div>2. Tap Settings</div>
+      <div>3. Tap Site Settings</div>
+      <div>4. Tap Notifications</div>
+      <div>5. Find this site and set to "Allow"</div>
+    `;
+  } else {
+    instructions.innerHTML = `
+      <div style="font-weight: 600; margin-bottom: 8px">Desktop:</div>
+      <div>1. Click the lock/info icon in your address bar</div>
+      <div>2. Find "Notifications" or "Site Settings"</div>
+      <div>3. Set to "Allow"</div>
+    `;
+  }
+}
+
+async function retryPermission() {
+  // Re-check permission in case user manually enabled it
+  const permission = Notification.permission;
+  if (permission === "granted") {
+    window.goToNotifySetup();
+  } else {
+    alert("Notifications are still blocked. Please follow the instructions above to enable them, then tap Try Again.");
+  }
 }
 window.goToNotifySetup = async () => {
   document.getElementById("landingIntro").style.display = "none";
   const notifySetup = document.getElementById("landingNotifySetup");
   notifySetup.style.display = "block";
-  // Request notification permission immediately
-  await requestNotifPermission();
   renderNotifyLabel();
 };
 
 window.goToInstallGate = () => {
-  // On phone, go through notify setup first. On desktop, skip to install.
-  if (isPhone()) {
-    const notifySetup = document.getElementById("landingNotifySetup");
-    if (notifySetup && notifySetup.style.display !== "block") {
-      window.goToNotifySetup();
-      return;
+  // Desktop: skip notify setup, go straight to install
+  if (!isPhone()) {
+    document.getElementById("landingIntro").style.display = "none";
+    const here = document.getElementById("landingStepHere");
+    here.style.display = "block";
+    const explainer = document.getElementById("onboardingExplainer");
+    if (explainer) {
+      explainer.textContent = "Write your questions here — you'll get a notification on your phone when it's time to reflect.";
     }
+    const steps = document.getElementById("landingManualSteps");
+    if (steps) {
+      steps.innerHTML = ["Click the install icon (⊕) in your address bar,", "or ⋮ menu → Install Reflect & Commit."]
+        .map((s) => "<div>· " + s + "</div>").join("");
+    }
+    return;
   }
 
-  document.getElementById("landingIntro").style.display = "none";
-  document.getElementById("landingNotifySetup").style.display = "none";
-  const here = document.getElementById("landingStepHere");
-  here.style.display = "block";
-  const explainer = document.getElementById("onboardingExplainer");
-  if (explainer) {
-    explainer.textContent = isPhone()
-      ? "You'll get a notification here when it's time to reflect."
-      : "Write your questions here — you'll get a notification on your phone when it's time to reflect.";
-  }
-  const steps = document.getElementById("landingManualSteps");
-  if (steps) {
-    steps.innerHTML = (isMobileUA()
-      ? ["Open this in Safari or Chrome.", "Tap Share (or ⋮) → Add to Home Screen."]
-      : ["Click the install icon (⊕) in your address bar,", "or ⋮ menu → Install Reflect & Commit."]
-    ).map((s) => "<div>· " + s + "</div>").join("");
+  // Phone: check permission first
+  const permission = Notification.permission;
+  if (permission === "granted") {
+    // Already granted, proceed to notify setup
+    window.goToNotifySetup();
+  } else if (permission === "denied") {
+    // Already denied, show instructions
+    showPermissionDenied();
+  } else {
+    // permission === "default", request it
+    handlePermissionRequest();
   }
 };
 function maybeOpenFromUrl() {

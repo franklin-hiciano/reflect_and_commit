@@ -82,6 +82,14 @@ body::after {
   color: #f97316;
   background: rgba(249, 115, 22, 0.15);
 }
+
+/* Permission denied screen instructions */
+#permissionInstructions div {
+  margin-bottom: 4px;
+}
+#permissionInstructions div:last-child {
+  margin-bottom: 0;
+}
 .btn-quiet { background: none; border: none; color: var(--ink-faint); font-family: var(--mono); font-size: 12px; cursor: pointer; }
 .btn-quiet:hover { color: var(--ink-dim); }
 

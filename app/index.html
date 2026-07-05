@@ -50,7 +50,10 @@
                     Design yourself questions that encourage future you to
                     live by your principles.
                 </div>
-                <button class="btn-ghost" onclick="goToInstallGate()">
+                <button class="btn-ghost" id="enableNotifBtn" onclick="handlePermissionRequest()" style="display: none">
+                    Enable Notifications
+                </button>
+                <button class="btn-ghost" id="getStartedBtn" onclick="goToInstallGate()">
                     Get started
                 </button>
             </div>
@@ -88,6 +91,41 @@
                     onclick="goToInstallGate()"
                 >
                     Continue
+                </button>
+            </div>
+
+            <div
+                class="landing-inner"
+                id="landingPermissionDenied"
+                style="display: none; max-width: 340px; margin: 0 auto"
+            >
+                <div
+                    style="font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: 0.01em; margin-bottom: 6px"
+                >
+                    Notifications Blocked
+                </div>
+                <div
+                    style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6"
+                >
+                    Notifications are required for Reflect &amp; Commit to work. You'll need to enable them manually.
+                </div>
+                <div
+                    id="permissionInstructions"
+                    style="font-family: var(--mono); font-size: 12px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px"
+                >
+                    <!-- Platform-specific instructions will be injected here -->
+                </div>
+                <button
+                    style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 12px"
+                    onclick="retryPermission()"
+                >
+                    Try Again
+                </button>
+                <button
+                    class="btn-quiet"
+                    onclick="resetLandingToIntro()"
+                >
+                    Back to Start
                 </button>
             </div>
 

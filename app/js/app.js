@@ -769,3 +769,29 @@ function stopVoice() {
 document.addEventListener("DOMContentLoaded", () => {
   window.renderDslEditor(); renderSettings();
 });
+async function scheduleNotificationOnBackend(h, m, fcmToken) {
+    if (!fcmToken) return;
+
+    const now = new Date();
+    const targetTime = new Date();
+    targetTime.setHours(h, m, 0, 0);
+    
+    // If the time has already passed today, schedule it for tomorrow
+    if (targetTime < now) {
+        targetTime.setDate(targetTime.getDate() + 1);
+    }
+    
+    // Calculate how many minutes from now the notification should fire
+    const delayMinutes = Math.max(1, Math.round((targetTime.getTime() - now.getTime()) / 60000));
+    
+    await fetch('/api/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            fcmToken: fcmToken,
+            delayMinutes: delayMinutes,
+            title: "Time to reflect",
+            body: "Your questions are ready."
+        })
+    });
+}

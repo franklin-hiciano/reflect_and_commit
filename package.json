@@ -1,0 +1,25 @@
+{
+  "name": "wisdom_tree",
+  "version": "1.0.0",
+  "description": "Replaces the click-heavy block editor (`tree-editor.js` + `dsl-graph.js`) with the DSL-text editor + editable node canvas prototyped in `Reflect & Commit.dc.html`. The raw DSL text is now the single source of truth for the question tree — see `app/js/tree-model.js` for the grammar and every mutation helper.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/franklin-hiciano/reflect_and_commit.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/franklin-hiciano/reflect_and_commit/issues"
+  },
+  "homepage": "https://github.com/franklin-hiciano/reflect_and_commit#readme",
+  "dependencies": {
+    "@upstash/qstash": "^2.11.1",
+    "firebase-admin": "^14.1.0"
+  }
+}

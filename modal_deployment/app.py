@@ -1,47 +1,25 @@
 import os
+import tarfile
 import shutil
 import modal
 
-# 1. Container Image Definition
+# 1. Lightweight, pristine image definition
 hermes_image = (
     modal.Image.debian_slim(python_version="3.12")
     .apt_install("curl", "git")
     .uv_pip_install("hermes-agent")
-    .run_commands(
-        "curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash"
-    )
+    .run_commands("curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash")
 )
 
-# 2. Network disk to isolate separate user database states
-volume = modal.Volume.from_name("hermes-user-memories", create_if_missing=True)
+nfs = modal.NetworkFileSystem.from_name("hermes-user-memories", create_if_missing=True)
 app = modal.App("hermes-multi-tenant-service", image=hermes_image)
 
 
-def initialize_hermes_config():
-    """Ensures Hermes activates the custom provider and binds env secrets"""
-    hermes_dir = os.path.expanduser("~/.hermes")
-    os.makedirs(hermes_dir, exist_ok=True)
-    
-    config_path = os.path.join(hermes_dir, "config.yaml")
-    
-    # Generate the global configuration block mapping FreeLLMAPI parameters
-    config_content = """
-provider: "custom"
-providers:
-  custom:
-    api_key: "${OPENAI_API_KEY}"
-    base_url: "${OPENAI_BASE_URL}"
-    default_model: "auto"
-"""
-    with open(config_path, "w") as f:
-        f.write(config_content.strip())
-
-
 @app.function(
-    volumes={"/data": volume}, 
-    timeout=300,
+    network_file_systems={"/data": nfs}, 
+    timeout=180,  # Generous headroom for network/inference loops
+    concurrency_limit=1,
     secrets=[
-        # Inject custom endpoint configurations seamlessly into the container environment
         modal.Secret.from_dict({
             "OPENAI_API_KEY": "freellmapi-49fca99347ad526f2172f80358cbb2e36789b2cbc982f4a0",
             "OPENAI_BASE_URL": "http://34.26.134.74:3001/v1"
@@ -50,37 +28,75 @@ providers:
 )
 @modal.web_endpoint(method="POST")
 def chat_with_agent(payload: dict):
-    """
-    Accepts JSON payloads: {"user_id": "user_123", "message": "Hello Agent"}
-    """
     user_id = payload.get("user_id")
     user_message = payload.get("message")
     
     if not user_id or not user_message:
         return {"error": "Missing user_id or message"}, 400
 
-    # Locate individual user workspaces inside the network drive
-    user_storage_path = f"/data/users/{user_id}/.hermes"
-    container_hermes_path = os.path.expanduser("~/.hermes")
-
-    # Hydrate current sandbox context with target user's SQLite memory files
-    if os.path.exists(user_storage_path):
-        shutil.copytree(user_storage_path, container_hermes_path, dirs_exist_ok=True)
-    else:
-        os.makedirs(container_hermes_path, exist_ok=True)
-
-    # Force initialization of the configuration mapping layer
-    initialize_hermes_config()
-
-    # Invoke Hermes Agent using the updated runtime structure
-    from run_agent import AIAgent
+    # Step 1: Create an isolated, high-speed LOCAL disk folder for this user
+    local_user_home = f"/tmp/hermes_{user_id}"
     
+    if os.path.exists(local_user_home):
+        shutil.rmtree(local_user_home)
+    os.makedirs(local_user_home, exist_ok=True)
+
+    # Step 2: Dynamically bind the Hermes environment to this local folder
+    os.environ["HERMES_HOME"] = local_user_home
+    os.chdir(local_user_home)
+
+    # Step 3: Stream user memories from NFS archive into local space (1 fast read operation)
+    nfs_archive_dir = "/data/users"
+    nfs_archive_path = f"{nfs_archive_dir}/{user_id}_state.tar.gz"
+    
+    if os.path.exists(nfs_archive_path):
+        with tarfile.open(nfs_archive_path, "r:gz") as tar:
+            tar.extractall(path=local_user_home)
+
+    # Step 4: Write fresh operational configuration inside the local home
+    config_path = os.path.join(local_user_home, "config.yaml")
+    config_content = f"""
+provider: "custom"
+providers:
+  custom:
+    api_key: "{os.environ.get('OPENAI_API_KEY')}"
+    base_url: "{os.environ.get('OPENAI_BASE_URL')}"
+    default_model: "gemini-1.5-flash"
+"""
+    with open(config_path, "w") as f:
+        f.write(config_content.strip())
+
+    # ---------------------------------------------------------
+    # THE FIX: Remove the injected guardrail string completely.
+    # Just pass the raw message to the agent.
+    # ---------------------------------------------------------
+
+    # Step 5: Instantiate and execute the chat tracking purely over local SSD
+    from run_agent import AIAgent
     agent = AIAgent(quiet_mode=True)
+    
+    # Pass the unaltered user_message
     response = agent.chat(user_message)
 
-    # Sync memory adjustments back to the persistent disk before teardown
-    os.makedirs(os.path.dirname(user_storage_path), exist_ok=True)
-    shutil.copytree(container_hermes_path, user_storage_path, dirs_exist_ok=True)
-    volume.commit()
+    # Step 6: Bundle updated local state and stream back to the NFS (1 fast write operation)
+    os.makedirs(nfs_archive_dir, exist_ok=True)
+    with tarfile.open(nfs_archive_path, "w:gz") as tar:
+        for item in os.listdir(local_user_home):
+            full_path = os.path.join(local_user_home, item)
+            tar.add(full_path, arcname=item)
 
-    return {"user_id": user_id, "agent_response": response}
+    return {
+        "user_id": user_id, 
+        "agent_response": response
+    }
+        # Step 7: Bundle updated local state and stream back to the NFS (1 fast write operation)
+    os.makedirs(nfs_archive_dir, exist_ok=True)
+    with tarfile.open(nfs_archive_path, "w:gz") as tar:
+        for item in os.listdir(local_user_home):
+            full_path = os.path.join(local_user_home, item)
+            tar.add(full_path, arcname=item)
+
+    return {
+        "user_id": user_id, 
+        "agent_response": response
+    }

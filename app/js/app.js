@@ -381,7 +381,8 @@ window.sendSelfNotification = async () => {
 let lastFiredDateKey = localStorage.getItem("rc_last_fired_date") || "";
 function scheduleNotificationLoop() {
   setInterval(() => {
-    const now = new Date(); const [h, m] = (settings.notifyTime || "20:00").split(":").map(Number); const key = now.toDateString();
+    const now = new Date(); const [h, m] = (settings.notifyTime || "20:00").split(":").map(Number);
+    const key = now.toDateString() + " " + now.getHours() + ":" + now.getMinutes();
     if (key !== lastFiredDateKey && now.getHours() === h && now.getMinutes() >= m && now.getMinutes() < m + 2) { lastFiredDateKey = key; localStorage.setItem("rc_last_fired_date", key); fireNotification("schedule"); }
   }, 30000);
 }
@@ -390,7 +391,7 @@ if ("serviceWorker" in navigator) {
   // now loads from both /app/index.html and the root index.html (which
   // references app/js/app.js), and "sw.js" alone would resolve against
   // whichever page loaded it, missing the file when served from root.
-  const swUrl = new URL("../sw.js", document.currentScript.src).href;
+  const swUrl = new URL("../../sw.js", document.currentScript.src).href;
   navigator.serviceWorker.register(swUrl, { scope: new URL(".", swUrl).href }).then((reg) => {
     // the browser only checks for a new sw.js at most once every ~24h on its
     // own — for a PWA that mostly gets opened once a day right at reflection

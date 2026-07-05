@@ -1,0 +1,92 @@
+Document 0: Overarching System Architecture ContextSystem Target: The "Zero-UI" Background Browser Agent LifecycleCore Objective: Orchestrate a high-intelligence, cloud-hosted LLM (Modal + Hermes) to act seamlessly on a user's local hardware (Tauri + Playwright). This configuration completely bypasses proxy billing, data-center IP bans, and headless browser fingerprinting by running directly inside the user's authentic consumer browser context.   [Modal Cloud Brain] (Phase 2) ──► WebSocket Relay (Phase 1) ──► Tauri Bridge Daemon (Phase 3)
+         ▲                                                               │
+         │ (State Loop Via Redis)                                        ▼
+ [Upstash Redis State]                                       Local Browser & RAG (Phases 4 & 5)
+The Architecture Core BlueprintThe Problem: Direct orchestration from cloud platforms (like Modal) trips enterprise-grade anti-bot mitigations instantly and risks execution timeouts during long background runs.  The Solution: Decouple reasoning from execution. The cloud handles the expensive cognitive load (thinking, DOM parsing, state tracking), while the local laptop acts as an automated input device.  How to Delegate to Sub-Agents: If you are dividing this task across individual coding models, paste Document 0 as global context, then feed each model its respective Phase Document (1 through 5) in isolation. Every phase enforces precise schemas to guarantee interoperability.Document 1: Phase 1 – The WebSocket Relay TunnelObjective: Build a high-throughput, low-latency, state-blind JSON-RPC relay that punctures residential NATs and routes bidirectional control signals without open incoming ports on the client.1. Core Technical SpecificationRuntime Environment: Node.js (Bun) or Cloudflare Workers.Data Store Requirement: In-memory Map tracking paired socket connections using an explicit session_id routing token.2. Connection Lifecycle LogicThe server must expose an upgrade endpoint: ws://[relay.domain.com/tunnel?session_id=](https://relay.domain.com/tunnel?session_id=)<uuid>&role=<brain|actuator>.On upgrade, the connection is bound to a global state object:TypeScriptinterface ActiveSession {
+  brain: WebSocket | null;
+  actuator: WebSocket | null;
+  pendingQueue: string[];
+}
+const sessions = new Map<string, ActiveSession>();
+Disconnection Behavior: If a connection drops, do not tear down the session key immediately. Retain it for 300 seconds to allow for network switching or device sleep reconnections.3. Strict Payload Routing EngineThe relay must validate every incoming frame before forwarding. Reject any malformed frame immediately to prevent infinite silent failures.Routing Logic:If role === "brain", verify sessions.get(session_id).actuator exists. Forward the payload verbatim. If missing, append the payload to pendingQueue (max 50 frames limit).If role === "actuator", forward directly to brain. If brain is dead/timed out, execute an immediate HTTP POST webhook trigger back to the Modal orchestration router to wake up a new instance.Document 2: Phase 2 – The Ephemeral Cloud Brain (Modal + Upstash)Objective: Implement a fully stateless, event-driven agent reasoning engine inside Modal that reads state from Upstash Redis, executes exactly one browser reasoning step, and immediately terminates to conserve compute and handle timeouts.1. Core Configuration (modal_app.py)Pythonimport modal
+from redis import Redis
+
+app = modal.App("hermes-stateless-brain")
+image = modal.Image.debian_slim().pip_install("redis", "openai", "pydantic")
+
+@app.function(image=image, timeout=30)
+@modal.web_endpoint(method="POST")
+def execute_step(payload: dict):
+    # Core Entrypoint for Webhook and Curl triggers
+2. Upstash State Serialization SchemaDo not preserve variables across container executions. Store everything in Redis using the key template: agent_state:{session_id}.JSON{
+  "current_goal": "Create a Shopify store for leather boots",
+  "step_counter": 14,
+  "conversation_history": [
+    {"role": "user", "content": "..."},
+    {"role": "assistant", "content": "..."}
+  ],
+  "last_known_url": "https://admin.shopify.com/store-setup",
+  "execution_status": "AWAITING_ACTUATOR"
+}
+3. Step-by-Step Execution SequenceRehydration: Read stringified payload from Upstash. Parse the current context and the incoming DOM structure provided by the local actuator.Reasoning: Execute the Hermes model call. The system prompt must force JSON output outlining exactly one tool invocation (e.g., click, type, extract, search_assets).Command Dispatched: Connect to the Phase 1 Relay, push the single JSON-RPC tool invocation to the local machine, update the Redis state machine status to AWAITING_ACTUATOR, and gracefully close the function context.Document 3: Phase 3 – The Local Process Actuator (Tauri Desktop App)Objective: Create a cross-platform desktop manager that isolates system binaries, manages background daemon lifecycles, and maintains the persistent connection loop to the cloud tunnel.  1. Rust Daemon Manager Layout (src-tauri/src/main.rs)Rustuse std::process::{Command, Child};
+use tauri::{State, Manager, RunEvent};
+use std::sync::Mutex;
+
+struct DaemonState {
+    orchestrator_process: Mutex<Option<Child>>,
+}
+
+#[tauri::command]
+fn start_bridge_daemon(session_id: String, state: State<'_, DaemonState>) -> Result<(), String> {
+    let child = Command::new("python")
+        .arg("local_orchestrator.py")
+        .arg("--session")
+        .arg(session_id)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+        
+    *state.orchestrator_process.lock().unwrap() = Some(child);
+    Ok(())
+}
+2. Critical IPC and Resource LifecycleZombie Prevention: You must intercept system interrupts to avoid leaving rogue python or playwright processes dangling on the user's operating system.Tauri Lifecycle Hook: Register an explicit drop handler inside Tauri’s run loop:Rusttauri::Builder::default()
+    .manage(DaemonState { orchestrator_process: Mutex::new(None) })
+    .build(tauri::generate_context!())
+    .expect("error while building tauri application")
+    .run(|app_handle, event| match event {
+        RunEvent::ExitRequested { .. } => {
+            let state = app_handle.state::<DaemonState>();
+            if let Some(mut child) = state.orchestrator_process.lock().unwrap().take() {
+                let _ = child.kill(); // Force terminate background processes cleanly
+            }
+        }
+        _ => {}
+    });
+Document 4: Phase 4 – The Shadow Context Engine (Local Vector RAG & CDP)Objective: Implement an offline, private asset ingestion engine using embedded storage that directly resolves and injects file inputs without violating browser security primitives.  1. Local Database & Embedding Implementation (local_orchestrator.py)Database: Use lancedb via native Python bindings for disk-backed array operations.Embeddings: Run local CPU inferences with onnxruntime utilizing the all-MiniLM-L6-v2 model weights to keep all personal data completely on the device.Directory Scraper: Bind a background path listener to ~/AgentAssets. Whenever a file is added, write the mapping schema to the vector table:Pythonschema = {
+    "file_path": "/Users/user/AgentAssets/logo.png",
+    "vector": [0.043, -0.012, ...],
+    "metadata": "company brand logo design transparent background"
+}
+2. Bypassing the Web Sandbox via Playwright CDPThe Constraint: Traditional JavaScript evaluations like input.value = '/path' fail due to security protections against unmediated file-system access.The Bypass: Interact directly with the browser via the Chrome DevTools Protocol layer utilizing Playwright's native selector overrides.Code Implementation Matrix:Python# When the cloud calls search_and_inject_asset
+async def handle_file_injection(target_css_selector: str, semantic_query: str):
+    # 1. Query the local LanceDB instance
+    matched_asset = lancedb_table.search(semantic_query).limit(1).to_pydantic()[0]
+
+    # 2. Inject directly into the Playwright Locator layer
+    file_input_locator = page.locator(target_css_selector)
+    await file_input_locator.set_input_files(matched_asset.file_path)
+
+    # 3. Emit success event back down the pipeline
+    return {"status": "SUCCESS", "injected_file": matched_asset.file_path}
+Document 5: Phase 5 – The Live Streaming Checkpoint UI & Human-In-The-Loop FrameworkObjective: Build a real-time visual telemetry bridge that streams the automated browser session and handles critical handoffs (like 2FA and CAPTCHAs) via interactive visual states.  1. Real-Time Telemetry Capture PipelineInside the local runtime orchestrator, hook into Playwright's frame events. Do not use video recording blocks which introduce significant disk latency.Frame Casting Implementation:Pythonasync def stream_browser_viewpoint(page, app_handle):
+    while browser_is_active:
+        # Capture high-performance frame buffers directly from the open page context
+        screenshot_bytes = await page.screenshot(type="jpeg", quality=40)
+        base64_frame = base64.b64encode(screenshot_bytes).decode('utf-8')
+
+        # Emit via the WebSocket Relay up to the user UI
+        await websocket.send_json({
+            "type": "telemetry_frame",
+            "frame": base64_frame
+        })
+        await asyncio.sleep(0.1) # Bound telemetry to 10fps to avoid network choke
+2. The Interactive Checkpoint Handoff LogicWhen the cloud brain flags a block (e.g., status: "NEEDS_HUMAN_INTERVENTION" due to a CAPTCHA or a 60-second 2FA entry):  The cloud halts execution, updates Upstash status, and logs the breakpoint condition.The Tauri frontend application detects the status code and un-hides the visual canvas layer.The frontend hooks mouse clicks and key presses directly over the canvas frame coordinates, transmitting those exact inputs via the local Playwright instance to let the human clear the security gate natively.Once cleared, the user clicks a "Resume Task" trigger, which prompts a webhook event to re-hydrate the Modal engine loop.  

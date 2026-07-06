@@ -1,0 +1,125 @@
+so this whole thing will only be for major life changes, this is not some agent that decides to micromanage your life and manage your tasks, it is something like a chnage-your-life-bot, preferring to do one or two things at once max. i want it to fire only for things that matter. because in the end my primary belief is truly that reflection is what will really boost agency (core thesis is that more ideas roughly translates to more action in life), this is was not originally meant to be an ai saas and really the agent is just an artificial incentive to reflection that just so happens to show you what happens if you take those reflections and act on them. therefore it pops up only for consent and necessary information, otherwise its just running your life experiments in the background, and such nothing happens in the front end unless an experiment is at a critical point or the user checks on what their agent is doing for them. now flesh out the plan in fine detail, for anything left ambiguous search the solution space for the simplest solution 
+
+This is a massive philosophical shift that makes the product infinitely more compelling.
+
+By framing the agent not as a productivity task-manager, but as a "Life Experiment Actuator," you change the entire UX and backend constraint model. The agent is a lagging indicator of deep human reflection—an artificial incentive loop. The user does the heavy lifting of thinking; the agent simply absorbs the kinetic energy of that reflection and prevents it from dying as a "good intention" by executing 1 or 2 high-impact experiments in the background.
+
+Because it runs entirely in the background and only surfaces for Explicit Consent Gates or Critical State Updates, we can radically simplify the architecture. We don't need complex real-time frontend syncing, multi-task scheduling, or heavy state management.
+
+Here is the hyper-detailed, edge-case-resolved implementation plan for Cursor to execute this exact vision.
+
+Phase 1: The Trajectory Payload & Background Hand-Off
+When the user hits a terminal node (e.g., done), the frontend packages the entire journey and silently ships it off, transitioning the UI immediately back to a peaceful "Reflection Complete" dashboard.
+
+1. Frontend Capture Implementation
+Inside your state manager, trace the user's explicit choices. When a terminal node triggers isDoneText(s), compile this exact flat payload:
+
+JSON
+{
+  "user_id": "user_alpha_81",
+  "session_id": "exp_gen_uuid_12345",
+  "timestamp": 1783382400,
+  "raw_trajectory": [
+    {"question": "What is draining your energy?", "choice": "Career tracking alignment"},
+    {"question": "What is the boldest move you could make?", "choice": "Pitching the stealth technical lead role to the VP directly"},
+    {"question": "What prevents this?", "choice": "I don't have a clean portfolio site or a formal deck ready."}
+  ]
+}
+Cursor Task: Update the node selection handler to append to a history array. On isDoneText(), fire a non-blocking fetch("POST", "/chat_with_agent") and immediately clear the active workspace to show a calm reflection metric page.
+
+Phase 2: The Core Sifter & Experiment Synthesis (app.py)
+When Modal receives this raw trajectory, it must decide if a "Major Life Experiment" is warranted. If the trajectory is purely emotional or meditative, it writes a graceful null state.
+
+1. The Sifter Prompt
+In app.py, route the payload into a dedicated synthesizer. We use a single strict system prompt to determine if action is required:
+
+Python
+SIFTER_PROMPT = """
+You are the Cognitive Core of a Life Experiment Engine. 
+Analyze the user's reflection trajectory. Determine if their conclusion maps to a major, high-leverage digital life experiment (e.g., sourcing high-quality leads, applying to a reach position, initiating a major account migration, extracting research papers for a thesis).
+
+Constraints:
+1. Max 1-2 concurrent goals ever.
+2. If the reflection is purely inward, emotional, or lacks a high-impact digital leverage point, you MUST respond exactly with: {"action_required": false, "experiment_goal": null}
+3. If action is required, output exactly: {"action_required": true, "experiment_goal": "A single clear objective sentence."}
+
+Output strict JSON only.
+"""
+2. Writing to Upstash (Simplest Solution Space)
+Instead of keeping a live state connection, we use Upstash Redis as a silent lock-box. If action_required is true, write to two keys:
+
+agent_active_experiment:{user_id} → Stores the experiment_goal, status: "STAGED", and step_counter: 0.
+
+agent_history:{user_id} → Appends this experiment log for the user's long-term dashboard.
+
+Simplest Solution Choice: If an active experiment already exists in Redis under agent_active_experiment:{user_id} and its status is not COMPLETED, the Sifter rejects the new experiment. This natively enforces your "maximum 1 or 2 things at once" rule without needing complex queue systems.
+
+Phase 3: The Background ReAct Execution Loop (The "Silent Run")
+Once the experiment is staged, Modal drops a lightweight wakeup ping over the Phase 1 WebSocket Relay to your local Tauri bridge daemon.
+
+1. The Headless Launch
+The Tauri app receives the wake-up signal, grabs the experiment_goal from Upstash, and provisions a hidden, headless Playwright context. The user sees absolutely nothing on their screen.
+
+2. Strict ReAct Thinking Loop
+The local daemon extracts the raw DOM from the hidden page and POSTs it back to Modal's execution endpoint. The system prompt forces Hermes into an aggressive ReAct constraint:
+
+JSON
+{
+  "thought": "The user wants to find high-leverage contacts at X company. I am on LinkedIn search. I need to enter the query into the search input box.",
+  "action": "fill_input",
+  "params": {"selector": "input[placeholder='Search']", "value": "VP of Engineering"}
+}
+3. Execution & State Persistence
+The local actuator runs the tool call, waits for the DOM to settle, and updates Upstash Redis (step_counter += 1).
+
+Resource Optimization: To keep cloud costs near zero and handle execution stability, the Modal container spins up, processes exactly one step of thinking, transmits the tool down the socket, and immediately dies. The local Tauri app holds the browser state, acts as the persistent device, and re-invokes Modal for the next step.
+
+Phase 4: The Intercept & Consent Gate (The Only UI Interruption)
+Because this is a "change-your-life-bot," the agent is explicitly forbidden from crossing into Tier 2 (Irreversible/High-Impact Actions) without human presence.
+
+1. The Gate Trigger
+When Hermes generates its thought process and determines the next step is a threshold action (e.g., clicking "Submit Application", sending a cold outreach email, purchasing a domain), it must call the tool propose_irreversible_action.
+
+2. Setting the Trap in Upstash
+When this tool is called, app.py instantly changes the Upstash state:
+
+JSON
+{
+  "status": "AWAITING_HUMAN_CONSENT",
+  "proposed_action": "Send cold outreach email to the VP of Engineering with the generated reflection deck.",
+  "current_url": "https://..."
+}
+The local Tauri engine parks the headless browser context in an idle, live state and stops executing.
+
+3. The Front-End Wakeup
+Your frontend application periodically polls Upstash (or listens to a lightweight WebSocket state change event). The absolute second it detects AWAITING_HUMAN_CONSENT:
+
+A sleek, minimal system notification or tray pop-up appears: "Your reflection experiment has reached a critical crossroad."
+
+When clicked, it opens the application interface, pulls the live telemetry frame buffer stream from Playwright (Phase 5 of plan.txt), and renders the exact email text or submission page alongside a prominent [Approve & Execute] or [Abort Experiment] button.
+
++-------------------------------------------------------------+
+|  CRITICAL EXPERIMENT CROSSROAD                              |
+|                                                             |
+|  Goal: Pitch Stealth Tech Lead Role                         |
+|  Proposed Action: Send direct message to VP of Engineering  |
+|                                                             |
+|  [ Live Preview of the Browser Canvas / Form State ]         |
+|                                                             |
+|  [ Abort Experiment ]                  [ Approve & Execute] |
++-------------------------------------------------------------+
+4. Post-Consent Resolution
+If the user clicks Approve, the Tauri app executes the final click natively, updates Upstash to COMPLETED, closes the browser context, and hides the UI.
+
+If the user clicks Abort, the context is instantly wiped from local RAM, the key is cleared, and the UI vanishes.
+
+Summary Checklist for Cursor Execution
+Provide this exact checklist to your Cursor agent to write the files:
+
+[ ] tree-model.js / Frontend: Modify the completion sequence to capture raw node/choice arrays and POST to Modal instead of displaying local completions.
+
+[ ] app.py (Sifter Function): Add an incoming payload check. If it's a reflection path, run SIFTER_PROMPT. Check Upstash for existing active locks. If clear, write the goal as STAGED.
+
+[ ] app.py (ReAct Step Handler): Standardize the JSON output schema (thought before action). Implement the propose_irreversible_action tool which flips the Redis state to AWAITING_HUMAN_CONSENT.
+
+[ ] Local Daemon: Ensure Playwright launches entirely headlessly during background runs and switches telemetry streams on only when the status transitions away from background execution.

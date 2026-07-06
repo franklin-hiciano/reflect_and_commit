@@ -171,7 +171,7 @@ body::after {
 /* bottom-LEFT, not bottom-right — the "⋯" home menu now lives there and the
    two would otherwise sit exactly on top of each other on mobile */
 .access-editor-anyway-btn {
-  position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom));
+  position: fixed; left: 16px; bottom: calc(76px + env(safe-area-inset-bottom));
   background: none; border: none; color: var(--ink-faint); font-family: var(--mono); font-size: 11px;
   letter-spacing: .02em; cursor: pointer; padding: 8px 4px; z-index: 40;
 }

@@ -3,6 +3,8 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithCustomToken,
   signOut as fbSignOut,
   onAuthStateChanged,
@@ -51,13 +53,22 @@ const setSyncDot = (s) => {
   if (d) d.className = "sync-dot" + (s ? " " + s : "");
 };
 
+// iOS Safari blocks signInWithPopup in PWA contexts — redirect flow is the
+// only reliable option there.
+const _iosUA = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 window.doSignIn = async () => {
   try {
-    await signInWithPopup(auth, gProvider);
+    if (_iosUA) {
+      await signInWithRedirect(auth, gProvider);
+    } else {
+      await signInWithPopup(auth, gProvider);
+    }
   } catch (e) {
     console.error(e);
   }
 };
+// handle the redirect result when returning from the Google sign-in page
+getRedirectResult(auth).catch(() => {});
 window.doSignOut = async () => {
   await fbSignOut(auth);
 };
@@ -278,6 +289,8 @@ window._registerPush = function (kind) {
     try {
       window._fcmToken = token;
       await setDoc(uDoc("devices", deviceId()), { token, kind: kind || "mobile", tzOffsetMin, updatedAt: serverTimestamp() }, { merge: true });
+      // schedule the backend notification now that we have the token
+      window._onFcmTokenReady && window._onFcmTokenReady(token);
     } catch (e) {}
   });
 };

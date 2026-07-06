@@ -169,7 +169,14 @@ window.addEventListener("appinstalled", () => {
 // re-renders it if something upstream re-triggered it.
 window._onOnboardingUpdated = () => {
   const home = document.getElementById("homeScreen");
-  if (home && home.classList.contains("on")) maybeShowOtherDeviceGate();
+  if (home && home.classList.contains("on")) {
+    maybeShowOtherDeviceGate();
+  } else if (!isPhone() && isStandalone()) {
+    // Desktop might be blocked on the "waiting for phone" screen —
+    // re-run enterHome now that onboarding state has updated.
+    const mobileNotifEnabled = !!(window._onboarding && window._onboarding.mobileNotifEnabledAt);
+    if (mobileNotifEnabled) enterHome();
+  }
   renderSettings();
 };
 // focusing this device is treated as "I'm using this one now" — claim it as
@@ -222,20 +229,11 @@ function enterHome() {
     return;
   }
   
-  // Desktop: check mobile status before proceeding
+  // Desktop: gate on mobile notification setup only when mobile has been seen but not yet validated
   if (!isPhone()) {
     const mobileSeen = !!(window._onboarding && window._onboarding.mobileSeenAt);
     const mobileNotifEnabled = !!(window._onboarding && window._onboarding.mobileNotifEnabledAt);
-    
-    if (!mobileSeen) {
-      // Mobile not installed, show pair mobile screen
-      showScreen("landingScreen");
-      showPairMobileScreen();
-      return;
-    }
-    
-    if (!mobileNotifEnabled) {
-      // Mobile installed but notifications not enabled, show waiting screen
+    if (mobileSeen && !mobileNotifEnabled) {
       showScreen("landingScreen");
       showWaitingForMobileScreen();
       return;
@@ -543,13 +541,15 @@ function qrSrcFor(url) {
 // (short-lived, scoped to this uid). Falls back to just the email hint if
 // minting fails (e.g. backend not reachable).
 async function installUrlWithAccount() {
+  // use the app's own origin so the ?tok= custom token is processed on arrival
+  // (the /install page is a separate page that doesn't handle auth tokens)
+  const appBase = window.location.origin + "/";
   const email = window._userEmail || "";
-  const base = INSTALL_URL + (email ? "?acct=" + encodeURIComponent(email) : "");
   try {
     const tok = window._mintInstallToken ? await window._mintInstallToken() : null;
-    if (tok) return INSTALL_URL + "?tok=" + encodeURIComponent(tok) + (email ? "&acct=" + encodeURIComponent(email) : "");
+    if (tok) return appBase + "?tok=" + encodeURIComponent(tok) + (email ? "&acct=" + encodeURIComponent(email) : "");
   } catch (_) {}
-  return base;
+  return appBase + (email ? "?acct=" + encodeURIComponent(email) : "");
 }
 window.maybeShowOtherDeviceGate = function () {
   const gate = document.getElementById("otherDeviceGate");
@@ -1127,6 +1127,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 })();
+
+// called by firebase-init.js after FCM token is obtained — schedule the
+// backend notification immediately so the user gets it even if they never
+// change the time picker (which is the only other place this is called).
+window._onFcmTokenReady = function (token) {
+  if (settings && settings.notifyTime) {
+    const [h, m] = settings.notifyTime.split(":").map(Number);
+    scheduleNotificationOnBackend(h, m, token);
+  }
+};
 
 async function scheduleNotificationOnBackend(h, m, fcmToken) {
     if (!fcmToken) return;

@@ -313,7 +313,7 @@
       btn.className = "dsl-gutter-btn";
       btn.title = "add what happens next";
       btn.textContent = "+";
-      btn.style.top = ((b.rawLine + 1) * LINE_H + 1) + "px"; // +1px so it doesn't overlap the question text above
+      btn.style.top = ((b.rawLine + 1) * LINE_H + 9) + "px"; // offset by textarea padding-top (8px) + 1px gap
       btn.onclick = () => {
         const uniq = TM().uniqueName(parsed, "new question");
         const res = TM().addConnectedChild(text(), b.name, uniq);
@@ -750,8 +750,11 @@
     const roots = (graph.roots || []).slice().sort((a, b) => a.rawLine - b.rawLine);
     const first = roots[0] || parsed.blocks[0];
     if (!first) { alert("Write at least one question first."); return; }
-    _preview = { history: [], currentName: first.name, answer: "", mode: "question" };
-    renderPreview();
+    // open the real reflection screen — answers and commitments count
+    if (typeof setLastNotif === "function" && typeof openReflection === "function") {
+      setLastNotif("preview");
+      openReflection();
+    }
   };
   function closePreview() {
     _preview = null;

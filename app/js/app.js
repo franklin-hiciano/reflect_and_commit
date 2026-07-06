@@ -157,11 +157,8 @@ function isPWASupportedBrowser() {
 function markDeviceSeenIfInstalled() { if (isStandalone()) window._markDeviceSeen && window._markDeviceSeen(deviceKind()); }
 window.addEventListener("appinstalled", () => {
   window._markDeviceSeen && window._markDeviceSeen(deviceKind());
-  // if we were still mid-onboarding (native prompt accepted before we ever
-  // got to "here"), move straight into the home screen + cross-device nudge
-  // instead of leaving the landing screen sitting there with nothing to do.
   const landing = document.getElementById("landingScreen");
-  if (landing && landing.classList.contains("on")) enterHome();
+  if (landing && landing.classList.contains("on")) showAlmostThere();
 });
 // fires whenever the onboarding doc changes — this is how the OTHER device
 // signing in gets noticed live, with nothing to click or refresh: if the
@@ -208,40 +205,30 @@ function showScreen(id) { document.querySelectorAll(".screen").forEach((s) => s.
 // the install step with a clear nudge — silently resetting all the way back
 // to the tagline screen (no explanation) is what read as "the button
 // doesn't work."
+// Show post-install nudge. Only called from the install flow (appinstalled
+// event, or after the install prompt is accepted). Never called on a normal
+// open — that path goes straight to enterHome().
+function showAlmostThere() {
+  showScreen("landingScreen");
+  const intro = document.getElementById("landingIntro");
+  const here = document.getElementById("landingStepHere");
+  if (intro && here) { intro.style.display = "none"; here.style.display = "block"; }
+  ["getStartedBtn", "pairMobileBtn", "onboardingNotifyGroup"].forEach((id) => {
+    const el = document.getElementById(id); if (el) el.style.display = "none";
+  });
+  const manualBox = document.getElementById("landingManualSteps");
+  if (manualBox && manualBox.parentElement) manualBox.parentElement.style.display = "none";
+  const trouble = document.getElementById("installTroubleshooting");
+  if (trouble) trouble.style.display = "none";
+  const explainer = document.getElementById("onboardingExplainer");
+  if (explainer) {
+    explainer.textContent = isPhone()
+      ? "Almost there — open Reflect & Commit from your home screen to finish setup."
+      : "Almost there — open the installed Reflect & Commit app to finish. If nothing happened, it may already be installed — remove it from chrome://apps and try again.";
+  }
+}
+
 function enterHome() {
-  if (!isStandalone()) {
-    showScreen("landingScreen");
-    const intro = document.getElementById("landingIntro");
-    const here = document.getElementById("landingStepHere");
-    if (intro && here) { intro.style.display = "none"; here.style.display = "block"; }
-    // hide all install controls — this state just says "open the app you installed"
-    ["getStartedBtn", "pairMobileBtn", "onboardingNotifyGroup"].forEach((id) => {
-      const el = document.getElementById(id); if (el) el.style.display = "none";
-    });
-    const manualBox = document.getElementById("landingManualSteps");
-    if (manualBox && manualBox.parentElement) manualBox.parentElement.style.display = "none";
-    const trouble = document.getElementById("installTroubleshooting");
-    if (trouble) trouble.style.display = "none";
-    const explainer = document.getElementById("onboardingExplainer");
-    if (explainer) {
-      explainer.textContent = isPhone()
-        ? "Almost there — open Reflect & Commit from your home screen to finish setup."
-        : "Almost there — open the installed Reflect & Commit app to finish. If nothing happened, it may already be installed — remove it from chrome://apps and try again.";
-    }
-    return;
-  }
-  
-  // Desktop: gate on mobile notification setup only when mobile has been seen but not yet validated
-  if (!isPhone()) {
-    const mobileSeen = !!(window._onboarding && window._onboarding.mobileSeenAt);
-    const mobileNotifEnabled = !!(window._onboarding && window._onboarding.mobileNotifEnabledAt);
-    if (mobileSeen && !mobileNotifEnabled) {
-      showScreen("landingScreen");
-      showWaitingForMobileScreen();
-      return;
-    }
-  }
-  
   showScreen("homeScreen");
   renderUserMenu();
   maybeShowOtherDeviceGate();
@@ -259,7 +246,15 @@ function renderUserMenu() {
   if (name) name.textContent = window._userName || "";
 }
 function goHome() { stopVoice(); if (isStandalone()) { enterHome(); } else { showScreen("landingScreen"); resetLandingToIntro(); } }
-function isStandalone() { return window.matchMedia("(display-mode: standalone)").matches || window.matchMedia("(display-mode: minimal-ui)").matches || window.navigator.standalone === true; }
+function isStandalone() {
+  const live = window.matchMedia("(display-mode: standalone)").matches
+    || window.matchMedia("(display-mode: minimal-ui)").matches
+    || window.navigator.standalone === true;
+  // Persist a "was standalone" flag so a one-time detection failure doesn't
+  // permanently lock the user out of their own installed app.
+  if (live) try { localStorage.setItem("rc_standalone", "1"); } catch (_) {}
+  return live || localStorage.getItem("rc_standalone") === "1";
+}
 // install is required on every device before use — phone AND desktop each
 // get their own install prompt the first time they sign in on that device.
 function routeAfterAuth() {
@@ -608,18 +603,14 @@ window.onGetStarted = async () => {
     deferredInstallPrompt.prompt();
     const choice = await deferredInstallPrompt.userChoice;
     deferredInstallPrompt = null;
-    if (choice && choice.outcome === "accepted") { markDeviceSeenIfInstalled(); enterHome(); }
+    if (choice && choice.outcome === "accepted") { markDeviceSeenIfInstalled(); showAlmostThere(); }
     return;
   }
-  // no native prompt available (iOS Safari, or install criteria not met in
-  // this environment) — there's no JS signal at all for a manual "Add to
-  // Home Screen", so this is the same best-effort trust the rest of the app
-  // already uses elsewhere: try to proceed. enterHome()'s own hard gate
-  // (isStandalone()) is the real enforcement — if this tab isn't actually
-  // running standalone, it bounces right back here instead of granting
-  // access to a plain browser tab.
+  // No native prompt (iOS manual add-to-home-screen, or prompt not fired).
+  // Trust the user clicked the address-bar icon; show the nudge to switch to
+  // the installed window. There's no JS signal for manual add-to-home-screen.
   markDeviceSeenIfInstalled();
-  enterHome();
+  showAlmostThere();
 };
 
 // ---------- notification window ----------

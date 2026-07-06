@@ -1,8 +1,6 @@
-// v3 — passthrough fetch, no caching (see v2 note below), plus:
-//  - notificationclick now actually opens/focuses the app into the reflection
-//    screen (previously only postMessage'd already-open tabs, so a click with
-//    no window open did nothing).
-//  - a real 'push' handler for server-sent web push (see functions/index.js).
+// v4 — same passthrough model, but navigation requests (index.html) now
+// bypass the HTTP cache entirely so stale script-version query strings never
+// get stuck serving old JS after a deploy.
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => {
   e.waitUntil(Promise.all([
@@ -10,7 +8,14 @@ self.addEventListener('activate', e => {
     caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))),
   ]));
 });
-self.addEventListener('fetch', e => { e.respondWith(fetch(e.request)); });
+self.addEventListener('fetch', e => {
+  // Always fetch the app shell fresh so ?v= script tags are never stale.
+  if (e.request.mode === 'navigate') {
+    e.respondWith(fetch(e.request, { cache: 'no-store' }));
+    return;
+  }
+  e.respondWith(fetch(e.request));
+});
 
 // server-sent push (FCM / web-push) — arrives even when no tab is open
 self.addEventListener('push', e => {

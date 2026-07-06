@@ -35,11 +35,7 @@
             </div>
         </div>
 
-        <!-- LANDING — same near-black, same fonts as the app itself. Just a
-         quiet doorway, not a separate world. Three sub-steps, one visible
-         at a time: intro (tagline lives ONLY here) → cross-device install
-         gate (clean, centered, nothing else on screen) → this device's
-         own install. -->
+        <!-- LANDING -->
         <div class="screen" id="landingScreen">
             <div class="landing-inner" id="landingIntro">
                 <div class="auth-logo">
@@ -49,53 +45,98 @@
                     Design yourself questions that encourage future you to
                     live by your principles.
                 </div>
-                <button class="btn-ghost" onclick="goToInstallGate()">
+                <button class="btn-ghost" id="enableNotifBtn" onclick="handlePermissionRequest()" style="display: none">
+                    Enable Notifications
+                </button>
+                <button class="btn-ghost" id="introGetStartedBtn" onclick="goToInstallGate()">
                     Get started
                 </button>
             </div>
 
-            <div
-                class="landing-inner"
-                id="landingStepHere"
-                style="display: none; max-width: 340px; margin: 0 auto"
-            >
-                <div
-                    style="font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: 0.01em; margin-bottom: 6px"
-                >
+            <div class="landing-inner" id="landingUnsupportedBrowser" style="display: none; max-width: 340px; margin: 0 auto">
+                <div style="font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: 0.01em; margin-bottom: 6px">
+                    Browser Not Supported
+                </div>
+                <div style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6">
+                    Reflect &amp; Commit requires a browser that supports Progressive Web Apps. Please open this page in Chrome, Safari, or Firefox to continue.
+                </div>
+            </div>
+
+            <div class="landing-inner" id="landingNotifySetup" style="display: none; max-width: 340px; margin: 0 auto">
+                <div style="font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: 0.01em; margin-bottom: 6px">
                     Reflect <span class="amp">&amp;</span> Commit
                 </div>
-                <div
-                    id="onboardingExplainer"
-                    style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6"
-                ></div>
-                <div class="notify-time-group" id="onboardingNotifyGroup">
-                    <button
-                        class="notify-countdown"
-                        onclick="openTimePicker(this)"
-                    ></button>
-                    <input
-                        type="time"
-                        class="notify-time-hidden"
-                        onchange="onNotifyTimeChange(this.value)"
-                        tabindex="-1"
-                    />
+                <div style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6">
+                    When should we remind you to reflect?
+                </div>
+                <div class="notify-time-group" id="onboardingNotifyGroup" style="margin-bottom: 22px">
+                    <button class="notify-countdown" onclick="openTimePicker(this)"></button>
+                    <input type="time" class="notify-time-hidden" onchange="onNotifyTimeChange(this.value)" tabindex="-1" />
                 </div>
                 <button
-                    id="getStartedBtn"
+                    id="continueToInstallBtn"
                     style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 16px"
-                    onclick="onGetStarted()"
+                    onclick="notifSetupContinue()"
                 >
+                    Enable notifications
+                </button>
+            </div>
+
+            <div class="landing-inner" id="landingPermissionDenied" style="display: none; max-width: 340px; margin: 0 auto">
+                <div style="font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: 0.01em; margin-bottom: 6px">
+                    Notifications Blocked
+                </div>
+                <div style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6">
+                    Notifications are required for Reflect &amp; Commit to work. You'll need to enable them manually.
+                </div>
+                <div id="permissionInstructions" style="font-family: var(--mono); font-size: 12px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px"></div>
+                <button style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 12px" onclick="retryPermission()">Try Again</button>
+                <button class="btn-quiet" onclick="resetLandingToIntro()">Back to Start</button>
+            </div>
+
+            <div class="landing-inner" id="landingPairMobile" style="display: none; max-width: 340px; margin: 0 auto">
+                <div style="font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: 0.01em; margin-bottom: 6px">
+                    Pair Your Phone
+                </div>
+                <div style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6">
+                    Scan this QR code with your phone camera to set up notifications.
+                </div>
+                <div id="pairQrContainer" style="display: flex; justify-content: center; margin-bottom: 22px">
+                    <img id="pairQr" style="width: 200px; height: 200px" alt="QR Code" />
+                </div>
+                <button class="btn-quiet" onclick="resetLandingToIntro()">Back</button>
+            </div>
+
+            <div class="landing-inner" id="landingWaitingForMobile" style="display: none; max-width: 340px; margin: 0 auto">
+                <div style="font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: 0.01em; margin-bottom: 6px">
+                    Waiting for Phone
+                </div>
+                <div style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6">
+                    Open the QR code on your phone and follow the setup instructions. We'll automatically continue here once your phone is ready.
+                </div>
+                <button class="btn-quiet" onclick="resetLandingToIntro()">Back</button>
+            </div>
+
+            <div class="landing-inner" id="landingStepHere" style="display: none; max-width: 340px; margin: 0 auto">
+                <div style="font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: 0.01em; margin-bottom: 6px">
+                    Reflect <span class="amp">&amp;</span> Commit
+                </div>
+                <div id="onboardingExplainer" style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6"></div>
+                <button id="getStartedBtn" style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 16px" onclick="onGetStarted()">
                     Install Reflect &amp; Commit
                 </button>
-                <div
-                    style="text-align: left; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; font-size: 12.5px; color: var(--ink-dim); line-height: 1.6"
-                >
-                    <div
-                        style="font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 8px"
-                    >
+                <button id="pairMobileBtn" style="display: none; width: 100%; background: transparent; color: var(--ink-dim); border: 1px solid var(--line); padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 16px" onclick="showPairMobileScreen()">
+                    Pair Mobile
+                </button>
+                <div style="text-align: left; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; font-size: 12.5px; color: var(--ink-dim); line-height: 1.6">
+                    <div style="font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 8px">
                         or add it manually
                     </div>
                     <div id="landingManualSteps"></div>
+                </div>
+                <div id="installTroubleshooting" style="font-family: var(--mono); font-size: 11px; color: var(--ink-faint); margin-top: 12px; line-height: 1.5">
+                    Still can't install? Open this page in Chrome, Safari, or Firefox.
+                    <span id="reinstallTroubleshooting" style="display: none"> Reinstalling? Delete from chrome://apps first.</span>
                 </div>
             </div>
         </div>
@@ -467,9 +508,9 @@
             </div>
         </div>
 
-        <script type="module" src="app/firebase-init.js?v=18"></script>
-        <script src="app/js/tree-model.js?v=18"></script>
-        <script src="app/js/dsl-editor.js?v=18"></script>
-        <script src="app/js/app.js?v=18"></script>
+        <script type="module" src="app/firebase-init.js?v=20"></script>
+        <script src="app/js/tree-model.js?v=20"></script>
+        <script src="app/js/dsl-editor.js?v=20"></script>
+        <script src="app/js/app.js?v=20"></script>
     </body>
 </html>

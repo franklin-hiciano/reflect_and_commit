@@ -214,17 +214,19 @@ function enterHome() {
     const intro = document.getElementById("landingIntro");
     const here = document.getElementById("landingStepHere");
     if (intro && here) { intro.style.display = "none"; here.style.display = "block"; }
+    // hide all install controls — this state just says "open the app you installed"
+    ["getStartedBtn", "pairMobileBtn", "onboardingNotifyGroup"].forEach((id) => {
+      const el = document.getElementById(id); if (el) el.style.display = "none";
+    });
+    const manualBox = document.getElementById("landingManualSteps");
+    if (manualBox && manualBox.parentElement) manualBox.parentElement.style.display = "none";
+    const trouble = document.getElementById("installTroubleshooting");
+    if (trouble) trouble.style.display = "none";
     const explainer = document.getElementById("onboardingExplainer");
-    // desktop Chrome PWAs never land on a "home screen" — that's mobile-only.
-    // On desktop, clicking install a second time (e.g. Chrome silently
-    // thinks it's already installed from earlier testing) just does
-    // nothing, so the real fix is removing the stale install via
-    // chrome://apps and trying again, not hunting for a home-screen icon
-    // that was never going to exist.
     if (explainer) {
       explainer.textContent = isPhone()
-        ? "Almost there — open Reflect & Commit from your home screen (not this browser tab) to finish."
-        : "Almost there — open the installed Reflect & Commit app (not this browser tab) to finish. If installing didn't seem to do anything, it may already be installed — go to chrome://apps, remove Reflect & Commit, then try again.";
+        ? "Almost there — open Reflect & Commit from your home screen to finish setup."
+        : "Almost there — open the installed Reflect & Commit app to finish. If nothing happened, it may already be installed — remove it from chrome://apps and try again.";
     }
     return;
   }
@@ -327,16 +329,10 @@ function resetLandingToIntro() {
   if (pairMobile) pairMobile.style.display = "none";
   if (waiting) waiting.style.display = "none";
   
-  // Show correct button based on device
-  if (enableBtn && getStartedBtn) {
-    if (isPhone()) {
-      enableBtn.style.display = "block";
-      getStartedBtn.style.display = "none";
-    } else {
-      enableBtn.style.display = "none";
-      getStartedBtn.style.display = "block";
-    }
-  }
+  // Show correct button in the intro based on device
+  const introGetStartedBtn = document.getElementById("introGetStartedBtn");
+  if (enableBtn) enableBtn.style.display = isPhone() ? "block" : "none";
+  if (introGetStartedBtn) introGetStartedBtn.style.display = isPhone() ? "none" : "block";
 }
 
 function showUnsupportedBrowserScreen() {
@@ -460,6 +456,15 @@ window.goToNotifySetup = async () => {
   renderNotifyLabel();
 };
 
+// "Enable notifications" button on the notification setup screen
+window.notifSetupContinue = async () => {
+  const ok = await requestNotifPermission();
+  if (!ok) { showPermissionDenied(); return; }
+  window._registerPush && window._registerPush(deviceKind());
+  await (window._markNotifValidated && window._markNotifValidated());
+  enterHome();
+};
+
 window.goToInstallGate = () => {
   // Desktop: skip notify setup, go straight to install
   if (!isPhone()) {
@@ -473,27 +478,22 @@ window.goToInstallGate = () => {
     
     if (isStandalone()) {
       // Desktop already installed, show pair mobile button
-      if (explainer) {
-        explainer.textContent = "Desktop installed! Now pair your phone to enable notifications.";
-      }
+      if (explainer) explainer.textContent = "Now pair your phone to enable notifications.";
       if (getStartedBtn) getStartedBtn.style.display = "none";
       if (pairMobileBtn) pairMobileBtn.style.display = "block";
-      if (steps) steps.style.display = "none";
+      const manualBox = document.getElementById("landingManualSteps");
+      if (manualBox && manualBox.parentElement) manualBox.parentElement.style.display = "none";
     } else {
-      // Desktop not installed, show install button
-      if (explainer) {
-        explainer.textContent = "Write your questions here — you'll get a notification on your phone when it's time to reflect.";
-      }
+      // Desktop not yet installed — show install button + manual fallback
+      if (explainer) explainer.textContent = "";
       if (getStartedBtn) getStartedBtn.style.display = "block";
       if (pairMobileBtn) pairMobileBtn.style.display = "none";
       if (steps) {
-        steps.style.display = "block";
-        steps.innerHTML = "Click install icon (⊕) in address bar";
+        if (steps.parentElement) steps.parentElement.style.display = "";
+        steps.innerHTML = "Click the install icon (⊕) in the address bar";
       }
       const reinstallTroubleshooting = document.getElementById("reinstallTroubleshooting");
-      if (reinstallTroubleshooting && isChrome()) {
-        reinstallTroubleshooting.style.display = "inline";
-      }
+      if (reinstallTroubleshooting && isChrome()) reinstallTroubleshooting.style.display = "inline";
     }
     return;
   }

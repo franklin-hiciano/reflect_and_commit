@@ -182,9 +182,14 @@ onAuthStateChanged(auth, async (user) => {
       if (window.renderNotifyLabel) window.renderNotifyLabel();
     }, () => {}));
 
-    // handoff listener — desktop auto-redirects when mobile completes setup
+    // handoff listener — desktop auto-redirects when mobile completes setup.
+    // skip the initial snapshot (stale consumed:true from a prior session) —
+    // only act on a real-time change so we don't bounce back to "Almost there"
+    // every time the user opens the already-installed app.
     if (!isPhone()) {
+      let handoffSeenFirst = false;
       unsubscribers.push(onSnapshot(uDoc("state", "handoff"), (snap) => {
+        if (!handoffSeenFirst) { handoffSeenFirst = true; return; }
         const handoff = snap.exists() ? snap.data() : {};
         if (handoff.consumed && window.enterHome) {
           window.enterHome();

@@ -259,7 +259,7 @@ function renderUserMenu() {
   if (name) name.textContent = window._userName || "";
 }
 function goHome() { stopVoice(); if (isStandalone()) { enterHome(); } else { showScreen("landingScreen"); resetLandingToIntro(); } }
-function isStandalone() { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; }
+function isStandalone() { return window.matchMedia("(display-mode: standalone)").matches || window.matchMedia("(display-mode: minimal-ui)").matches || window.navigator.standalone === true; }
 // install is required on every device before use — phone AND desktop each
 // get their own install prompt the first time they sign in on that device.
 function routeAfterAuth() {
@@ -331,8 +331,8 @@ function resetLandingToIntro() {
   
   // Show correct button in the intro based on device
   const introGetStartedBtn = document.getElementById("introGetStartedBtn");
-  if (enableBtn) enableBtn.style.display = isPhone() ? "block" : "none";
-  if (introGetStartedBtn) introGetStartedBtn.style.display = isPhone() ? "none" : "block";
+  if (enableBtn) enableBtn.style.display = isPhone() ? "" : "none";
+  if (introGetStartedBtn) introGetStartedBtn.style.display = isPhone() ? "none" : "";
 }
 
 function showUnsupportedBrowserScreen() {

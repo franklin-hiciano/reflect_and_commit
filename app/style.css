@@ -91,16 +91,6 @@ body::after {
   margin-bottom: 0;
 }
 
-/* Pair mobile screen */
-#pairQr {
-  border-radius: 8px;
-  border: 1px solid var(--line);
-}
-
-/* Waiting for mobile screen */
-#landingWaitingForMobile {
-  text-align: center;
-}
 .btn-quiet { background: none; border: none; color: var(--ink-faint); font-family: var(--mono); font-size: 12px; cursor: pointer; }
 .btn-quiet:hover { color: var(--ink-dim); }
 

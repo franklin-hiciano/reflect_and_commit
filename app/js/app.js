@@ -127,11 +127,13 @@ window._onCommitmentsUpdated = () => { commitments = window._commitments || []; 
 window._onDraftUpdated = () => { const rd = window._remoteDraft; if (rd && rd.active && !draft.active) { draft = { ...blankDraft(), ...rd }; localStorage.setItem(LS_DRAFT, JSON.stringify(draft)); } };
 window._onSignedIn = () => {
   window.renderDslEditor(); renderSettings(); scheduleNotificationLoop();
-  routeAfterAuth(); maybeOpenFromUrl();
+  routeAfterAuth();
+  maybeOpenFromUrl();
   if ("Notification" in window && Notification.permission === "granted") window._registerPush && window._registerPush(deviceKind());
   window._claimActiveDevice && window._claimActiveDevice(deviceKind());
-  // NOT marking "seen" here — signing in isn't installing. See markDeviceSeenIfInstalled below.
   markDeviceSeenIfInstalled();
+  // Desktop first launch: if phone hasn't onboarded yet, fire a push to it.
+  if (!isPhone() && isStandalone() && !mobileOnboarded()) sendPairingPushToPhone();
 };
 function deviceKind() { return isPhone() ? "mobile" : "desktop"; }
 function isNotifValidated() { return !!(window._deviceData && window._deviceData.notifValidatedAt); }
@@ -166,13 +168,15 @@ window.addEventListener("appinstalled", () => {
 // re-renders it if something upstream re-triggered it.
 window._onOnboardingUpdated = () => {
   const home = document.getElementById("homeScreen");
-  if (home && home.classList.contains("on")) {
+  if (!home) return;
+  if (home.classList.contains("on")) {
+    // Home is open — gate only ever shows on home if mobile isn't onboarded
+    // yet. After persistence it's gone for the life of the account.
     maybeShowOtherDeviceGate();
   } else if (!isPhone() && isStandalone()) {
-    // Desktop might be blocked on the "waiting for phone" screen —
-    // re-run enterHome now that onboarding state has updated.
-    const mobileNotifEnabled = !!(window._onboarding && window._onboarding.mobileNotifEnabledAt);
-    if (mobileNotifEnabled) enterHome();
+    // Desktop might be blocked on "waiting for phone" — auto-advance when
+    // mobileOnboardedAt shows up in the live snapshot.
+    if (mobileOnboarded()) enterHome();
   }
   renderSettings();
 };
@@ -213,7 +217,7 @@ function showAlmostThere() {
   const intro = document.getElementById("landingIntro");
   const here = document.getElementById("landingStepHere");
   if (intro && here) { intro.style.display = "none"; here.style.display = "block"; }
-  ["getStartedBtn", "pairMobileBtn", "onboardingNotifyGroup"].forEach((id) => {
+  ["getStartedBtn", "onboardingNotifyGroup"].forEach((id) => {
     const el = document.getElementById(id); if (el) el.style.display = "none";
   });
   const manualBox = document.getElementById("landingManualSteps");
@@ -232,7 +236,6 @@ function enterHome() {
   showScreen("homeScreen");
   renderUserMenu();
   maybeShowOtherDeviceGate();
-  applyMobileEditRestriction();
 }
 // account menu trigger (top right) — avatar + name from the signed-in
 // Google account, same source as the cross-device gate's avatar.
@@ -253,48 +256,116 @@ function isStandalone() {
 }
 // install is required on every device before use — phone AND desktop each
 // get their own install prompt the first time they sign in on that device.
+// Mobile follows a strict linear flow: install → notifications → time → done.
+// Desktop: install, then gate until mobile onboarding is complete (first time only).
 function routeAfterAuth() {
-  if (isStandalone()) {
-    // Mobile: check notification status before entering home
-    if (isPhone()) {
-      const notifValidated = isNotifValidated();
-      if (!notifValidated) {
-        // Show notification hard block
-        showScreen("landingScreen");
-        handlePermissionRequest();
-        return;
-      }
-    }
-    enterHome();
-  } else {
+  if (!isStandalone()) {
     showScreen("landingScreen");
-    // Check browser support on desktop
     if (!isPhone() && !isPWASupportedBrowser()) {
       showUnsupportedBrowserScreen();
     } else {
       resetLandingToIntro();
     }
+    return;
+  }
+
+  // --- Device is standalone (installed PWA) ---
+  if (isPhone()) {
+    // Mobile linear onboarding: install → notifications → time → done
+    if (!isNotifValidated()) {
+      showScreen("landingScreen");
+      goToNotifySetup();
+      return;
+    }
+    // Notifications done — check if time is set
+    // (time is always set — default 20:00 — so if notif is validated, we're done)
+    completeMobileOnboarding();
+  } else {
+    // Desktop: gate only on FIRST launch until mobile has onboarded
+    if (!mobileOnboarded()) {
+      showScreen("landingScreen");
+      showDesktopWaitingGate();
+    } else {
+      enterHome();
+    }
   }
 }
 
-// ---------- mobile edit restriction ----------
-// questions are written on desktop only; the notification + reflecting still
-// happens on the phone, but the editor is hidden there by default. A quiet
-// "access editor anyway" escape hatch (bottom-right) overrides this for the
-// rest of the session — resets back to hidden next time enterHome() runs
-// (e.g. after leaving and coming back).
-let _mobileEditUnlocked = false;
-function applyMobileEditRestriction() {
-  const editor = document.getElementById("dslHome");
-  const notice = document.getElementById("mobileEditNotice");
-  const anywayBtn = document.getElementById("accessEditorAnywayBtn");
-  const phone = isPhone();
-  const hide = phone && !_mobileEditUnlocked;
-  if (editor) editor.style.display = hide ? "none" : "";
-  if (notice) notice.style.display = hide ? "block" : "none";
-  if (anywayBtn) anywayBtn.style.display = hide ? "block" : "none";
+// --- Mobile onboarding completion ---
+function completeMobileOnboarding() {
+  // Write the permanent "mobile onboarded" flag
+  window._markMobileOnboarded && window._markMobileOnboarded();
+  // Trigger handoff so desktop auto-advances if it's waiting
+  window._consumeHandoff && window._consumeHandoff();
+  enterHome();
 }
-window.accessEditorAnyway = () => { _mobileEditUnlocked = true; applyMobileEditRestriction(); };
+
+// --- Desktop waiting gate (first launch only, until phone is onboarded) ---
+function showDesktopWaitingGate() {
+  document.getElementById("landingIntro").style.display = "none";
+  const here = document.getElementById("landingStepHere");
+  if (here) here.style.display = "block";
+  const explainer = document.getElementById("onboardingExplainer");
+  if (explainer) explainer.textContent = "Waiting for your phone to finish setup…";
+  const getStartedBtn = document.getElementById("getStartedBtn");
+  if (getStartedBtn) getStartedBtn.style.display = "none";
+  // Show the "send notification to phone" button if we have a push token
+  const sendNotifBtn = document.getElementById("sendPairingNotifBtn");
+  if (sendPairingNotifBtn) {
+    // Will be shown by maybeShowOtherDeviceGate once we know if mobile has a token
+  }
+  maybeShowOtherDeviceGate();
+}
+
+function mobileOnboarded() {
+  return !!(window._onboarding && window._onboarding.mobileOnboardedAt);
+}
+
+// --- Desktop: fire a push notification to the phone ---
+async function sendPairingPushToPhone() {
+  if (!window._uid || isPhone()) return;
+  const btn = document.getElementById("sendPairingNotifBtn");
+  if (!btn) return;
+  if (btn.dataset.sent === "1") return; // already sent, don't spam
+  const dev = await window._getMobileDeviceToken();
+  if (!dev || !dev.token) { btn.style.display = "none"; return; }
+  btn.dataset.sent = "1";
+  btn.textContent = "Sent a notification to your phone";
+  try {
+    await fetch("/api/send-now", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fcmToken: dev.token,
+        title: "Open Reflect & Commit",
+        body: "Finish setup to pair your phone.",
+      }),
+    });
+  } catch (_) {}
+}
+
+// ---------- mobile edit restriction ----------
+// Removing the desktop-only edit lock on mobile: phone shows the editor
+// just like desktop does — the "go edit on desktop" suggestion was a
+// paternalistic distraction that suppressed curiosity. Live presence
+// (the activeDevice shade) still tells the user when desktop is editing,
+// but they can still look at and modify questions right on the phone.
+//
+// Mobile edit lock code intentionally left here as a comment block so the
+// git history of WHY it was nuked is self-documenting:
+//
+// let _mobileEditUnlocked = false;
+// function applyMobileEditRestriction() {
+//   const editor = document.getElementById("dslHome");
+//   const notice = document.getElementById("mobileEditNotice");
+//   const anywayBtn = document.getElementById("accessEditorAnywayBtn");
+//   const phone = isPhone();
+//   const hide = phone && !_mobileEditUnlocked;
+//   if (editor) editor.style.display = hide ? "none" : "";
+//   if (notice) notice.style.display = hide ? "block" : "none";
+//   if (anywayBtn) anywayBtn.style.display = hide ? "block" : "none";
+// }
+// window.accessEditorAnyway = () => { _mobileEditUnlocked = true; applyMobileEditRestriction(); };
 
 // ---------- local install (this device) ----------
 // "Get started" leads straight into installing THIS device — no detour
@@ -308,52 +379,24 @@ function resetLandingToIntro() {
   const notifySetup = document.getElementById("landingNotifySetup");
   const denied = document.getElementById("landingPermissionDenied");
   const unsupported = document.getElementById("landingUnsupportedBrowser");
-  const pairMobile = document.getElementById("landingPairMobile");
-  const waiting = document.getElementById("landingWaitingForMobile");
   const enableBtn = document.getElementById("enableNotifBtn");
-  const getStartedBtn = document.getElementById("getStartedBtn");
   if (!intro || !here) return;
   intro.style.display = "block"; here.style.display = "none";
   if (notifySetup) notifySetup.style.display = "none";
   if (denied) denied.style.display = "none";
   if (unsupported) unsupported.style.display = "none";
-  if (pairMobile) pairMobile.style.display = "none";
-  if (waiting) waiting.style.display = "none";
   
-  // Show correct button in the intro based on device
+  // Both phone AND desktop show "Install" first (introGetStartedBtn).
+  // Notifications come after install, phone-only.
   const introGetStartedBtn = document.getElementById("introGetStartedBtn");
-  if (enableBtn) enableBtn.style.display = isPhone() ? "" : "none";
-  if (introGetStartedBtn) introGetStartedBtn.style.display = isPhone() ? "none" : "";
+  if (introGetStartedBtn) introGetStartedBtn.style.display = "";
+  if (enableBtn) enableBtn.style.display = "none";
 }
 
 function showUnsupportedBrowserScreen() {
   document.getElementById("landingIntro").style.display = "none";
   const unsupported = document.getElementById("landingUnsupportedBrowser");
   if (unsupported) unsupported.style.display = "block";
-}
-
-function showPairMobileScreen() {
-  document.getElementById("landingIntro").style.display = "none";
-  document.getElementById("landingStepHere").style.display = "none";
-  const pairMobile = document.getElementById("landingPairMobile");
-  if (pairMobile) pairMobile.style.display = "block";
-  
-  // Generate QR code with token
-  const qr = document.getElementById("pairQr");
-  if (qr && window._mintInstallToken) {
-    window._mintInstallToken().then((token) => {
-      const url = window.location.origin + "/?tok=" + token;
-      qr.src = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" + encodeURIComponent(url);
-    });
-  }
-}
-
-function showWaitingForMobileScreen() {
-  document.getElementById("landingIntro").style.display = "none";
-  document.getElementById("landingStepHere").style.display = "none";
-  document.getElementById("landingPairMobile").style.display = "none";
-  const waiting = document.getElementById("landingWaitingForMobile");
-  if (waiting) waiting.style.display = "block";
 }
 
 async function handlePermissionRequest() {
@@ -447,70 +490,57 @@ window.goToNotifySetup = async () => {
   renderNotifyLabel();
 };
 
-// "Enable notifications" button on the notification setup screen
+// Mobile linear onboarding step 2: enable notifications.
+// User picks a time first (default 20:00), then taps the enable button.
 window.notifSetupContinue = async () => {
   const ok = await requestNotifPermission();
   if (!ok) { showPermissionDenied(); return; }
   window._registerPush && window._registerPush(deviceKind());
   await (window._markNotifValidated && window._markNotifValidated());
+  // _markNotifValidated writes both mobileNotifEnabledAt AND mobileOnboardedAt
+  // atomically; we're done with onboarding — go straight home.
   enterHome();
 };
 
 window.goToInstallGate = () => {
-  // Desktop: skip notify setup, go straight to install
-  if (!isPhone()) {
-    document.getElementById("landingIntro").style.display = "none";
-    const here = document.getElementById("landingStepHere");
-    here.style.display = "block";
-    const explainer = document.getElementById("onboardingExplainer");
-    const getStartedBtn = document.getElementById("getStartedBtn");
-    const pairMobileBtn = document.getElementById("pairMobileBtn");
-    const steps = document.getElementById("landingManualSteps");
-    
-    if (isStandalone()) {
-      // Desktop already installed, show pair mobile button
-      if (explainer) explainer.textContent = "Now pair your phone to enable notifications.";
-      if (getStartedBtn) getStartedBtn.style.display = "none";
-      if (pairMobileBtn) pairMobileBtn.style.display = "block";
-      const manualBox = document.getElementById("landingManualSteps");
-      if (manualBox && manualBox.parentElement) manualBox.parentElement.style.display = "none";
-    } else {
-      // Desktop not yet installed — show install button + manual fallback
-      if (explainer) explainer.textContent = "";
-      if (getStartedBtn) getStartedBtn.style.display = "block";
-      if (pairMobileBtn) pairMobileBtn.style.display = "none";
-      if (steps) {
-        if (steps.parentElement) steps.parentElement.style.display = "";
-        steps.innerHTML = "Click the install icon (⊕) in the address bar";
-      }
-      const reinstallTroubleshooting = document.getElementById("reinstallTroubleshooting");
-      if (reinstallTroubleshooting && isChrome()) reinstallTroubleshooting.style.display = "inline";
+  document.getElementById("landingIntro").style.display = "none";
+  const here = document.getElementById("landingStepHere");
+  here.style.display = "block";
+  const explainer = document.getElementById("onboardingExplainer");
+  const getStartedBtn = document.getElementById("getStartedBtn");
+  const steps = document.getElementById("landingManualSteps");
+  
+  if (isStandalone()) {
+    // Already installed — go straight home if mobile is onboarded, show
+    // pairing gate otherwise (desktop), or go to notify setup (phone).
+    if (isPhone()) {
+      window.goToNotifySetup();
+      return;
     }
+    if (mobileOnboarded()) { enterHome(); return; }
+    // Mobile not onboarded yet — show the pairing gate
+    if (explainer) explainer.textContent = "";
+    if (getStartedBtn) getStartedBtn.style.display = "none";
+    const manualBox = document.getElementById("landingManualSteps");
+    if (manualBox && manualBox.parentElement) manualBox.parentElement.style.display = "none";
+    maybeShowOtherDeviceGate();
     return;
   }
 
-  // Phone: check permission first
-  const permission = Notification.permission;
-  if (permission === "granted") {
-    // Already granted, proceed to notify setup
-    window.goToNotifySetup();
-  } else if (permission === "denied") {
-    // Already denied, show instructions
-    showPermissionDenied();
-  } else {
-    // permission === "default", request it
-    handlePermissionRequest();
+  // Not yet installed — show install button + manual fallback (same for both)
+  if (explainer) explainer.textContent = "";
+  if (getStartedBtn) getStartedBtn.style.display = "block";
+  if (steps) {
+    if (steps.parentElement) steps.parentElement.style.display = "";
+    steps.innerHTML = isPhone() ? "Tap the share icon then 'Add to Home Screen'" : "Click the install icon (⊕) in the address bar";
   }
+  const reinstallTroubleshooting = document.getElementById("reinstallTroubleshooting");
+  if (reinstallTroubleshooting && isChrome()) reinstallTroubleshooting.style.display = "inline";
 };
 function maybeOpenFromUrl() {
   const p = new URLSearchParams(location.search);
-  // ?tok= carries a Firebase custom token minted by the desktop QR code —
-  // auto-sign in so the phone never shows the "Continue with Google" button.
-  if (p.get("tok")) {
-    const tok = p.get("tok");
-    history.replaceState({}, "", location.pathname);
-    window._autoSignInWithToken && window._autoSignInWithToken(tok);
-  }
+  // ?reflect=1 is set by the sw.js notification click — opens straight into
+  // the reflection flow when the user taps a "Time to reflect" notification.
   if (p.get("reflect") === "1") { history.replaceState({}, "", location.pathname); openReflection(); }
 }
 
@@ -520,68 +550,55 @@ function maybeOpenFromUrl() {
 // screen except the other device actually completing its own install —
 // this app is only worth using once both are paired, so it blocks rather
 // than nags.
-function otherKind() { return isPhone() ? "desktop" : "mobile"; }
-function otherDeviceSeen() { return !!(window._onboarding && window._onboarding[otherKind() + "SeenAt"]); }
 function qrSrcFor(url) {
-  // higher error-correction + resolution so it scans instantly and holds up
-  // sharp even on a retina display, not the soft/low-density default
   return "https://api.qrserver.com/v1/create-qr-code/?size=320x320&ecc=H&data=" + encodeURIComponent("https://" + url);
-}
-// the QR carries a Firebase custom token so the phone auto-authenticates
-// without a second Google sign-in. The token is minted on-demand by /api/token
-// (short-lived, scoped to this uid). Falls back to just the email hint if
-// minting fails (e.g. backend not reachable).
-async function installUrlWithAccount() {
-  // use the app's own origin so the ?tok= custom token is processed on arrival
-  // (the /install page is a separate page that doesn't handle auth tokens)
-  const appBase = window.location.origin + "/";
-  const email = window._userEmail || "";
-  try {
-    const tok = window._mintInstallToken ? await window._mintInstallToken() : null;
-    if (tok) return appBase + "?tok=" + encodeURIComponent(tok) + (email ? "&acct=" + encodeURIComponent(email) : "");
-  } catch (_) {}
-  return appBase + (email ? "?acct=" + encodeURIComponent(email) : "");
 }
 window.maybeShowOtherDeviceGate = function () {
   const gate = document.getElementById("otherDeviceGate");
   if (!gate) return false;
-  if (otherDeviceSeen()) { gate.classList.remove("on"); return false; }
+  
+  // Gate is only ever active on first launch if mobile hasn't onboarded yet.
+  if (mobileOnboarded()) { gate.classList.remove("on"); return false; }
+
   const label = document.getElementById("otherDeviceLabel");
   const qr = document.getElementById("landingQr");
   const hint = document.getElementById("otherDeviceHint");
-  // showing the signed-in account's avatar here (same on both devices) is
-  // the quickest way to catch two different Google accounts — by far the
-  // most common reason this gate never clears — without digging into settings.
   const avatar = document.getElementById("otherDeviceAvatar");
   if (avatar) {
     if (window._userPhoto) { avatar.src = window._userPhoto; avatar.alt = window._userName || "signed-in account"; avatar.title = window._userName || ""; avatar.style.display = "block"; }
     else avatar.style.display = "none";
   }
+
   if (isPhone()) {
-    label.textContent = "Go set up Reflect & Commit on your computer to write your questions — you'll still get tonight's reflection right here.";
-    qr.style.display = "none";
-    hint.textContent = INSTALL_URL;
+    // Mobile never gets the pairing gate overlay itself once installed —
+    // it just goes to home, and setting up notifications auto-unlocks desktop.
+    gate.classList.remove("on");
+    return false;
   } else {
+    // Desktop pairing gate: show QR + "send notification" button
     label.textContent = "Now install it on your phone too" + (window._userEmail ? (" as " + window._userEmail) : "") + ". Come back here once you're done.";
-    // mint a token asynchronously and update the QR when ready
-    installUrlWithAccount().then((url) => {
-      if (document.getElementById("otherDeviceGate") && document.getElementById("otherDeviceGate").classList.contains("on")) {
-        qr.src = qrSrcFor(url);
-      }
-    });
-    qr.src = qrSrcFor(INSTALL_URL); // show immediately with plain URL while token mints
+    qr.src = qrSrcFor(INSTALL_URL);
     qr.style.display = "block";
     hint.textContent = INSTALL_URL;
+
+    // Check if phone has registered an FCM token so we can show "send notification"
+    const sendBtn = document.getElementById("sendPairingNotifBtn");
+    if (sendBtn) {
+      window._getMobileDeviceToken().then((dev) => {
+        if (dev && dev.token) {
+          sendBtn.style.display = "block";
+          if (sendBtn.dataset.sent !== "1") {
+            sendBtn.textContent = "Send a notification to your phone";
+          }
+        } else {
+          sendBtn.style.display = "none";
+        }
+      });
+    }
   }
   gate.classList.add("on");
   return true;
 };
-// the *SeenAt flags are permanent by design (see comment above) — without
-// this, an account that's ever fully paired once has no way back to a
-// fresh "waiting for the other device" state, e.g. to actually re-pair a
-// replacement phone, or (what was reading as "this gate is buggy, it
-// instantly disappears") when the flags were already satisfied from a much
-// earlier session and the gate hides itself the instant real data arrives.
 window.resetPairing = async () => {
   if (!confirm("Reset device pairing? Both devices will need to be marked installed again.")) return;
   await (window._resetPairing && window._resetPairing());
@@ -1072,24 +1089,6 @@ function stopVoice() {
 // ---------- boot ----------
 document.addEventListener("DOMContentLoaded", () => {
   window.renderDslEditor(); renderSettings();
-  // fire the token check immediately at boot — before the auth listener
-  // resolves — so the phone never has to sit through the "Continue with
-  // Google" button at all when it scanned a QR code with a token in it.
-  const _bootParams = new URLSearchParams(location.search);
-  if (_bootParams.get("tok")) {
-    const _tok = _bootParams.get("tok");
-    history.replaceState({}, "", location.pathname);
-    // firebase-init.js may not be ready yet; poll briefly then give up
-    let _attempts = 0;
-    const _trySignIn = () => {
-      if (window._autoSignInWithToken) {
-        window._autoSignInWithToken(_tok);
-      } else if (_attempts++ < 20) {
-        setTimeout(_trySignIn, 150);
-      }
-    };
-    _trySignIn();
-  }
 });
 
 // "Installing update…" overlay — shown between a SW controller change and

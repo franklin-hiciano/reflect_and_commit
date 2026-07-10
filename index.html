@@ -94,39 +94,13 @@
                 <button class="btn-quiet" onclick="resetLandingToIntro()">Back to Start</button>
             </div>
 
-            <div class="landing-inner" id="landingPairMobile" style="display: none; max-width: 340px; margin: 0 auto">
-                <div style="font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: 0.01em; margin-bottom: 6px">
-                    Pair Your Phone
-                </div>
-                <div style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6">
-                    Scan this QR code with your phone camera to set up notifications.
-                </div>
-                <div id="pairQrContainer" style="display: flex; justify-content: center; margin-bottom: 22px">
-                    <img id="pairQr" style="width: 200px; height: 200px" alt="QR Code" />
-                </div>
-                <button class="btn-quiet" onclick="resetLandingToIntro()">Back</button>
-            </div>
-
-            <div class="landing-inner" id="landingWaitingForMobile" style="display: none; max-width: 340px; margin: 0 auto">
-                <div style="font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: 0.01em; margin-bottom: 6px">
-                    Waiting for Phone
-                </div>
-                <div style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6">
-                    Open the QR code on your phone and follow the setup instructions. We'll automatically continue here once your phone is ready.
-                </div>
-                <button class="btn-quiet" onclick="resetLandingToIntro()">Back</button>
-            </div>
-
             <div class="landing-inner" id="landingStepHere" style="display: none; max-width: 340px; margin: 0 auto">
                 <div style="font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: 0.01em; margin-bottom: 6px">
                     Reflect <span class="amp">&amp;</span> Commit
                 </div>
                 <div id="onboardingExplainer" style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6"></div>
                 <button id="getStartedBtn" style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 16px" onclick="onGetStarted()">
-                    Install Reflect &amp; Commit
-                </button>
-                <button id="pairMobileBtn" style="display: none; width: 100%; background: transparent; color: var(--ink-dim); border: 1px solid var(--line); padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 16px" onclick="showPairMobileScreen()">
-                    Pair Mobile
+                    Install Reflect & Commit
                 </button>
                 <div style="text-align: left; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; font-size: 12.5px; color: var(--ink-dim); line-height: 1.6">
                     <div style="font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 8px">
@@ -144,30 +118,15 @@
         <!-- HOME — settings + edit questions -->
         <div class="screen" id="homeScreen">
             <div class="home-body">
-                <!-- app/js/dsl-editor.js builds everything inside here: the
-             duplicate/multi-root warning banner, the mobile pane switcher,
-             the dsl-editor + node-canvas split, and the version-history
-             slider. See app/js/tree-model.js for the DSL grammar itself.
-             Editing is desktop-only — app.js hides this whole block (and
-             shows #mobileEditNotice instead) whenever isPhone() is true. -->
+                app/js/app.js builds everything inside here: the
+                duplicate/multi-root warning banner, the mobile pane switcher,
+                the dsl-editor + node-canvas split, and the version-history
+                slider. See app/js/tree-model.js for the DSL grammar itself.
+                Editor is available on both phones and desktops — the
+                mobileEditNotice and accessEditorAnywayBtn elements that used
+                to gate the editor to desktop have been removed. -->
                 <div id="dslHome" class="dsl-home"></div>
-                <div
-                    class="mobile-edit-notice"
-                    id="mobileEditNotice"
-                    style="display: none"
-                >
-                    Questions are written on desktop — open Reflect &amp;
-                    Commit there to edit.
-                </div>
             </div>
-            <button
-                class="access-editor-anyway-btn"
-                id="accessEditorAnywayBtn"
-                onclick="accessEditorAnyway()"
-                style="display: none"
-            >
-                access editor anyway
-            </button>
 
             <!-- account menu trigger — screen-level (not embedded in the
            canvas squircle) so mobile, where the whole editor is hidden,
@@ -267,6 +226,13 @@
                         style="display: none"
                         alt="scan to install on your phone"
                     />
+                    <button
+                        id="sendPairingNotifBtn"
+                        style="display: none; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer; margin: 16px 0"
+                        onclick="sendPairingPushToPhone()"
+                    >
+                        Send a notification to your phone
+                    </button>
                     <div class="install-gate-url" id="otherDeviceHint"></div>
                     <div
                         class="install-gate-reload-hint"

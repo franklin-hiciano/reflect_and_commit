@@ -5,7 +5,6 @@ import {
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
-  signInWithCustomToken,
   signOut as fbSignOut,
   onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -15,8 +14,10 @@ import {
   collection,
   setDoc,
   getDoc,
+  getDocs,
   onSnapshot,
   query,
+  where,
   orderBy,
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -71,35 +72,6 @@ window.doSignIn = async () => {
 getRedirectResult(auth).catch(() => {});
 window.doSignOut = async () => {
   await fbSignOut(auth);
-};
-
-// Mints a custom token by calling our /api/token endpoint so the QR code
-// can carry it — phones scanning the code auto-authenticate without a
-// second Google sign-in prompt.
-window._mintInstallToken = async function () {
-  if (!uid) return null;
-  try {
-    const res = await fetch('/api/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.token || null;
-  } catch (e) {
-    return null;
-  }
-};
-
-// Called on the phone after scanning the QR code: signs in with the
-// embedded custom token so the user doesn't need to tap "Continue with Google".
-window._autoSignInWithToken = async function (token) {
-  try {
-    await signInWithCustomToken(auth, token);
-  } catch (e) {
-    console.error('autoSignInWithToken:', e);
-  }
 };
 
 // every onSnapshot below is torn down on sign-out (and before re-subscribing
@@ -304,9 +276,14 @@ window._markNotifValidated = async function () {
   if (!uid) return;
   try {
     await setDoc(uDoc("devices", deviceId()), { notifValidatedAt: serverTimestamp() }, { merge: true });
-    // Also mark mobile notification as enabled in onboarding state for desktop to detect
+    // Atomic mobile-completion marker: notifications validated + time pickable
+    // (time defaults to 20:00 earlier in app.js — close enough to be considered
+    // onboarded). Also still set the older flag for backwards-compatibility.
     if (isPhone()) {
-      await setDoc(uDoc("state", "onboarding"), { mobileNotifEnabledAt: serverTimestamp() }, { merge: true });
+      await setDoc(uDoc("state", "onboarding"), {
+        mobileNotifEnabledAt: serverTimestamp(),
+        mobileOnboardedAt: serverTimestamp(),
+      }, { merge: true });
       // Trigger handoff to desktop
       await window._consumeHandoff && window._consumeHandoff();
     }
@@ -341,9 +318,28 @@ window._claimActiveDevice = async function (kind, activityPhase) {
 
 // -- install-gate onboarding: a one-way "this kind of device has signed in
 // at least once" flag, merged so mobile and desktop never clobber each other --
+window._markMobileOnboarded = async function () {
+  if (!uid) return;
+  try { await setDoc(uDoc("state", "onboarding"), { mobileOnboardedAt: serverTimestamp() }, { merge: true }); } catch (e) {}
+};
 window._markDeviceSeen = async function (kind) {
   if (!uid) return;
   try { await setDoc(uDoc("state", "onboarding"), { [kind + "SeenAt"]: serverTimestamp() }, { merge: true }); } catch (e) {}
+};
+// Find the mobile device's FCM token + push notification time, so desktop can
+// fire a pairing ping to it. Returns null if no mobile device has registered yet.
+window._getMobileDeviceToken = async function () {
+  if (!uid) return null;
+  try {
+    const q = query(uCol("devices"), where("kind", "==", "mobile"));
+    const snap = await getDocs(q);
+    if (snap.empty) return null;
+    for (const d of snap.docs) {
+      const data = d.data();
+      if (data.token) return { token: data.token, tzOffsetMin: data.tzOffsetMin };
+    }
+    return null;
+  } catch (_) { return null; }
 };
 // these flags are permanent by design (see above) — the only way back to a
 // fresh "waiting for the other device" state, e.g. re-pairing a new phone

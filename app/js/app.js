@@ -230,7 +230,13 @@ function showAlmostThere() {
   if (explainer) {
     explainer.textContent = isPhone()
       ? "Almost there — open Reflect & Commit from your home screen to finish setup."
-      : "Almost there — open the installed Reflect & Commit app to finish. If nothing happened, it may already be installed — remove it from chrome://apps and try again.";
+      : "Almost there — open the installed Reflect & Commit app to finish. If nothing happened, it may already be installed — remove it from chrome://apps and try again. If you're already in the app, press Ctrl+R (Cmd+R on Mac) to refresh.";
+  }
+  // Add a retry button in case isStandalone() detection failed
+  const retryBtn = document.getElementById("retryStandaloneBtn");
+  if (retryBtn) {
+    retryBtn.style.display = "block";
+    retryBtn.onclick = () => { routeAfterAuth(); };
   }
 }
 
@@ -535,6 +541,12 @@ window.goToInstallGate = () => {
   if (steps) {
     if (steps.parentElement) steps.parentElement.style.display = "";
     steps.innerHTML = isPhone() ? "Tap the share icon then 'Add to Home Screen'" : "Click the install icon (⊕) in the address bar";
+    // Also show QR code for manual install
+    const manualQr = document.getElementById("manualInstallQr");
+    if (manualQr) {
+      manualQr.src = qrSrcFor(INSTALL_URL);
+      manualQr.style.display = "block";
+    }
   }
   const reinstallTroubleshooting = document.getElementById("reinstallTroubleshooting");
   if (reinstallTroubleshooting && isChrome()) reinstallTroubleshooting.style.display = "inline";

@@ -247,13 +247,9 @@ function renderUserMenu() {
 }
 function goHome() { stopVoice(); if (isStandalone()) { enterHome(); } else { showScreen("landingScreen"); resetLandingToIntro(); } }
 function isStandalone() {
-  const live = window.matchMedia("(display-mode: standalone)").matches
+  return window.matchMedia("(display-mode: standalone)").matches
     || window.matchMedia("(display-mode: minimal-ui)").matches
     || window.navigator.standalone === true;
-  // Persist a "was standalone" flag so a one-time detection failure doesn't
-  // permanently lock the user out of their own installed app.
-  if (live) try { localStorage.setItem("rc_standalone", "1"); } catch (_) {}
-  return live || localStorage.getItem("rc_standalone") === "1";
 }
 // install is required on every device before use — phone AND desktop each
 // get their own install prompt the first time they sign in on that device.

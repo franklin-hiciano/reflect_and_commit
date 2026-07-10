@@ -213,6 +213,8 @@ function showScreen(id) { document.querySelectorAll(".screen").forEach((s) => s.
 // event, or after the install prompt is accepted). Never called on a normal
 // open — that path goes straight to enterHome().
 function showAlmostThere() {
+  // Already in the installed app — no nudge needed
+  if (isStandalone()) return;
   showScreen("landingScreen");
   const intro = document.getElementById("landingIntro");
   const here = document.getElementById("landingStepHere");

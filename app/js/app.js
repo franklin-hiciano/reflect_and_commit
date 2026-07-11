@@ -582,7 +582,7 @@ window.goToInstallGate = () => {
   const explainer = document.getElementById("onboardingExplainer");
   const getStartedBtn = document.getElementById("getStartedBtn");
   const steps = document.getElementById("landingManualSteps");
-  
+
   if (isStandalone()) {
     // Already installed — go straight home if mobile is onboarded, show
     // pairing gate otherwise (desktop), or go to notify setup (phone).
@@ -591,7 +591,7 @@ window.goToInstallGate = () => {
       return;
     }
     if (mobileOnboarded()) { enterHome(); return; }
-    // Mobile not onboarded yet — show the pairing gate
+    // Mobile not onboarded yet — show the pairing gate (QR in overlay)
     if (explainer) explainer.textContent = "";
     if (getStartedBtn) getStartedBtn.style.display = "none";
     const manualBox = document.getElementById("landingManualSteps");
@@ -600,12 +600,28 @@ window.goToInstallGate = () => {
     return;
   }
 
-  // Not yet installed — show install button + manual fallback (same for both)
+  // Not yet installed on THIS device.
   if (explainer) explainer.textContent = "";
   if (getStartedBtn) getStartedBtn.style.display = "block";
-  if (steps) {
-    if (steps.parentElement) steps.parentElement.style.display = "";
-    steps.innerHTML = isPhone() ? "Tap the share icon then 'Add to Home Screen'" : "Click the install icon (⊕) in the address bar";
+
+  if (isPhone()) {
+    // Phone: manual add-to-home-screen instructions
+    if (steps) {
+      if (steps.parentElement) steps.parentElement.style.display = "";
+      steps.innerHTML = "Tap the Share button <svg viewBox='0 0 24 24' width='14' height='14' style='vertical-align:middle;margin:0 2px' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8'/><polyline points='16 6 12 2 8 6'/><line x1='12' y1='2' x2='12' y2='15'/></svg> then <b>Add to Home Screen</b>";
+    }
+  } else {
+    // Desktop: show QR code + clickable install link in the main area
+    if (steps) {
+      if (steps.parentElement) steps.parentElement.style.display = "";
+      steps.innerHTML = "<div style='text-align:center;margin-bottom:12px'>" +
+        "<img id='landingStepHereQr' src='" + qrSrcFor(INSTALL_URL) + "' alt='Scan to install on phone' style='width:180px;height:180px;border-radius:8px;background:#fff'/>" +
+        "</div>" +
+        "<div style='font-size:11px;color:var(--ink-faint);text-align:center;word-break:break-all'>" +
+        "Or open this link on your phone:<br>" +
+        "<a href='https://" + INSTALL_URL + "' target='_blank' rel='noopener' style='color:var(--gold);text-decoration:underline'>https://" + INSTALL_URL + "</a>" +
+        "</div>";
+    }
   }
   const reinstallTroubleshooting = document.getElementById("reinstallTroubleshooting");
   if (reinstallTroubleshooting && isChrome()) reinstallTroubleshooting.style.display = "inline";

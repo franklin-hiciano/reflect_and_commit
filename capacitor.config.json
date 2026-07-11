@@ -1,0 +1,12 @@
+{
+  "appId": "com.franklin.reflectandcommit",
+  "appName": "Reflect & Commit",
+  "webDir": "app",
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": ["profile", "email"],
+      "iosClientId": "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
+      "androidClientId": "YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com"
+    }
+  }
+}

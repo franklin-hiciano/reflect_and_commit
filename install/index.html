@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Install Reflect &amp; Commit</title>
     <meta name="description" content="Put Reflect & Commit on your home screen so tonight's reflection is one tap away." />
-    <link rel="manifest" href="../app/manifest.json" />
+    <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#0a0a0b" />
     <link rel="apple-touch-icon" href="../app/icons/apple-touch-icon.png" />
     <link rel="icon" href="../app/icons/icon-192.png" />
@@ -76,6 +76,14 @@
     </div>
 
     <script>
+      // Register the app's service worker so THIS page meets PWA
+      // installability criteria. Without a controlling SW that has a fetch
+      // handler, Chrome never fires `beforeinstallprompt`, so the Install
+      // button below stays hidden and "add to home screen" is the only path.
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(function () {});
+      }
+
       // The QR code on desktop's pairing screen encodes the signed-in
       // account's email as ?acct= — surfacing it here, before sign-in even
       // happens, is the only point where a mismatched Google account can

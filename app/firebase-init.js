@@ -31,7 +31,7 @@ const isCapacitorNative = typeof Capacitor !== "undefined" && (Capacitor.isNativ
 // replacing the old state/questions {list: [...]} array. Old doc is just
 // left alone and unused now.
 const cfg = {
-  apiKey: "«reda...»",
+  apiKey: "AIzaSyBZQvIOvSOsmkW100IoZVsOiclEeAYm-V8",
   authDomain: "wisdom-tree-29e66.firebaseapp.com",
   projectId: "wisdom-tree-29e66",
   storageBucket: "wisdom-tree-29e66.firebasestorage.app",

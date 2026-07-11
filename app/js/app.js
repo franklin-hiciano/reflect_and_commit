@@ -959,19 +959,14 @@ function renderChat() {
   if (!node) return afterQuestions();
   setPhase("phaseChat");
   setBackVisible(draft.history.length > 0);
-  setCollapseVisible(draft.history.length > 0);
+  // reflection shows ONLY the current question — no scrolling transcript of
+  // past answers. (draft.history is still tracked for the back button and for
+  // answer logging; it's just never rendered on the reflect screen.)
+  setCollapseVisible(false);
 
   const scroll = document.getElementById("chatScroll");
-  scroll.classList.toggle("collapsed", chatCollapsed);
+  scroll.classList.remove("collapsed");
   scroll.innerHTML = "";
-  draft.history.forEach((name) => {
-    const n = resolveBlock(name); if (!n) return;
-    const a = draft.answers[name];
-    const ans = a && typeof a === "object" ? a.label : (a || "");
-    const item = document.createElement("div"); item.className = "chat-item past";
-    item.innerHTML = `<div class="chat-q">${escapeHtml(n.name)}</div><div class="chat-a">${escapeHtml(ans)}</div>`;
-    scroll.appendChild(item);
-  });
   const cur = document.createElement("div"); cur.className = "chat-item current";
   cur.innerHTML = `<div class="chat-q big">${escapeHtml(node.name)}</div>`;
   scroll.appendChild(cur);

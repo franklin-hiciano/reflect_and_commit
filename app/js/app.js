@@ -198,6 +198,41 @@ function updateActivityPhase() {
   }
 }
 
+// ---------- PWA detection with sessionStorage persistence ----------
+// Once we've confirmed we're running in standalone mode, remember it for
+// the rest of the session — this prevents the "almost there" screen from
+// reappearing on reload when the display-mode media query momentarily
+// returns false (e.g. during SW controller change).
+const STANDALONE_KEY = "rc_known_standalone";
+function isStandalone() {
+  const mq = window.matchMedia("(display-mode: standalone)");
+  const mqMinimal = window.matchMedia("(display-mode: minimal-ui)");
+  const standalone = mq.matches || mqMinimal.matches || window.navigator.standalone === true;
+  if (standalone) {
+    try { sessionStorage.setItem(STANDALONE_KEY, "1"); } catch (_) {}
+    return true;
+  }
+  // If we've already confirmed standalone this session, trust it
+  try { if (sessionStorage.getItem(STANDALONE_KEY) === "1") return true; } catch (_) {}
+  return false;
+}
+
+// Auto-recheck on focus/visibility change — handles the case where the
+// app was launched from home screen but the media query hadn't settled yet.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && isStandalone()) {
+    // If we're on the landing screen and now confirmed standalone, re-route
+    const landing = document.getElementById("landingScreen");
+    if (landing && landing.classList.contains("on")) routeAfterAuth();
+  }
+});
+window.addEventListener("focus", () => {
+  if (isStandalone()) {
+    const landing = document.getElementById("landingScreen");
+    if (landing && landing.classList.contains("on")) routeAfterAuth();
+  }
+});
+
 // ---------- routing ----------
 function showScreen(id) { document.querySelectorAll(".screen").forEach((s) => s.classList.remove("on")); document.getElementById(id).classList.add("on"); updateActivityPhase(); }
 // landing on the home screen: the cross-device nudge takes priority over the
@@ -230,15 +265,21 @@ function showAlmostThere() {
   if (explainer) {
     explainer.textContent = isPhone()
       ? "Almost there — open Reflect & Commit from your home screen to finish setup."
-      : "Almost there — open the installed Reflect & Commit app to finish. If nothing happened, it may already be installed — remove it from chrome://apps and try again. If you're already in the app, press Ctrl+R (Cmd+R on Mac) to refresh.";
-  }
-  // Add a retry button in case isStandalone() detection failed
-  const retryBtn = document.getElementById("retryStandaloneBtn");
-  if (retryBtn) {
-    retryBtn.style.display = "block";
-    retryBtn.onclick = () => { routeAfterAuth(); };
+      : "Almost there — open the installed Reflect & Commit app to finish. If nothing happened, it may already be installed — remove it from chrome://apps and try again.";
   }
 }
+
+// Auto-recheck standalone status when the page gains focus/visibility
+// This handles the Ctrl+R case where display-mode isn't immediately reported
+function maybeRecheckStandalone() {
+  if (isStandalone()) {
+    routeAfterAuth();
+  }
+}
+window.addEventListener("focus", maybeRecheckStandalone);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") maybeRecheckStandalone();
+});
 
 function enterHome() {
   showScreen("homeScreen");
@@ -257,11 +298,6 @@ function renderUserMenu() {
   if (name) name.textContent = window._userName || "";
 }
 function goHome() { stopVoice(); if (isStandalone()) { enterHome(); } else { showScreen("landingScreen"); resetLandingToIntro(); } }
-function isStandalone() {
-  return window.matchMedia("(display-mode: standalone)").matches
-    || window.matchMedia("(display-mode: minimal-ui)").matches
-    || window.navigator.standalone === true;
-}
 // install is required on every device before use — phone AND desktop each
 // get their own install prompt the first time they sign in on that device.
 // Mobile follows a strict linear flow: install → notifications → time → done.
@@ -282,7 +318,7 @@ function routeAfterAuth() {
     // Mobile linear onboarding: install → notifications → time → done
     if (!isNotifValidated()) {
       showScreen("landingScreen");
-      goToNotifySetup();
+      goToNotifySetup();  // First step: pick time
       return;
     }
     // Notifications done — check if time is set
@@ -292,7 +328,7 @@ function routeAfterAuth() {
     // Desktop: gate only on FIRST launch until mobile has onboarded
     if (!mobileOnboarded()) {
       showScreen("landingScreen");
-      showDesktopWaitingGate();
+      showDesktopFirstLaunchGate();
     } else {
       enterHome();
     }
@@ -308,20 +344,27 @@ function completeMobileOnboarding() {
   enterHome();
 }
 
-// --- Desktop waiting gate (first launch only, until phone is onboarded) ---
-function showDesktopWaitingGate() {
+// --- Desktop first-launch gate (until phone is onboarded) ---
+function showDesktopFirstLaunchGate() {
   document.getElementById("landingIntro").style.display = "none";
   const here = document.getElementById("landingStepHere");
   if (here) here.style.display = "block";
   const explainer = document.getElementById("onboardingExplainer");
-  if (explainer) explainer.textContent = "Waiting for your phone to finish setup…";
+  if (explainer) {
+    explainer.innerHTML = "Install Reflect & Commit on your phone first. " +
+      "Scan the QR code or open this link on your phone:<br><br>" +
+      "<a href='https://" + INSTALL_URL + "' target='_blank' rel='noopener' " +
+      "style='color: var(--gold); text-decoration: underline; word-break: break-all;'>" +
+      "https://" + INSTALL_URL + "</a>";
+  }
   const getStartedBtn = document.getElementById("getStartedBtn");
   if (getStartedBtn) getStartedBtn.style.display = "none";
-  // Show the "send notification to phone" button if we have a push token
-  const sendNotifBtn = document.getElementById("sendPairingNotifBtn");
-  if (sendPairingNotifBtn) {
-    // Will be shown by maybeShowOtherDeviceGate once we know if mobile has a token
-  }
+  // Hide manual fallback (not relevant on desktop first-launch)
+  const manualBox = document.getElementById("landingManualSteps");
+  if (manualBox && manualBox.parentElement) manualBox.parentElement.style.display = "none";
+  const trouble = document.getElementById("installTroubleshooting");
+  if (trouble) trouble.style.display = "none";
+  // Show QR + send-notification via the pairing gate
   maybeShowOtherDeviceGate();
 }
 
@@ -498,7 +541,29 @@ window.goToNotifySetup = async () => {
   renderNotifyLabel();
 };
 
-// Mobile linear onboarding step 2: enable notifications.
+// Mobile linear onboarding: after install, go to time picker first
+function goToMobileNotifySetup() {
+  window.goToNotifySetup();
+}
+
+// Step 1: User picks time, clicks Continue -> go to permission screen
+window.goToNotifPermission = () => {
+  document.getElementById("landingNotifySetup").style.display = "none";
+  document.getElementById("landingNotifPermission").style.display = "block";
+};
+
+// Step 2: User taps Enable Notifications -> request permission, then complete
+window.requestNotifPermissionOnboard = async () => {
+  const ok = await requestNotifPermission();
+  if (!ok) { showPermissionDenied(); return; }
+  window._registerPush && window._registerPush(deviceKind());
+  await (window._markNotifValidated && window._markNotifValidated());
+  // _markNotifValidated writes both mobileNotifEnabledAt AND mobileOnboardedAt
+  // atomically; we're done with onboarding — go straight home.
+  enterHome();
+};
+
+// Mobile linear onboarding step 2 (old combined): enable notifications.
 // User picks a time first (default 20:00), then taps the enable button.
 window.notifSetupContinue = async () => {
   const ok = await requestNotifPermission();
@@ -522,7 +587,7 @@ window.goToInstallGate = () => {
     // Already installed — go straight home if mobile is onboarded, show
     // pairing gate otherwise (desktop), or go to notify setup (phone).
     if (isPhone()) {
-      window.goToNotifySetup();
+      goToMobileNotifySetup();
       return;
     }
     if (mobileOnboarded()) { enterHome(); return; }
@@ -541,12 +606,6 @@ window.goToInstallGate = () => {
   if (steps) {
     if (steps.parentElement) steps.parentElement.style.display = "";
     steps.innerHTML = isPhone() ? "Tap the share icon then 'Add to Home Screen'" : "Click the install icon (⊕) in the address bar";
-    // Also show QR code for manual install
-    const manualQr = document.getElementById("manualInstallQr");
-    if (manualQr) {
-      manualQr.src = qrSrcFor(INSTALL_URL);
-      manualQr.style.display = "block";
-    }
   }
   const reinstallTroubleshooting = document.getElementById("reinstallTroubleshooting");
   if (reinstallTroubleshooting && isChrome()) reinstallTroubleshooting.style.display = "inline";

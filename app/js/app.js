@@ -27,6 +27,10 @@ var dslText = ""; // classic <script>, top-level var == window.dslText — dsl-e
 let settings = { notifyTime: "20:00" };
 let commitments = [];
 let chatCollapsed = false;
+// the mobile login veil (reusing the device-shade) is a manual overlay, not
+// driven by activeDevice — this flag keeps _onActiveDeviceUpdated from clearing
+// it the moment an activeDevice snapshot arrives.
+let _mobileVeilUp = false;
 let draft = blankDraft();
 
 // phone = mobile UA, or a coarse-pointer device on a narrow screen. Used to
@@ -126,10 +130,15 @@ window._onSettingsUpdated = () => {
 window._onCommitmentsUpdated = () => { commitments = window._commitments || []; };
 window._onDraftUpdated = () => { const rd = window._remoteDraft; if (rd && rd.active && !draft.active) { draft = { ...blankDraft(), ...rd }; localStorage.setItem(LS_DRAFT, JSON.stringify(draft)); } };
 window._onSignedIn = () => {
-  window.renderDslEditor(); renderSettings(); scheduleNotificationLoop();
+  window.renderDslEditor(); renderSettings();
+  // notifications are a phone-only concern — desktop is purely for growing the
+  // tree, so it neither runs the local reflection-reminder loop nor registers
+  // for push. (Sending a pairing ping TO the phone still works — that uses the
+  // phone's own token, below.)
+  if (isPhone()) scheduleNotificationLoop();
   routeAfterAuth();
   maybeOpenFromUrl();
-  if ("Notification" in window && Notification.permission === "granted") window._registerPush && window._registerPush(deviceKind());
+  if (isPhone() && "Notification" in window && Notification.permission === "granted") window._registerPush && window._registerPush(deviceKind());
   window._claimActiveDevice && window._claimActiveDevice(deviceKind());
   markDeviceSeenIfInstalled();
   // Desktop first launch: if phone hasn't onboarded yet, fire a push to it.
@@ -284,8 +293,42 @@ document.addEventListener("visibilitychange", () => {
 function enterHome() {
   showScreen("homeScreen");
   renderUserMenu();
+  applyDeviceChrome();
   maybeShowOtherDeviceGate();
+  maybeVeilMobile();
 }
+// desktop is edit-only: strip the notification chrome (reflection-time clock +
+// "edit reflection time" / "send test notification" menu items) so nothing on
+// desktop implies it will ever notify you. Phone keeps all of it.
+function applyDeviceChrome() {
+  const phone = isPhone();
+  const clock = document.querySelector(".home-clock-group");
+  if (clock) clock.style.display = phone ? "" : "none";
+  ["settingsEditTime", "settingsTestNotif"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = phone ? "" : "none";
+  });
+}
+// "put the veil up once you login on mobile" — the first time a phone lands on
+// home after signing in, drop the same device-shade it would show if desktop
+// were the active device, so the phone reads as "your questions live on the
+// computer." One tap on "use here instead" lifts it for good on this device.
+function maybeVeilMobile() {
+  if (!isPhone()) return;
+  try { if (localStorage.getItem("rc_mobile_unveiled") === "1") return; } catch (_) {}
+  const shade = document.getElementById("deviceShade");
+  const title = document.querySelector(".device-shade-title");
+  if (title) title.textContent = "in use on your other device";
+  _mobileVeilUp = true;
+  if (shade) shade.classList.add("on");
+}
+window.useHereInstead = () => {
+  try { localStorage.setItem("rc_mobile_unveiled", "1"); } catch (_) {}
+  _mobileVeilUp = false;
+  const shade = document.getElementById("deviceShade");
+  if (shade) shade.classList.remove("on");
+  takeOverDevice();
+};
 // account menu trigger (top right) — avatar + name from the signed-in
 // Google account, same source as the cross-device gate's avatar.
 function renderUserMenu() {
@@ -303,6 +346,10 @@ function goHome() { stopVoice(); if (isStandalone()) { enterHome(); } else { sho
 // Mobile follows a strict linear flow: install → notifications → time → done.
 // Desktop: install, then gate until mobile onboarding is complete (first time only).
 function routeAfterAuth() {
+  // First thing on first entry: a single-action "Got it" intro screen. One tap
+  // and it's never shown again (rc_seen_intro). The user owns the copy.
+  if (!hasSeenIntro()) { showScreen("landingScreen"); showGotIt(); return; }
+
   if (!isStandalone()) {
     showScreen("landingScreen");
     if (!isPhone() && !isPWASupportedBrowser()) {
@@ -315,14 +362,14 @@ function routeAfterAuth() {
 
   // --- Device is standalone (installed PWA) ---
   if (isPhone()) {
-    // Mobile linear onboarding: install → notifications → time → done
+    // Mobile onboarding — one screen, one action: install → enable
+    // notifications → home. Reflection time defaults to 20:00 and is changed
+    // later from the home clock, so it's no longer its own onboarding step.
     if (!isNotifValidated()) {
       showScreen("landingScreen");
-      goToNotifySetup();  // First step: pick time
+      goToNotifPermission();
       return;
     }
-    // Notifications done — check if time is set
-    // (time is always set — default 20:00 — so if notif is validated, we're done)
     completeMobileOnboarding();
   } else {
     // Desktop: gate only on FIRST launch until mobile has onboarded
@@ -371,6 +418,12 @@ function showDesktopFirstLaunchGate() {
 function mobileOnboarded() {
   return !!(window._onboarding && window._onboarding.mobileOnboardedAt);
 }
+
+// ---------- first-run "Got it" intro (single action) ----------
+function hasSeenIntro() { try { return localStorage.getItem("rc_seen_intro") === "1"; } catch (_) { return false; } }
+function hideAllLandingPanes() { document.querySelectorAll("#landingScreen .landing-inner").forEach((el) => { el.style.display = "none"; }); }
+function showGotIt() { hideAllLandingPanes(); const g = document.getElementById("landingGotIt"); if (g) g.style.display = "block"; }
+window.dismissGotIt = () => { try { localStorage.setItem("rc_seen_intro", "1"); } catch (_) {} routeAfterAuth(); };
 
 // --- Desktop: fire a push notification to the phone ---
 async function sendPairingPushToPhone() {
@@ -431,11 +484,13 @@ function resetLandingToIntro() {
   const denied = document.getElementById("landingPermissionDenied");
   const unsupported = document.getElementById("landingUnsupportedBrowser");
   const enableBtn = document.getElementById("enableNotifBtn");
+  const gotIt = document.getElementById("landingGotIt");
   if (!intro || !here) return;
   intro.style.display = "block"; here.style.display = "none";
   if (notifySetup) notifySetup.style.display = "none";
   if (denied) denied.style.display = "none";
   if (unsupported) unsupported.style.display = "none";
+  if (gotIt) gotIt.style.display = "none";
   
   // Both phone AND desktop show "Install" first (introGetStartedBtn).
   // Notifications come after install, phone-only.
@@ -546,10 +601,11 @@ function goToMobileNotifySetup() {
   window.goToNotifySetup();
 }
 
-// Step 1: User picks time, clicks Continue -> go to permission screen
+// Single-action notification step: just the "Enable notifications" screen.
 window.goToNotifPermission = () => {
-  document.getElementById("landingNotifySetup").style.display = "none";
-  document.getElementById("landingNotifPermission").style.display = "block";
+  hideAllLandingPanes();
+  const p = document.getElementById("landingNotifPermission");
+  if (p) p.style.display = "block";
 };
 
 // Step 2: User taps Enable Notifications -> request permission, then complete
@@ -611,16 +667,14 @@ window.goToInstallGate = () => {
       steps.innerHTML = "Tap the Share button <svg viewBox='0 0 24 24' width='14' height='14' style='vertical-align:middle;margin:0 2px' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8'/><polyline points='16 6 12 2 8 6'/><line x1='12' y1='2' x2='12' y2='15'/></svg> then <b>Add to Home Screen</b>";
     }
   } else {
-    // Desktop: show QR code + clickable install link in the main area
+    // Desktop installs ITSELF here. The phone-pairing QR deliberately does NOT
+    // appear in the browser tab — you don't install desktop and phone at the
+    // same moment, so the QR only shows once you're inside the installed app
+    // (the otherDeviceGate overlay). Here we just point at the desktop install.
     if (steps) {
       if (steps.parentElement) steps.parentElement.style.display = "";
-      steps.innerHTML = "<div style='text-align:center;margin-bottom:12px'>" +
-        "<img id='landingStepHereQr' src='" + qrSrcFor(INSTALL_URL) + "' alt='Scan to install on phone' style='width:180px;height:180px;border-radius:8px;background:#fff'/>" +
-        "</div>" +
-        "<div style='font-size:11px;color:var(--ink-faint);text-align:center;word-break:break-all'>" +
-        "Or open this link on your phone:<br>" +
-        "<a href='https://" + INSTALL_URL + "' target='_blank' rel='noopener' style='color:var(--gold);text-decoration:underline'>https://" + INSTALL_URL + "</a>" +
-        "</div>";
+      steps.innerHTML = "<div style='font-size:12.5px;color:var(--ink-dim);line-height:1.6'>" +
+        "Click <b>Install Reflect &amp; Commit</b> above, or use the install icon in your browser's address bar.</div>";
     }
   }
   const reinstallTroubleshooting = document.getElementById("reinstallTroubleshooting");
@@ -849,6 +903,11 @@ function dueCommitment() { const today = new Date(); today.setHours(0, 0, 0, 0);
 
 // ---------- reflection ----------
 async function openReflection() {
+  // reflecting is a deliberate action on THIS device — lift the mobile login
+  // veil so tonight's reflection is never hidden behind it.
+  _mobileVeilUp = false;
+  const _shade = document.getElementById("deviceShade");
+  if (_shade) _shade.classList.remove("on");
   if (!withinReflectWindow()) { document.getElementById("nextAvailLabel").textContent = nextScheduledLabel(); showScreen("unavailableScreen"); return; }
   showScreen("reflectScreen");
   // always reconcile against the server's true draft before deciding whether
@@ -1006,7 +1065,9 @@ window._onActiveDeviceUpdated = () => {
     }
   }
   
-  shade.classList.toggle("on", shouldBlock);
+  // keep the mobile login veil up even when there's no real cross-device
+  // block, until the person explicitly taps "use here instead".
+  shade.classList.toggle("on", shouldBlock || _mobileVeilUp);
 };
 window.takeOverDevice = () => { window._claimActiveDevice && window._claimActiveDevice(deviceKind(), currentActivityPhase()); };
 

@@ -65,6 +65,9 @@
               '<button class="squircle-corner-btn" id="canvasPreviewBtn" title="preview — walk through this tree right now, nothing saved">' +
                 '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>' +
               '</button>' +
+              '<button class="squircle-corner-btn" id="copyDslBtn" title="copy the tree text">' +
+                '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>' +
+              '</button>' +
               '<button class="squircle-corner-btn" id="historyToggleBtn" title="version history">' +
                 '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /><path d="M12 8v4l3 2" /></svg>' +
               '</button>' +
@@ -93,6 +96,8 @@
     document.getElementById("paneBtnCanvas").onclick = () => setPane("canvas");
     document.getElementById("historyToggleBtn").onclick = toggleHistory;
     document.getElementById("canvasPreviewBtn").onclick = startPreview;
+    const copyBtn = document.getElementById("copyDslBtn");
+    if (copyBtn) copyBtn.onclick = copyDslText;
     const pairedBtn = document.getElementById("pairedEditingBtn");
     pairedBtn.classList.toggle("on", _pairedEditing);
     pairedBtn.onclick = () => {
@@ -113,7 +118,27 @@
       const finalText = _pairedEditing
         ? window._cascadeRenameIfHeaderEdited(oldText, newText, cursor)
         : newText;
+      if (finalText === newText) {
+        // textarea already holds finalText; renderDslPane won't reassign
+        // el.value (its guard), so the caret stays put on its own.
+        window.setDslText(finalText);
+        return;
+      }
+      // A paired-rename cascade rewrote OTHER lines, so finalText differs from
+      // what's in the box and renderDslPane will reassign el.value — which
+      // drops the caret to the very end (this was the "kicked to the end after
+      // one character" bug). The line under the caret is never itself touched
+      // by the cascade, so remember the caret as (line, column) and restore it
+      // against finalText after the re-render.
+      const before = newText.slice(0, cursor);
+      const line = (before.match(/\n/g) || []).length;
+      const col = cursor - (before.lastIndexOf("\n") + 1);
       window.setDslText(finalText);
+      const fLines = finalText.split("\n");
+      let off = 0;
+      for (let i = 0; i < line && i < fLines.length; i++) off += fLines[i].length + 1;
+      off += Math.min(col, (fLines[line] || "").length);
+      try { el.setSelectionRange(off, off); } catch (_) {}
     });
     el.addEventListener("dragstart", onDslDragStart);
     el.addEventListener("dragover", (e) => e.preventDefault());
@@ -159,6 +184,40 @@
   function toggleHistory() {
     _historyOpen = !_historyOpen;
     window.renderDslEditor();
+  }
+
+  // ── copy the whole tree text to the clipboard, with a brief confirmation
+  // and an execCommand fallback for browsers without the async clipboard API
+  // (or where it's blocked). This is what the corner "copy" button does. ──
+  function copyDslText() {
+    const t = text();
+    const btn = document.getElementById("copyDslBtn");
+    const flash = () => {
+      if (!btn) return;
+      btn.classList.add("copied");
+      btn.title = "copied";
+      clearTimeout(btn._copyTimer);
+      btn._copyTimer = setTimeout(() => { btn.classList.remove("copied"); btn.title = "copy the tree text"; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(flash).catch(() => fallbackCopy(t, flash));
+    } else {
+      fallbackCopy(t, flash);
+    }
+  }
+  function fallbackCopy(t, done) {
+    try {
+      const scratch = document.createElement("textarea");
+      scratch.value = t;
+      scratch.style.position = "fixed";
+      scratch.style.left = "-9999px";
+      document.body.appendChild(scratch);
+      scratch.focus();
+      scratch.select();
+      const ok = document.execCommand && document.execCommand("copy");
+      document.body.removeChild(scratch);
+      if (ok) done && done();
+    } catch (_) {}
   }
   function scrubTo(i) {
     const snap = _snapshots[i];
@@ -875,6 +934,13 @@
     }
   }
 
+  // first non-empty line of a snapshot, truncated — so the history list reads
+  // as "what the tree actually said at that point" instead of a version number.
+  function snapshotPreview(t) {
+    const firstLine = (t || "").split("\n").map((s) => s.trim()).find((s) => s) || "";
+    if (!firstLine) return "(empty)";
+    return firstLine.length > 46 ? firstLine.slice(0, 46) + "…" : firstLine;
+  }
   function renderHistoryRow() {
     const toggle = document.getElementById("historyToggleBtn");
     const dropdown = document.getElementById("historyDropdown");
@@ -885,13 +951,20 @@
     dropdown.classList.toggle("on", _historyOpen);
     wrap.innerHTML = "";
     if (!_historyOpen) return;
-    _snapshots.forEach((snap, i) => {
+    // newest first — each row shows a truncation of the tree at that saved
+    // point plus when it was taken; click to scrub back to it.
+    for (let i = _snapshots.length - 1; i >= 0; i--) {
+      const snap = _snapshots[i];
       const b = document.createElement("button");
       b.className = "history-snapshot" + (i === _snapIndex ? " on" : "");
-      b.title = new Date(snap.ts).toLocaleTimeString();
-      b.textContent = String(i + 1);
+      const when = new Date(snap.ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      const preview = snapshotPreview(snap.text);
+      const pv = document.createElement("span"); pv.className = "history-snapshot-preview"; pv.textContent = preview;
+      const tm = document.createElement("span"); tm.className = "history-snapshot-time"; tm.textContent = when;
+      b.appendChild(pv); b.appendChild(tm);
+      b.title = preview;
       b.onclick = () => scrubTo(i);
       wrap.appendChild(b);
-    });
+    }
   }
 })();

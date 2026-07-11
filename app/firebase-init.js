@@ -23,12 +23,15 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { registerForPush } from "./firebase-messaging-setup.js";
 
+// Detect if running in Capacitor native context (iOS/Android app)
+const isCapacitorNative = typeof Capacitor !== "undefined" && (Capacitor.isNativePlatform || (window.Capacitor && window.Capacitor.isNativePlatform));
+
 // same firebase project as before — schema is new/simplified again: the
 // question tree is now stored as its own DSL TEXT (state/tree {text}),
 // replacing the old state/questions {list: [...]} array. Old doc is just
 // left alone and unused now.
 const cfg = {
-  apiKey: "AIzaSyBZQvIOvSOsmkW100IoZVsOiclEeAYm-V8",
+  apiKey: "«reda...»",
   authDomain: "wisdom-tree-29e66.firebaseapp.com",
   projectId: "wisdom-tree-29e66",
   storageBucket: "wisdom-tree-29e66.firebasestorage.app",
@@ -54,24 +57,43 @@ const setSyncDot = (s) => {
   if (d) d.className = "sync-dot" + (s ? " " + s : "");
 };
 
-// iOS Safari blocks signInWithPopup in PWA contexts — redirect flow is the
-// only reliable option there.
-const _iosUA = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+// Native sign-in using @capacitor-firebase/authentication (works in iOS/Android app)
+// Falls back to web SDK redirect/popup for PWA/browser
 window.doSignIn = async () => {
   try {
-    if (_iosUA) {
-      await signInWithRedirect(auth, gProvider);
+    if (isCapacitorNative) {
+      // Use native Firebase Auth plugin — handles Google Sign-In natively
+      const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+      await FirebaseAuthentication.signInWithGoogle();
     } else {
-      await signInWithPopup(auth, gProvider);
+      // Web/PWA: iOS Safari blocks popup in PWA → redirect; else popup
+      const _iosUA = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      if (_iosUA) {
+        await signInWithRedirect(auth, gProvider);
+      } else {
+        await signInWithPopup(auth, gProvider);
+      }
     }
   } catch (e) {
     console.error(e);
   }
 };
-// handle the redirect result when returning from the Google sign-in page
-getRedirectResult(auth).catch(() => {});
+
+// Handle redirect result (web only — native plugin handles callback internally)
+if (!isCapacitorNative) {
+  getRedirectResult(auth).catch(() => {});
+}
 window.doSignOut = async () => {
-  await fbSignOut(auth);
+  try {
+    if (isCapacitorNative) {
+      const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+      await FirebaseAuthentication.signOut();
+    } else {
+      await fbSignOut(auth);
+    }
+  } catch (e) {
+    console.error(e);
+  }
 };
 
 // every onSnapshot below is torn down on sign-out (and before re-subscribing

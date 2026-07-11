@@ -42,6 +42,24 @@
          as an overlay on top of the home screen (#otherDeviceGate below) —
          not before you've even installed the device in front of you. -->
         <div class="screen" id="landingScreen">
+            <!-- first-run intro — one screen, one action ("Got it"). Placeholder
+             copy; owner edits it. Shown once (rc_seen_intro) before anything else. -->
+            <div class="landing-inner" id="landingGotIt" style="display: none; max-width: 340px; margin: 0 auto">
+                <div style="font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: 0.01em; margin-bottom: 12px">
+                    Reflect <span class="amp">&amp;</span> Commit
+                </div>
+                <div style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 26px; line-height: 1.7">
+                    [ write your intro here ]
+                </div>
+                <button
+                    id="gotItBtn"
+                    style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer"
+                    onclick="dismissGotIt()"
+                >
+                    Got it
+                </button>
+            </div>
+
             <div class="landing-inner" id="landingIntro">
                 <div class="auth-logo">
                     Reflect <span class="amp">&amp;</span> Commit
@@ -108,30 +126,6 @@
                                 onclick="goToNotifPermission()"
                             >
                                 Continue
-                            </button>
-                        </div>
-
-                        <div
-                            class="landing-inner"
-                            id="landingNotifPermission"
-                            style="display: none; max-width: 340px; margin: 0 auto"
-                        >
-                            <div
-                                style="font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: 0.01em; margin-bottom: 6px"
-                            >
-                                Reflect <span class="amp">&</span> Commit
-                            </div>
-                            <div
-                                style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6"
-                            >
-                                Notifications are required. Tap to enable.
-                            </div>
-                            <button
-                                id="enableNotifBtnOnboard"
-                                style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 16px"
-                                onclick="requestNotifPermissionOnboard()"
-                            >
-                                Enable notifications
                             </button>
                         </div>
 
@@ -238,15 +232,8 @@
         <!-- HOME — settings + edit questions -->
         <div class="screen" id="homeScreen">
             <div class="home-body">
-                <!-- js/dsl-editor.js builds everything inside here: the
- duplicate/multi-root warning banner, the mobile pane switcher,
- the dsl-editor + node-canvas split, and the version-history
- slider. See js/tree-model.js for the DSL grammar itself.
- Editor is available on both phones and desktops — the
- mobileEditNotice and accessEditorAnywayBtn elements that used
- to gate the editor to desktop have been removed. -->
-    <div id="dslHome" class="dsl-home"></div>
- </div>
+                <div id="dslHome" class="dsl-home"></div>
+            </div>
 
             <!-- account menu trigger — screen-level (not embedded in the
            canvas squircle) so mobile, where the whole editor is hidden,
@@ -271,12 +258,14 @@
                 <div class="settings-panel-inner">
                     <button
                         class="settings-menu-item"
+                        id="settingsEditTime"
                         onclick="document.getElementById('homeClockBtn').click()"
                     >
                         edit reflection time
                     </button>
                     <button
                         class="settings-menu-item"
+                        id="settingsTestNotif"
                         onclick="sendSelfNotification()"
                     >
                         send test notification
@@ -592,7 +581,7 @@
                 <div class="device-shade-title">
                     in use on your other device
                 </div>
-                <button class="btn-shapeless" onclick="takeOverDevice()">
+                <button class="btn-shapeless" onclick="useHereInstead()">
                     use here instead
                 </button>
             </div>

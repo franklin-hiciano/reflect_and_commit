@@ -159,31 +159,36 @@
            OVER the canvas — now normal flow, so the canvas genuinely starts
            below it. -->
             <div class="home-header-row" id="homeHeaderRow">
-                <!-- standalone circle, no longer nested inside the pill. Comes
-             FIRST in the row — order is play, then the pill — and the whole
-             group sits flush right (was centered). -->
-                <button class="home-pill-play" id="homePillPlay" onclick="startPreview()" title="walk your tree now">
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8 5v14l11-7z" /></svg>
-                </button>
+                <!-- play circle + its bold "reflects in n hours/minutes" label
+             (iOS-section-title style) now travel together as one group,
+             since the label sits directly above the circle. -->
+                <div class="home-play-group">
+                    <div class="home-reflect-label" id="homeReflectLabel"></div>
+                    <button class="home-pill-play" id="homePillPlay" onclick="startPreview()" title="walk your tree now">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8 5v14l11-7z" /></svg>
+                    </button>
+                </div>
                 <div class="home-pill" id="homePill">
-                    <!-- no longer clickable itself, no chevron — the lightbulb
-                 below is the expand/collapse trigger now. -->
+                    <!-- current idea — not clickable itself; the chevron below
+                 is the expand/collapse trigger. -->
                     <div class="home-pill-commit" id="homePillCommit">
                         <span class="home-pill-commit-text" id="homePillCommitText"></span>
                     </div>
                     <!-- nothing else in the middle: the want→done rate and
                  per-commitment time deltas now live inside the dropdown
                  (built by renderCommitDrop in app.js) instead of cluttering
-                 this always-visible row. -->
-                    <button class="home-pill-streak" id="homePillStreak" onclick="toggleCommitPill()" title="ideas executed — click to see past ones">
-                        <svg class="bulb" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2z"/><rect x="9" y="19" width="6" height="1.6" rx="0.8"/><rect x="10" y="21.4" width="4" height="1.6" rx="0.8"/></svg>
-                        <span class="home-pill-streak-count" id="homePillStreakCount">0</span>
+                 this always-visible row. A plain chevron now (was a
+                 lightbulb+streak-count) — rotates to point down when open. -->
+                    <button class="home-pill-streak" id="homePillStreak" onclick="toggleCommitPill()" title="see past ones">
+                        <svg class="pill-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>
                     </button>
                     <!-- account menu trigger — nested inside the pill now (was
                  a separate screen-level element) so mobile, where the whole
                  editor is hidden, still has a way to reach settings/sign-out
                  from the one thing that's always shown. Avatar only, no name
-                 text. -->
+                 text. On mobile this detaches to a fixed bottom-center
+                 position — see the mobile media query — so mobile's bottom
+                 area really is just this button. -->
                     <button
                         class="user-menu-trigger"
                         id="userMenuTrigger"
@@ -209,6 +214,13 @@
 
             <div class="home-body">
                 <div id="dslHome" class="dsl-home"></div>
+                <!-- mobile: the DSL editor/canvas split above is desktop-only
+                     (authoring stays desktop-only) — this is what mobile
+                     shows instead, a single plain read-only list of question
+                     titles, top to bottom. No fades; the list just scrolls,
+                     and the idea dropdown overlays it when open rather than
+                     pushing it around (see .home-pill-drop). -->
+                <div class="mobile-node-list" id="mobileNodeList"></div>
             </div>
 
             <div class="settings-panel" id="settingsPanel">
@@ -219,19 +231,6 @@
                         onclick="document.getElementById('homeClockBtn').click()"
                     >
                         edit reflection time
-                    </button>
-                    <button
-                        class="settings-menu-item"
-                        id="settingsTestNotif"
-                        onclick="sendSelfNotification()"
-                    >
-                        send test notification
-                    </button>
-                    <button
-                        class="settings-menu-item"
-                        onclick="resetPairing()"
-                    >
-                        reset device pairing
                     </button>
                     <button class="settings-menu-item" onclick="doSignOut()">
                         sign out

@@ -174,16 +174,25 @@ body::after {
   box-shadow: var(--elev-sm); font-family: var(--serif);
 }
 .home-pill .user-menu-trigger { position: static; background: none; border: none; padding: 0 2px; box-shadow: none; }
-/* standalone circle, sibling of .home-pill inside .home-header-row — no
-   longer nested inside the pill itself. */
+/* play circle + its bold "reflects in…" label travel together now — see
+   .home-reflect-label below. Still a sibling of .home-pill inside
+   .home-header-row, not nested inside the pill itself. */
+.home-play-group { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: none; }
+/* bold, small, uppercase, letter-spaced — the "iOS section title" look the
+   ask referenced (Settings-app-style small caps), sitting directly above
+   the play circle. Text itself comes from reflectsInLabel() in app.js. */
+.home-reflect-label {
+  font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--ink-faint); white-space: nowrap;
+}
 .home-pill-play {
   width: 28px; height: 28px; border-radius: 50%; background: none; border: 1.6px solid #3fa66b;
   color: #3fa66b; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
   transition: color .2s, border-color .2s; flex: none;
 }
 .home-pill-play:hover { color: #5ecb8b; border-color: #5ecb8b; }
-/* no longer clickable — a plain readout now, the lightbulb below is the
-   expand/collapse trigger (was the chevron on this element). */
+/* no longer clickable — a plain readout now, the chevron below is the
+   expand/collapse trigger. */
 .home-pill-commit {
   display: flex; align-items: center; gap: 6px; color: var(--ink-dim);
   font-family: var(--serif); font-size: 12.5px; padding: 4px 4px; max-width: 260px;
@@ -191,23 +200,22 @@ body::after {
 /* closed state: hide the WHOLE container, not just the text span inside it —
    the span alone going display:none still left this div's own padding
    (4px/4px) taking up real width, which read as a fat, unexplained left
-   margin next to the lightbulb when the pill was collapsed. */
+   margin next to the chevron when the pill was collapsed. */
 .home-pill-commit { display: none; }
 .home-pill.open .home-pill-commit { display: flex; }
 .home-pill-commit-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: none; }
 .home-pill.open .home-pill-commit-text { display: inline; }
-/* the lightbulb is a real button now — click to expand/collapse the idea
-   menu (was the chevron/text button above). */
+/* plain chevron now (was a lightbulb + streak count) — click to expand/
+   collapse the idea menu; rotates from pointing right to pointing down
+   when open, rather than needing a separate open/closed icon swap. */
 .home-pill-streak {
-  display: flex; align-items: center; gap: 4px; padding: 2px 8px 2px 4px; border: 1px solid var(--line);
-  border-radius: 999px; color: var(--ink-faint); background: none; cursor: pointer; font-family: inherit;
-  transition: border-color .2s, color .2s;
+  display: flex; align-items: center; justify-content: center; padding: 6px; border: none; border-radius: 50%;
+  color: var(--ink-dim); background: none; cursor: pointer; font-family: inherit;
+  transition: color .2s;
 }
-.home-pill-streak:hover { border-color: #35343a; }
-.home-pill-streak .bulb { width: 13px; height: 13px; }
-.home-pill-streak.lit { color: #e08a3c; border-color: #6b4a2a; }
-.home-pill-streak-count { font-family: var(--syne); font-size: 12px; font-weight: 700; color: var(--ink-dim); }
-.home-pill-streak.lit .home-pill-streak-count { color: var(--ink); }
+.home-pill-streak:hover { color: var(--ink); }
+.home-pill-streak .pill-chevron { transition: transform .25s var(--ease); }
+.home-pill.open .home-pill-streak .pill-chevron { transform: rotate(90deg); }
 .home-pill-drop {
   display: none; position: absolute; top: 100%; right: 16px; left: auto; transform: none;
   margin-top: 4px; z-index: 30; width: 300px;
@@ -250,31 +258,68 @@ body::after {
 /* line-drag inside the DSL editor */
 .dsl-textarea.line-dragging { cursor: grabbing; caret-color: transparent; }
 
-/* ---------- mobile: read-only home ---------- */
-.mobile-play-big, .mobile-edit-note { display: none; }
+/* ---------- mobile: read-only home ----------
+   Rebuilt layout, top to bottom: big play circle (fixed, upper area) → the
+   current idea floating (no chip chrome) with a chevron on its right that
+   opens the idea dropdown, which overlays whatever's below it rather than
+   pushing it → a plain scrollable list of question titles filling the rest
+   of the screen → just the pfp, alone, fixed at the very bottom. No fades
+   anywhere in this — .canvas-fade is already desktop-only, and the new node
+   list is a plain clipped scroll region, no gradient treatment. */
+.mobile-play-big, .mobile-edit-note, .mobile-node-list { display: none; }
 @media (max-width: 819px) {
-  /* big centered play in the upper area */
   .mobile-play-big {
     display: flex; position: fixed; top: 15%; left: 50%; transform: translate(-50%, -50%);
     width: 88px; height: 88px; border-radius: 50%; background: none; border: 2px solid #3fa66b;
     color: #3fa66b; align-items: center; justify-content: center; cursor: pointer; z-index: 25;
   }
-  /* the header row itself has nothing left to lay out on mobile — both its
-     children go back to fixed positioning below — so collapse it to avoid
-     reserving dead space at the top of the screen. */
-  .home-header-row { position: static; padding: 0; height: 0; min-height: 0; overflow: visible; }
-  /* the pill sits at the bottom middle — pfp + streak share it; text always open */
-  .home-pill { position: fixed; top: auto; bottom: calc(14px + env(safe-area-inset-bottom)); left: 50%; right: auto; transform: translateX(-50%); max-width: calc(100% - 20px); }
-  /* mobile: text (and its container) always shows, regardless of the
-     open/closed toggle that desktop uses. */
-  .home-pill-commit { display: flex; }
-  .home-pill-commit-text { display: inline; }
-  .home-pill-play { display: none; }
-  .home-pill-drop { position: fixed; top: auto; bottom: calc(66px + env(safe-area-inset-bottom)); left: 12px; right: 12px; transform: none; margin-top: 0; width: auto; }
-  .mobile-edit-note {
-    display: block; position: fixed; bottom: calc(64px + env(safe-area-inset-bottom));
-    left: 0; right: 0; text-align: center; font-family: var(--serif); font-size: 11px; color: var(--ink-faint); z-index: 24;
+  /* the header row now holds the "current idea + chevron" row instead of
+     collapsing to nothing — pushed down with top padding so it clears the
+     fixed play circle above it, roughly matching the original ~45%-of-
+     height pill position without needing fixed-position math of its own:
+     from here down it's normal document flow (row → dropdown-anchor →
+     node list), not a stack of independently fixed pieces. */
+  .home-header-row {
+    position: relative; z-index: 20; height: auto; min-height: 0; padding: 0 20px;
+    padding-top: 32vh; justify-content: center; background: none;
   }
+  /* the play circle + its label live at .mobile-play-big instead on mobile */
+  .home-play-group { display: none; }
+  /* no chip/pill chrome on mobile — "current idea" floats as plain text +
+     chevron, not inside a bordered pill; text is always shown (never
+     collapsed), only the past-items dropdown itself toggles. */
+  .home-pill {
+    background: none; border: none; box-shadow: none; padding: 0; width: 100%;
+    justify-content: space-between; gap: 10px;
+  }
+  .home-pill-commit { display: flex; flex: 1; min-width: 0; }
+  .home-pill-commit-text { display: inline; }
+  /* the dropdown overlays the node list below it (absolute, not fixed) —
+     "the list covers if necessary" — instead of reflowing anything. */
+  .home-pill-drop { position: absolute; top: 100%; left: 20px; right: 20px; margin-top: 8px; width: auto; }
+  /* pfp detaches from the pill's own flow entirely and pins to the very
+     bottom of the screen, alone — this IS mobile's entire bottom area now. */
+  .home-pill .user-menu-trigger {
+    position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); top: auto;
+    transform: translateX(-50%); z-index: 30; background: #131315; border: 1px solid var(--line); padding: 5px;
+  }
+  .mobile-edit-note {
+    display: block; position: static; padding: 10px 20px 2px; text-align: center;
+    font-family: var(--serif); font-size: 11px; color: var(--ink-faint);
+  }
+  /* the desktop DSL editor/canvas split never renders here — this plain
+     list replaces it entirely (authoring stays desktop-only). .home-body
+     is already the scroll container (overflow-y:auto, same as desktop) —
+     this is plain block content inside it, not a second nested scroller,
+     and its own horizontal padding is skipped since .home-body already
+     provides 24px on each side. */
+  .dsl-home { display: none; }
+  .mobile-node-list { display: block; padding: 4px 0 calc(90px + env(safe-area-inset-bottom)); }
+  .mobile-node-item {
+    padding: 13px 2px; border-bottom: 1px solid var(--line);
+    font-family: var(--serif); font-size: 14px; color: var(--ink-dim); line-height: 1.4;
+  }
+  .mobile-node-empty { padding: 16px 2px; font-family: var(--serif); font-size: 13px; color: var(--ink-faint); }
 }
 .user-menu-avatar { width: 26px; height: 26px; border-radius: 50%; display: block; }
 
@@ -530,12 +575,14 @@ body::after {
 .canvas-card-tag { font-family: var(--mono); font-size: 9px; color: var(--ink-faint); letter-spacing: .04em; text-transform: uppercase; }
 .canvas-card-tag.dup { color: #e0937a; text-transform: none; }
 /* kind label — floats ABOVE the card, ALWAYS on (not gated by selection
-   anymore — every node shows what kind of response it is at all times). */
+   anymore — every node shows what kind of response it is at all times).
+   Plain floating text now, no chip/pill chrome (background/border/shadow) —
+   matching the memory-status label's treatment below, since a bordered pill
+   here read as its own heavy UI element rather than a light label. */
 .canvas-card-kind {
-  position: absolute; bottom: 100%; left: 0; margin-bottom: 6px; z-index: 3;
-  padding: 4px 9px; background: var(--surface-3); border: 1px solid var(--line); border-radius: 10px;
+  position: absolute; bottom: 100%; left: 0; margin-bottom: 4px; z-index: 3;
   font-family: var(--serif); font-size: 9px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .04em;
-  white-space: nowrap; box-shadow: var(--elev-sm);
+  white-space: nowrap;
 }
 /* recall now sits bottom-LEFT (was middle-right) — its own independently
    clickable toggle, separate from the whole-card click above. Deletion no

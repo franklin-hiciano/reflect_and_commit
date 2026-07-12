@@ -99,8 +99,36 @@ window.setDslText = function (newText, selRange, snapshotWeight) {
   saveLocalTree();
   window._saveTree && window._saveTree(dslText);
   window.renderDslEditor();
+  renderMobileNodeList();
   if (typeof window._renderTreeGraph === "function") window._renderTreeGraph();
 };
+
+// mobile home replaces the desktop DSL editor/canvas split entirely with a
+// single plain read-only list of question titles, top to bottom, in
+// whatever order they're declared in the DSL text — authoring stays
+// desktop-only, this is just a glance at what's there. Re-rendered on every
+// setDslText (local edits) and every remote tree sync (_onTreeUpdated), so
+// it stays current if the tree is edited on desktop while a phone has this
+// screen open.
+function renderMobileNodeList() {
+  const list = document.getElementById("mobileNodeList");
+  if (!list) return;
+  const parsed = getParsed();
+  list.innerHTML = "";
+  if (!parsed.blocks.length) {
+    const e = document.createElement("div");
+    e.className = "mobile-node-empty";
+    e.textContent = "no questions yet";
+    list.appendChild(e);
+    return;
+  }
+  parsed.blocks.forEach((b) => {
+    const item = document.createElement("div");
+    item.className = "mobile-node-item";
+    item.textContent = b.name || "(untitled)";
+    list.appendChild(item);
+  });
+}
 
 // ---------- firestore hooks ----------
 let lastRenderedTree = null;
@@ -134,6 +162,7 @@ window._onTreeUpdated = () => {
     if (dslText === lastRenderedTree) return;
     lastRenderedTree = dslText;
     window.renderDslEditor();
+    renderMobileNodeList();
   }
 };
 window._onSettingsUpdated = () => {
@@ -147,29 +176,37 @@ window._onSettingsUpdated = () => {
 };
 window._onCommitmentsUpdated = () => { commitments = window._commitments || []; renderHomePill(); };
 
-// ---------- home pill: play · commitment · streak (ideas executed) · pfp ----------
-// streak = CUMULATIVE ideas executed (can't be broken — measures follow-through,
-// not attendance), shown as a lightbulb (gray at 0, lit once >0). The pill text
-// is the most recent live commitment; the dropdown shows hold-to-resolve
-// buttons for it plus the resolved history (time delta for done, ✕ for
-// missed), newest first. Gray "not done yet" entries don't pile up — only
-// resolved ones stay.
+// ---------- home pill: current idea · chevron · pfp ----------
+// The pill text is the most recent live commitment; the dropdown (opened by
+// the chevron — was a lightbulb+streak-count, now just a plain rotating
+// chevron) shows hold-to-resolve buttons for it plus the resolved history
+// (time delta for done, ✕ for missed) and the want→done rate, newest first.
+// Gray "not done yet" entries don't pile up — only resolved ones stay.
 let _commitPillOpen = false;
 function _pillSorted() {
   return (commitments || []).slice().sort((a, b) => new Date(b.dueDate || b.createdAt || 0) - new Date(a.dueDate || a.createdAt || 0));
+}
+// bold "reflects in n hours/minutes" readout above the desktop play circle —
+// same underlying schedule math as nextScheduledLabel() (defined further
+// down), just expressed as a countdown instead of a calendar/clock label.
+function reflectsInLabel() {
+  const [h, m] = (settings.notifyTime || "20:00").split(":").map(Number);
+  const now = new Date(), next = new Date(now); next.setHours(h, m, 0, 0);
+  if (next <= now) next.setDate(next.getDate() + 1);
+  const diffMin = Math.max(1, Math.round((next - now) / 60000));
+  if (diffMin < 60) return "reflects in " + diffMin + (diffMin === 1 ? " minute" : " minutes");
+  const diffHr = Math.round(diffMin / 60);
+  return "reflects in " + diffHr + (diffHr === 1 ? " hour" : " hours");
 }
 function renderHomePill() {
   const pill = document.getElementById("homePill");
   if (!pill) return;
   const sorted = _pillSorted();
   const active = sorted.find((c) => c.status === "active");
-  const kept = (commitments || []).filter((c) => c.status === "done").length;
   const txt = document.getElementById("homePillCommitText");
   if (txt) txt.textContent = active ? active.text : "no commitments to show";
-  const streak = document.getElementById("homePillStreak");
-  const count = document.getElementById("homePillStreakCount");
-  if (count) count.textContent = String(kept);
-  if (streak) streak.classList.toggle("lit", kept > 0); // lightbulb: gray at 0, lit once >0
+  const label = document.getElementById("homeReflectLabel");
+  if (label) label.textContent = reflectsInLabel();
   // opening the pill (0D → the "open" class) reveals the truncated commit
   // text AND the dropdown TOGETHER — there's no separate horizontal-only
   // intermediate stage, both are driven by the same _commitPillOpen flag.
@@ -455,18 +492,20 @@ function enterHome() {
   applyDeviceChrome();
   maybeShowOtherDeviceGate();
   maybeVeilMobile();
+  renderMobileNodeList();
 }
-// desktop is edit-only: strip the notification chrome (reflection-time clock +
-// "edit reflection time" / "send test notification" menu items) so nothing on
-// desktop implies it will ever notify you. Phone keeps all of it.
+// The pfp menu is now just "edit reflection time" + "sign out" on EVERY
+// device — desktop no longer strips it (it used to, back when the menu also
+// had phone-only items like "send test notification"; those are gone now,
+// so there's nothing left that only makes sense on a phone). The standalone
+// bottom-center clock button (`.home-clock-group`) stays in the DOM — its
+// `#homeClockBtn` is still what "edit reflection time" proxies a click to —
+// but is never shown on its own anymore; editing reflection time now has
+// exactly one entry point (the pfp menu) on every device, which is also
+// what keeps mobile's bottom area down to just the pfp.
 function applyDeviceChrome() {
-  const phone = isPhone();
   const clock = document.querySelector(".home-clock-group");
-  if (clock) clock.style.display = phone ? "" : "none";
-  ["settingsEditTime", "settingsTestNotif"].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = phone ? "" : "none";
-  });
+  if (clock) clock.style.display = "none";
 }
 // "put the veil up once you login on mobile" — the first time a phone lands on
 // home after signing in, drop the same device-shade it would show if desktop
@@ -1296,10 +1335,26 @@ function fillRecall(node, el) {
 }
 
 // -- back --
+// Critical fix: `enterCommit()` no longer shows an actual "commit" phase/
+// screen — it's a pass-through straight into `enterDone(true)` (the commit
+// card was deliberately removed, see the note above `captureConvergence`).
+// That left `draft.phase` NEVER actually equal to `"commit"` anymore, so the
+// branch below that used to handle "back from commit" was dead, AND the
+// `"done"` branch calling `enterCommit()` just re-ran straight back into
+// `enterDone(true)` — same screen, same content, over and over. Pressing
+// back from the done screen visibly did nothing (worse: it silently forced
+// `draft.committed = true` every time, even if the original ending had been
+// "skipped"/logged instead of committed). This was the "sends me to the end
+// and doesn't even let me go back" bug — every walk that reaches the
+// starred question legitimately ends on the done screen (that's the
+// intended "minimum" behavior), but from there, back was a no-op.
+// Fixed: "done" now goes directly back to the last real question — the same
+// target-resolution the old (dead) "commit" branch already had, just
+// triggered from the phase that's actually reachable now.
 window.goBackPhase = () => {
   if (draft.phase === "question") { if (draft.history.length) { draft.currentName = draft.history.pop(); saveDraft(); renderChat(); } }
-  else if (draft.phase === "commit") {
-    // lastQuestionName should always be set on the way into commit, but fall
+  else if (draft.phase === "commit" || draft.phase === "done") {
+    // lastQuestionName should always be set on the way into done, but fall
     // back to the last history entry (or the top of the list) rather than
     // silently doing nothing if it's ever missing.
     const parsed = getParsed();
@@ -1307,7 +1362,6 @@ window.goBackPhase = () => {
     if (!target) return;
     draft.phase = "question"; draft.currentName = target; saveDraft(); renderChat();
   }
-  else if (draft.phase === "done") { enterCommit(); }
 };
 
 // -- convergence capture (the commit card is GONE) --

@@ -7,6 +7,16 @@
             content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"
         />
         <title>Reflect &amp; Commit</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Syne:wght@600;700;800&display=swap"
+        />
+        <link
+            rel="stylesheet"
+            href="https://api.fontshare.com/v2/css?f[]=amulya@400,500,700&display=swap"
+        />
         <link rel="stylesheet" href="style.css" />
         <link rel="manifest" href="manifest.json" />
         <meta name="theme-color" content="#0a0a0b" />
@@ -48,12 +58,12 @@
                 <div style="font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: 0.01em; margin-bottom: 12px">
                     Reflect <span class="amp">&amp;</span> Commit
                 </div>
-                <div style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 26px; line-height: 1.7">
+                <div style="font-family: var(--serif); font-size: 13px; color: var(--ink-dim); margin-bottom: 26px; line-height: 1.7">
                     The app runs on one thesis: you'll execute your own ideas if you keep thinking of them, no matter how crazy or life-changing they may be. Asking good questions is an extraordinary way of generating life-changing ideas. Thus, use questions to identify can do tomorrow to change your life a bit. I.e. prompt yourself into thinking of solutions to your major problems before bed. Just write questions that will improve your life, that's all.
                 </div>
                 <button
                     id="gotItBtn"
-                    style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer"
+                    style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--serif); font-size: 14px; font-weight: 600; cursor: pointer"
                     onclick="dismissGotIt()"
                 >
                     Got it
@@ -87,7 +97,7 @@
                     Browser Not Supported
                 </div>
                 <div
-                    style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6"
+                    style="font-family: var(--serif); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6"
                 >
                     Reflect &amp; Commit requires a browser that supports Progressive Web Apps. Please open this page in Chrome, Safari, or Firefox to continue.
                 </div>
@@ -104,7 +114,7 @@
                                 Reflect <span class="amp">&</span> Commit
                             </div>
                             <div
-                                style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6"
+                                style="font-family: var(--serif); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6"
                             >
                                 When should we remind you to reflect?
                             </div>
@@ -122,7 +132,7 @@
                             </div>
                             <button
                                 id="continueToNotifBtn"
-                                style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 16px"
+                                style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--serif); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 16px"
                                 onclick="goToNotifPermission()"
                             >
                                 Continue
@@ -140,13 +150,13 @@
                                 Reflect <span class="amp">&</span> Commit
                             </div>
                             <div
-                                style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6"
+                                style="font-family: var(--serif); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6"
                             >
                                 Notifications are required. Tap to enable.
                             </div>
                             <button
                                 id="enableNotifBtnOnboard"
-                                style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 16px"
+                                style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--serif); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 16px"
                                 onclick="requestNotifPermissionOnboard()"
                             >
                                 Enable notifications
@@ -164,18 +174,18 @@
                     Notifications Blocked
                 </div>
                 <div
-                    style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6"
+                    style="font-family: var(--serif); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6"
                 >
                     Notifications are required for Reflect &amp; Commit to work. You'll need to enable them manually.
                 </div>
                 <div
                     id="permissionInstructions"
-                    style="font-family: var(--mono); font-size: 12px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px"
+                    style="font-family: var(--serif); font-size: 12px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px"
                 >
                     <!-- Platform-specific instructions will be injected here -->
                 </div>
                 <button
-                    style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 12px"
+                    style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--serif); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 12px"
                     onclick="retryPermission()"
                 >
                     Try Again
@@ -200,11 +210,11 @@
                 </div>
                 <div
                     id="onboardingExplainer"
-                    style="font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6"
+                    style="font-family: var(--serif); font-size: 13px; color: var(--ink-dim); margin-bottom: 22px; line-height: 1.6"
                 ></div>
                 <button
                     id="getStartedBtn"
-                    style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 16px"
+                    style="display: block; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--serif); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 16px"
                     onclick="onGetStarted()"
                 >
                     Install Reflect & Commit
@@ -221,7 +231,7 @@
                 </div>
                 <div
                     id="installTroubleshooting"
-                    style="font-family: var(--mono); font-size: 11px; color: var(--ink-faint); margin-top: 12px; line-height: 1.5"
+                    style="font-family: var(--serif); font-size: 11px; color: var(--ink-faint); margin-top: 12px; line-height: 1.5"
                 >
                     Still can't install? Open this page in Chrome, Safari, or Firefox.
                     <span id="reinstallTroubleshooting" style="display: none"> Reinstalling? Delete from chrome://apps first.</span>
@@ -341,7 +351,7 @@
                     />
                     <button
                         id="sendPairingNotifBtn"
-                        style="display: none; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer; margin: 16px 0"
+                        style="display: none; width: 100%; background: var(--ink); color: #0a0a0b; border: 1px solid var(--ink); padding: 13px 22px; border-radius: 999px; font-family: var(--serif); font-size: 14px; font-weight: 600; cursor: pointer; margin: 16px 0"
                         onclick="sendPairingPushToPhone()"
                     >
                         Send a notification to your phone

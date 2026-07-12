@@ -398,11 +398,17 @@ function showDesktopFirstLaunchGate() {
   if (here) here.style.display = "block";
   const explainer = document.getElementById("onboardingExplainer");
   if (explainer) {
-    explainer.innerHTML = "Install Reflect & Commit on your phone first. " +
-      "Scan the QR code or open this link on your phone:<br><br>" +
-      "<a href='https://" + INSTALL_URL + "' target='_blank' rel='noopener' " +
-      "style='color: var(--gold); text-decoration: underline; word-break: break-all;'>" +
-      "https://" + INSTALL_URL + "</a>";
+    // Render the QR + link INLINE on this (visible) screen. The old code put the
+    // QR in #otherDeviceGate, which lives inside the hidden #homeScreen — so the
+    // QR either never showed or flashed and was replaced by this copy screen.
+    // The link is intentionally NOT a clickable anchor: you're meant to type it
+    // on your phone, not open it on the desktop you're already looking at.
+    explainer.innerHTML =
+      "Install Reflect &amp; Commit on your phone first. Scan the QR code or type this link on your phone:" +
+      "<img src='" + qrSrcFor(INSTALL_URL) + "' alt='scan to install on your phone' " +
+      "style='display:block; width:190px; height:190px; margin:18px auto; border-radius:12px; background:#fff; padding:10px' />" +
+      "<span style='display:block; text-align:center; color: var(--ink-dim); word-break: break-all; user-select: all; -webkit-user-select: all'>" +
+      "https://" + INSTALL_URL + "</span>";
   }
   const getStartedBtn = document.getElementById("getStartedBtn");
   if (getStartedBtn) getStartedBtn.style.display = "none";
@@ -411,8 +417,6 @@ function showDesktopFirstLaunchGate() {
   if (manualBox && manualBox.parentElement) manualBox.parentElement.style.display = "none";
   const trouble = document.getElementById("installTroubleshooting");
   if (trouble) trouble.style.display = "none";
-  // Show QR + send-notification via the pairing gate
-  maybeShowOtherDeviceGate();
 }
 
 function mobileOnboarded() {
@@ -661,10 +665,23 @@ window.goToInstallGate = () => {
   if (getStartedBtn) getStartedBtn.style.display = "block";
 
   if (isPhone()) {
-    // Phone: manual add-to-home-screen instructions
+    // Phone: the ONLY prompt-less install path is iOS Safari's manual
+    // Share -> Add to Home Screen (and it must be Safari — Chrome/Firefox on
+    // iOS just make a bookmark, not a standalone PWA). Android fires the native
+    // install prompt via the button above, so we don't hand out a manual method
+    // that wouldn't actually install a PWA there.
     if (steps) {
+      const shareIcon = "<svg viewBox='0 0 24 24' width='14' height='14' style='vertical-align:middle;margin:0 2px' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8'/><polyline points='16 6 12 2 8 6'/><line x1='12' y1='2' x2='12' y2='15'/></svg>";
+      let html;
+      if (isIOS() && isSafari()) {
+        html = "Tap the Share button " + shareIcon + " then <b>Add to Home Screen</b>.";
+      } else if (isIOS()) {
+        html = "Open this page in <b>Safari</b> first — then Share " + shareIcon + " &rarr; <b>Add to Home Screen</b>. (Other iOS browsers can't install the app.)";
+      } else {
+        html = "Tap <b>Install Reflect &amp; Commit</b> above. If you don't see a prompt, open your browser menu and choose <b>Install app</b>.";
+      }
       if (steps.parentElement) steps.parentElement.style.display = "";
-      steps.innerHTML = "Tap the Share button <svg viewBox='0 0 24 24' width='14' height='14' style='vertical-align:middle;margin:0 2px' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8'/><polyline points='16 6 12 2 8 6'/><line x1='12' y1='2' x2='12' y2='15'/></svg> then <b>Add to Home Screen</b>";
+      steps.innerHTML = "<div style='font-size:12.5px;color:var(--ink-dim);line-height:1.6'>" + html + "</div>";
     }
   } else {
     // Desktop installs ITSELF here. The phone-pairing QR deliberately does NOT

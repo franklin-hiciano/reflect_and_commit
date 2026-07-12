@@ -27,11 +27,8 @@
   let _historyOpen = false;
   let _cardDrag = null; // { name, x, y } — dragging an existing card onto another to link it
   let _editingName = null; // block name currently being renamed inline on the canvas
-  // Paired Editing: when ON, renaming a declaration cascades to every
-  // reference and vice versa (already the default behaviour). When OFF, the
-  // cascade is suppressed so you can freely rename a single reference without
-  // touching the declaration or any other copy. Toggled from the corner button.
-  let _pairedEditing = true;
+  // Renaming a declaration OR any reference always cascades to every other
+  // occurrence of that title, so the two views never drift out of sync.
 
   function TM() { return window.TreeModel; }
   function text() { return window.dslText || ""; }
@@ -59,9 +56,6 @@
         '<div class="dsl-pane" id="dslPane">' +
           '<div class="dsl-editor-wrap">' +
             '<div class="squircle-corner-tools">' +
-              '<button class="squircle-corner-btn" id="pairedEditingBtn" title="paired editing — editing any reference or declaration also updates all other copies">' +
-                '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><rect x="9" y="3" width="12" height="12" rx="2"/></svg>' +
-              '</button>' +
               '<button class="squircle-corner-btn" id="canvasPreviewBtn" title="preview — walk through this tree right now, nothing saved">' +
                 '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>' +
               '</button>' +
@@ -71,13 +65,17 @@
               '<button class="squircle-corner-btn" id="historyToggleBtn" title="version history">' +
                 '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /><path d="M12 8v4l3 2" /></svg>' +
               '</button>' +
+              '<button class="squircle-corner-btn danger" id="deleteAllBtn" title="delete the entire tree">' +
+                '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>' +
+              '</button>' +
             '</div>' +
             '<div class="history-dropdown" id="historyDropdown">' +
               '<div class="history-snapshots" id="historySnapshots"></div>' +
             "</div>" +
             '<div class="dsl-editor-scroll">' +
               '<div class="dsl-inner" id="dslInner">' +
-                '<textarea id="dslTextarea" class="dsl-textarea" spellcheck="false" wrap="off" placeholder="write your first question…"></textarea>' +
+                '<div class="dsl-highlight" id="dslHighlight" aria-hidden="true"></div>' +
+                '<textarea id="dslTextarea" class="dsl-textarea" spellcheck="false" wrap="soft" placeholder="write your first question…"></textarea>' +
               "</div>" +
             "</div>" +
           "</div>" +
@@ -98,26 +96,17 @@
     document.getElementById("canvasPreviewBtn").onclick = startPreview;
     const copyBtn = document.getElementById("copyDslBtn");
     if (copyBtn) copyBtn.onclick = copyDslText;
-    const pairedBtn = document.getElementById("pairedEditingBtn");
-    pairedBtn.classList.toggle("on", _pairedEditing);
-    pairedBtn.onclick = () => {
-      _pairedEditing = !_pairedEditing;
-      pairedBtn.classList.toggle("on", _pairedEditing);
-      pairedBtn.title = _pairedEditing
-        ? "paired editing ON — editing any reference or declaration also updates all copies"
-        : "paired editing OFF — edits are isolated to the line you type on";
-    };
+    const delBtn = document.getElementById("deleteAllBtn");
+    if (delBtn) delBtn.onclick = deleteAllText;
 
     const el = ta();
     el.addEventListener("input", (e) => {
       const newText = e.target.value;
       const oldText = window.dslText || "";
       const cursor = e.target.selectionStart;
-      // only cascade renames to other lines when paired editing is enabled—
-      // typing with it OFF just changes this line alone (raw DSL text).
-      const finalText = _pairedEditing
-        ? window._cascadeRenameIfHeaderEdited(oldText, newText, cursor)
-        : newText;
+      // editing any reference or the declaration always cascades so every
+      // occurrence of a title stays in sync (this used to be a toggle).
+      const finalText = window._cascadeRenameIfHeaderEdited(oldText, newText, cursor);
       if (finalText === newText) {
         // textarea already holds finalText; renderDslPane won't reassign
         // el.value (its guard), so the caret stays put on its own.
@@ -143,6 +132,34 @@
     el.addEventListener("dragstart", onDslDragStart);
     el.addEventListener("dragover", (e) => e.preventDefault());
     el.addEventListener("drop", onDslDrop);
+
+    // clicking anywhere outside an open recall menu closes it (recall stays in
+    // whatever on/off state it's in — the button, not the outside click, toggles).
+    document.addEventListener("mousedown", (e) => {
+      if (_recallOpenFor == null) return;
+      if (e.target.closest && e.target.closest(".canvas-recall-popover, .canvas-recall-btn")) return;
+      _recallOpenFor = null;
+      window.renderDslEditor();
+    });
+
+    // drag anywhere on empty canvas to PAN it (left/right and up/down) — the
+    // scroll container persists across re-renders so this is wired once here.
+    const scroll = document.querySelector(".canvas-scroll");
+    if (scroll) {
+      let pan = null;
+      scroll.addEventListener("mousedown", (e) => {
+        if (e.target.closest("[data-canvas-card], .canvas-ghost-slot, .canvas-recall-popover, .canvas-naming, button, textarea, input")) return;
+        pan = { x: e.clientX, y: e.clientY, sl: scroll.scrollLeft, st: scroll.scrollTop };
+        scroll.classList.add("grabbing");
+        e.preventDefault();
+      });
+      window.addEventListener("mousemove", (e) => {
+        if (!pan) return;
+        scroll.scrollLeft = pan.sl - (e.clientX - pan.x);
+        scroll.scrollTop = pan.st - (e.clientY - pan.y);
+      });
+      window.addEventListener("mouseup", () => { if (pan) { pan = null; scroll.classList.remove("grabbing"); } });
+    }
   };
 
   function setPane(p) {
@@ -218,6 +235,14 @@
       document.body.removeChild(scratch);
       if (ok) done && done();
     } catch (_) {}
+  }
+  // ── delete the ENTIRE tree text (the "x" in the editor pill). Confirmed,
+  // since it wipes everything — version history still holds prior snapshots
+  // to scrub back to. ──
+  function deleteAllText() {
+    if (!text().trim()) return;
+    if (!confirm("Delete the entire tree? You can scrub back through version history.")) return;
+    mutate("");
   }
   function scrubTo(i) {
     const snap = _snapshots[i];
@@ -327,16 +352,12 @@
 
   function renderWarning(dupInfo, multiRoots) {
     const el = document.getElementById("dslWarning");
-    // the canvas only ever draws the FIRST root's connected component (see
-    // buildCanvas) — the rest of multiRoots are already hidden there rather
-    // than drawn as if wired in, so this is just a small heads-up that more
-    // exists in the text than what's on screen, not an error to fix.
-    const extraRoots = multiRoots.slice(1);
-    if (!dupInfo.length && !extraRoots.length) { el.style.display = "none"; return; }
-    const parts = [];
-    if (dupInfo.length) parts.push(dupInfo.map((d) => '"' + d.name + '"').join(", ") + " defined more than once");
-    if (extraRoots.length) parts.push(extraRoots.map((n) => '"' + n + '"').join(", ") + " not connected — hidden from the canvas above until wired in");
-    el.textContent = parts.join("; ");
+    // disconnected second-heads are NOT flagged with a "hidden" message anymore —
+    // instead their text is shown a little greyed in the DSL editor until wired
+    // in (see renderDslPane). Only a genuine authoring error (a duplicate title)
+    // still warrants a warning here.
+    if (!dupInfo.length) { el.style.display = "none"; return; }
+    el.textContent = dupInfo.map((d) => '"' + d.name + '"').join(", ") + " defined more than once";
     el.style.display = "block";
   }
 
@@ -352,17 +373,49 @@
     document.getElementById("canvasPane").style.display = !isMobile || _pane === "canvas" ? "flex" : "none";
   }
 
+  // measure the pixel top of each logical line as the textarea ACTUALLY renders
+  // it (now that wrap is on, one logical line can occupy several visual rows, so
+  // rawLine*LINE_H no longer locates it). A hidden mirror matched to the
+  // textarea's content box wraps identically, so its per-line offsets are exact.
+  function measureLineTops(t, el) {
+    const cs = getComputedStyle(el);
+    const mirror = document.createElement("div");
+    const st = mirror.style;
+    st.position = "absolute"; st.visibility = "hidden"; st.left = "-9999px"; st.top = "0";
+    st.boxSizing = "border-box"; st.width = el.clientWidth + "px";
+    st.fontFamily = cs.fontFamily; st.fontSize = cs.fontSize; st.lineHeight = cs.lineHeight;
+    st.letterSpacing = cs.letterSpacing; st.padding = cs.padding;
+    st.whiteSpace = "pre-wrap"; st.wordBreak = "break-word"; st.overflowWrap = "break-word";
+    const rows = t.split("\n").map((ln) => {
+      const d = document.createElement("div");
+      d.textContent = ln.length ? ln : "​"; // keep empty lines a full row tall
+      mirror.appendChild(d);
+      return d;
+    });
+    document.body.appendChild(mirror);
+    const tops = rows.map((d) => d.offsetTop);
+    const bottoms = rows.map((d) => d.offsetTop + d.offsetHeight);
+    const total = mirror.scrollHeight;
+    document.body.removeChild(mirror);
+    return { tops, bottoms, total };
+  }
+
   function renderDslPane(t) {
     const el = ta();
     if (el.value !== t) el.value = t; // only touches value on external changes — never fights the cursor while typing
-    const lineCount = (t.match(/\n/g) || []).length + 1;
     const inner = document.getElementById("dslInner");
-    inner.style.height = Math.max(220, (lineCount + 2) * LINE_H) + "px";
+    // measure real wrapped-line positions; fall back to LINE_H math if the pane
+    // isn't laid out yet (clientWidth 0, e.g. hidden mobile pane).
+    const m = el.clientWidth ? measureLineTops(t, el) : null;
+    const lineCount = (t.match(/\n/g) || []).length + 1;
+    // size to content (the editor grows upward from the bottom, so it never
+    // takes more room than the text needs); a small floor keeps an empty editor
+    // tappable.
+    inner.style.height = Math.max(LINE_H + 16, m ? m.total : (lineCount + 1) * LINE_H) + "px";
 
     // gutter "+" — one per empty leaf line (a text question with nowhere to
-    // go yet), sitting where the destination reference would actually be
-    // typed: indented one level, on the line right below the question —
-    // not off to the side of the question's own line.
+    // go yet), sitting on the line right below the question where the next
+    // reference would be typed.
     inner.querySelectorAll(".dsl-gutter-btn").forEach((n) => n.remove());
     const parsed = TM().parse(t);
     parsed.blocks.forEach((b) => {
@@ -372,7 +425,10 @@
       btn.className = "dsl-gutter-btn";
       btn.title = "add what happens next";
       btn.textContent = "+";
-      btn.style.top = ((b.rawLine + 1) * LINE_H + 9) + "px"; // offset by textarea padding-top (8px) + 1px gap
+      const belowTop = m
+        ? (b.rawLine + 1 < m.tops.length ? m.tops[b.rawLine + 1] : m.bottoms[b.rawLine])
+        : (b.rawLine + 1) * LINE_H + 9;
+      btn.style.top = belowTop + "px";
       btn.onclick = () => {
         const uniq = TM().uniqueName(parsed, "new question");
         const res = TM().addConnectedChild(text(), b.name, uniq);
@@ -405,7 +461,6 @@
     const t = TM();
     const dupInfo = t.findDuplicateTitles(parsed);
     const dupNames = new Set(dupInfo.map((d) => t.norm(d.name)));
-    const recallOptions = parsed.blocks.map((b) => ({ id: b.name, text: b.name || "(untitled)" }));
 
     let blocks = parsed.blocks;
     let terminals = graph.terminals;
@@ -414,6 +469,10 @@
       blocks = blocks.filter((b) => visible.has(b.name));
       terminals = terminals.filter((tm) => visible.has(tm.from));
     }
+
+    // recall options are only the questions actually IN this tree — disconnected
+    // second-heads (hidden from the canvas) must not show up as recall targets.
+    const recallOptions = blocks.map((b) => ({ id: b.name, text: b.name || "(untitled)" }));
 
     // where a "+" click/drag from this block would actually land: one column
     // over, offset a bit per existing outgoing thing (a real next, a "done"
@@ -425,16 +484,18 @@
     // of whether it already resolves to "done" — same as the classic
     // corner "+", adding another body line there is what turns a dead end
     // into a branching choice.
-    function outCountOf(b) {
-      if (b.type === "choice") return (b.options || []).length;
-      if (b.next) return 1; // a real target or an isDone marker — either way something already renders at col+1/same row
-      if (b.terminal) return 1; // apostrophe dead-end with no body still gets its own "done" terminal card there
-      return 0;
-    }
+    // where a "+" from this block would add its NEXT child. If the block already
+    // has children (a next, choice options, or a done terminal), the ghost slot
+    // must sit BELOW the lowest of them so it never overlaps an existing branch;
+    // an empty leaf's first child goes straight across at the same row.
     const ghostColRow = new Map();
     blocks.forEach((b) => {
       const col = (graph.col.get(b.name) || 0) + 1;
-      const row = (graph.row.get(b.name) || 0) + outCountOf(b) * 0.55;
+      const myRow = graph.row.get(b.name) || 0;
+      const childRows = [];
+      (graph.edges || []).forEach((e) => { if (e.from === b.name) { const r = graph.row.get(e.to); if (r != null) childRows.push(r); } });
+      terminals.forEach((tm) => { if (tm.from === b.name && tm.row != null) childRows.push(tm.row); });
+      const row = childRows.length ? Math.max(myRow, ...childRows) + 0.9 : myRow;
       ghostColRow.set(b.name, { col, row });
     });
 
@@ -453,13 +514,22 @@
       const cx = PAD + col * COL_W + CARD_W / 2, cy = PAD + row * ROW_H + CARD_H / 2;
       xyByName.set(b.name, { x: cx - CARD_W / 2, y: cy - CARD_H / 2, cx, cy });
     });
+    // a node is a LEAF (unfinished path) if nothing leads out of it — no next,
+    // no choice options, no "done". Those are the highest-leverage places to
+    // extend, so only they show a persistent "+"; interior nodes reveal theirs
+    // on hover.
+    const hasChild = new Set();
+    const childrenOf = new Map();
+    graph.edges.forEach((e) => { hasChild.add(e.from); if (!childrenOf.has(e.from)) childrenOf.set(e.from, []); childrenOf.get(e.from).push(e.to); });
+    terminals.forEach((tm) => hasChild.add(tm.from));
     const nodes = blocks.map((b) => {
       const p = xyByName.get(b.name) || { x: 0, y: 0 };
       const g = ghostColRow.get(b.name);
       const ghost = g ? { x: PAD + g.col * COL_W, y: PAD + (g.row - minRow) * ROW_H } : null;
       return {
         id: b.name, name: b.name, text: b.name || "(untitled)", star: !!b.star, isChoice: b.type === "choice",
-        isTerminal: false, isDuplicate: dupNames.has(t.norm(b.name)), recallTarget: b.recallTarget,
+        isTerminal: false, isDuplicate: dupNames.has(t.norm(b.name)), recallTarget: b.recallTarget, isLeaf: !hasChild.has(b.name),
+        children: childrenOf.get(b.name) || [],
         x: p.x, y: p.y, w: CARD_W, h: CARD_H, ghost,
       };
     });
@@ -483,14 +553,16 @@
       const a = xyByName.get(term.from), b = xyByName.get(term.id);
       if (a && b) edges.push({ d: edgePath(a, b) });
     });
-    const recallEdges = graph.recallEdges.map((e) => {
-      const a = xyByName.get(e.from), b = xyByName.get(e.to);
-      return a && b ? { d: edgePath(a, b) } : null;
-    }).filter(Boolean);
+    const recallEdges = graph.recallEdges
+      .filter((e) => t.norm(e.from) !== t.norm(e.to)) // a question recalling its OWN answers draws no edge
+      .map((e) => {
+        const a = xyByName.get(e.from), b = xyByName.get(e.to);
+        return a && b ? { d: edgePath(a, b) } : null;
+      }).filter(Boolean);
     const ghostEdges = nodes.filter((n) => n.ghost).map((n) => {
       const a = xyByName.get(n.name);
       const b = { x: n.ghost.x, cy: n.ghost.y + CARD_H / 2 };
-      return a ? { d: edgePath(a, b) } : null;
+      return a ? { d: edgePath(a, b), name: n.name, isLeaf: n.isLeaf } : null;
     }).filter(Boolean);
 
     return { nodes, edges, recallEdges, ghostEdges, w: totalW, h: totalH, recallOptions };
@@ -501,6 +573,20 @@
     const content = document.getElementById("canvasContent");
     content.style.width = canvas.w + "px";
     content.style.height = canvas.h + "px";
+    // center the tree in the viewport when it fits, but leave margins at 0 when
+    // it's bigger so BOTH axes stay fully scrollable (CSS flex/grid centering was
+    // clipping the scrollable area — this JS approach never does).
+    const scrollEl = document.querySelector(".canvas-scroll");
+    if (scrollEl) {
+      const vw = scrollEl.clientWidth, vh = scrollEl.clientHeight;
+      const editorW = mobile() ? 0 : vw * 0.6; // the DSL editor covers the left 60% on desktop
+      // vertically: center the tree in the band between the top of the screen and
+      // the 45% mark (i.e. its center sits at ~22.5% down).
+      content.style.marginTop = Math.max(0, vh * 0.225 - canvas.h / 2) + "px";
+      // horizontally: place it in the space to the RIGHT of the editor so the
+      // leftmost node clears it; you can still drag/scroll it left under the editor.
+      content.style.marginLeft = (editorW + Math.max(0, ((vw - editorW) - canvas.w) / 2)) + "px";
+    }
     content.innerHTML = "";
 
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -520,6 +606,10 @@
     canvas.ghostEdges.forEach((e) => {
       const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
       p.setAttribute("d", e.d); p.setAttribute("fill", "none"); p.setAttribute("stroke", "var(--line)"); p.setAttribute("stroke-width", "1.2"); p.setAttribute("stroke-dasharray", "1 5");
+      // interior (non-leaf) ghost paths are hidden alongside their "+", so the
+      // canvas isn't full of dashed lines pointing at nothing; both appear on
+      // hover of the source card.
+      p.setAttribute("class", "ghost-edge" + (e.isLeaf ? "" : " interior")); if (e.name != null) p.dataset.ghostFor = e.name;
       svg.appendChild(p);
     });
     if (_plusDrag) {
@@ -579,15 +669,9 @@
   function buildCardEl(n, recallOptions) {
     const isTerm = n.isTerminal;
     const card = document.createElement("div");
-    card.className = "canvas-card" + (isTerm ? " terminal" : "") + (n.isDuplicate ? " duplicate" : "") + (n.isChoice ? " choice" : "") + (n.star ? " star" : "");
+    card.className = "canvas-card" + (isTerm ? " terminal" : "") + (n.isDuplicate ? " duplicate" : "") + (n.isChoice ? " choice" : "");
     card.style.left = n.x + "px"; card.style.top = n.y + "px"; card.style.width = n.w + "px"; card.style.height = n.h + "px";
     card.dataset.canvasCard = n.name || "";
-
-    if (n.star) {
-      const star = document.createElement("div");
-      star.className = "canvas-star-badge"; star.title = "tonight's minimum"; star.textContent = "★";
-      card.appendChild(star);
-    }
 
     const label = document.createElement("div");
     label.className = "canvas-card-text";
@@ -600,34 +684,37 @@
       const input = document.createElement("textarea");
       input.className = "canvas-card-text-input"; input.value = n.name; input.rows = 1;
       label.appendChild(input);
-      setTimeout(() => { input.focus(); input.select(); }, 0);
+      // focus and drop the caret at the END (not select-all — selecting the
+      // whole thing on every click was the jarring bit).
+      setTimeout(() => { input.focus(); const L = input.value.length; input.setSelectionRange(L, L); }, 0);
       let done = false;
+      let curName = n.name;                 // the block's title as it evolves
+      const originalText = text();          // to restore on cancel
+      // LIVE: every keystroke renames the block (and all its references) and
+      // pushes the new text straight into the DSL editor, WITHOUT rebuilding the
+      // canvas (which would kill this input). The full re-render happens on
+      // commit. This is what makes node edits show up in the DSL immediately.
+      input.addEventListener("input", () => {
+        const val = input.value.trim();
+        if (!val || val === curName) return;
+        const newText = TM().renameBlockTitle(text(), curName, val);
+        window.dslText = newText;
+        const dta = ta();
+        if (dta && dta.value !== newText) dta.value = newText;
+        curName = val;
+      });
       const commit = () => {
         if (done) return; done = true;
-        const val = input.value.trim();
         _editingName = null;
-        if (val && val !== n.name) {
-          // renameBlockTitle updates the declaration + every reference;
-          // when paired editing is off, only update the declaration line
-          // (leaves references as-is, effectively detaching this rename).
-          if (_pairedEditing) {
-            mutate(TM().renameBlockTitle(text(), n.name, val));
-          } else {
-            // raw text replace of just the declaration line
-            const t = text();
-            const lines = t.split("\n");
-            const parsed = TM().parse(t);
-            const block = parsed.blocks.find(b => b.name === n.name);
-            if (block != null && lines[block.rawLine] != null) {
-              lines[block.rawLine] = lines[block.rawLine].replace(n.name, val);
-              mutate(lines.join("\n"));
-            } else {
-              mutate(TM().renameBlockTitle(t, n.name, val));
-            }
-          }
-        } else window.renderDslEditor();
+        if (text() !== originalText) mutate(text()); // persist + full re-render
+        else window.renderDslEditor();
       };
-      const cancel = () => { if (done) return; done = true; _editingName = null; window.renderDslEditor(); };
+      const cancel = () => {
+        if (done) return; done = true; _editingName = null;
+        window.dslText = originalText;
+        const dta = ta(); if (dta) dta.value = originalText;
+        window.renderDslEditor();
+      };
       input.addEventListener("keydown", (e) => {
         if (e.key === "Enter") { e.preventDefault(); commit(); }
         else if (e.key === "Escape") { e.preventDefault(); cancel(); }
@@ -673,9 +760,22 @@
 
       const recall = document.createElement("button");
       recall.className = "canvas-recall-btn" + (n.recallTarget ? " on" : "");
-      recall.title = "recall another question's past answers";
+      recall.title = "recall past answers (from this question, or another)";
       recall.innerHTML = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></svg>';
-      recall.onclick = (e) => { e.stopPropagation(); _recallOpenFor = _recallOpenFor === n.name ? null : n.name; window.renderDslEditor(); };
+      // The recall button is an on/off toggle. OFF → turn ON (purple), defaulting
+      // to this question's own past answers, and open the menu to pick another.
+      // ON → turn OFF (not purple) and close. Clicking OUTSIDE just closes the
+      // menu, leaving recall on (see the document handler in initDslEditor).
+      recall.onclick = (e) => {
+        e.stopPropagation();
+        if (n.recallTarget) {
+          _recallOpenFor = null;
+          mutate(TM().setRecall(text(), n.name, null));
+        } else {
+          _recallOpenFor = n.name;
+          mutate(TM().setRecall(text(), n.name, n.name)); // default: recall own answers
+        }
+      };
       card.appendChild(recall);
 
       // the "+" itself lives at the ghost slot (see buildGhostSlotEl), drawn
@@ -686,21 +786,58 @@
         if (e.target.closest(".canvas-card-text, .canvas-del-btn, .canvas-recall-btn, .canvas-recall-popover, textarea, input")) return;
         startCardDrag(e, n.name);
       });
+
+      // hovering a card reveals its (otherwise hidden) interior "+" AND the path
+      // to it. A short hide-delay bridges the gap between card and slot so you
+      // can actually move onto the "+" and click it (its own :hover then keeps
+      // it up). Revealing a parent's BRANCH slot also suppresses its children's
+      // continuation slots, so two hypotheticals never stack on the same spot.
+      const esc = (window.CSS && CSS.escape ? CSS.escape(n.name) : n.name);
+      const slotFor = (nm) => document.querySelector('.canvas-ghost-slot[data-ghost-slot-for="' + (window.CSS && CSS.escape ? CSS.escape(nm) : nm) + '"]');
+      const ghostEdgeEl = () => {
+        const svg = document.querySelector(".canvas-content svg");
+        return svg ? Array.from(svg.querySelectorAll("path.ghost-edge")).find((p) => p.dataset.ghostFor === n.name) : null;
+      };
+      let hideTimer = null;
+      const reveal = () => {
+        clearTimeout(hideTimer);
+        const s = slotFor(n.name); if (s) s.classList.add("reveal");
+        const e2 = ghostEdgeEl(); if (e2) e2.classList.add("reveal");
+        (n.children || []).forEach((c) => { const cs = slotFor(c); if (cs) cs.classList.add("suppressed"); });
+      };
+      const hideSoon = () => {
+        hideTimer = setTimeout(() => {
+          const s = slotFor(n.name); if (s) s.classList.remove("reveal");
+          const e2 = ghostEdgeEl(); if (e2) e2.classList.remove("reveal");
+          (n.children || []).forEach((c) => { const cs = slotFor(c); if (cs) cs.classList.remove("suppressed"); });
+        }, 160);
+      };
+      card.addEventListener("mouseenter", reveal);
+      card.addEventListener("mouseleave", hideSoon);
+      // keep it up while the pointer is on the "+" itself
+      const mySlot = slotFor(n.name);
+      if (mySlot) { mySlot.addEventListener("mouseenter", () => clearTimeout(hideTimer)); mySlot.addEventListener("mouseleave", hideSoon); }
     }
 
     if (_recallOpenFor === n.name) {
       const pop = document.createElement("div");
       pop.className = "canvas-recall-popover";
-      const hdr = document.createElement("div"); hdr.className = "canvas-recall-popover-hdr"; hdr.textContent = "recall answers from…";
-      pop.appendChild(hdr);
-      const none = document.createElement("button");
-      none.className = "canvas-recall-opt none"; none.textContent = "— none —";
-      none.onclick = (e) => { e.stopPropagation(); mutate(TM().setRecall(text(), n.name, null)); _recallOpenFor = null; };
-      pop.appendChild(none);
+      // single-select menu, checkmark on the current target. Picking an option
+      // just changes which question's answers are recalled and keeps the menu
+      // open (close by clicking off, or toggle the whole thing off via the
+      // recall button). Default target is this question itself.
+      const selected = n.recallTarget ? TM().norm(n.recallTarget) : TM().norm(n.name);
       recallOptions.forEach((opt) => {
         const b = document.createElement("button");
-        b.className = "canvas-recall-opt"; b.textContent = opt.text;
-        b.onclick = (e) => { e.stopPropagation(); mutate(TM().setRecall(text(), n.name, opt.id)); _recallOpenFor = null; };
+        const isSel = TM().norm(opt.id) === selected;
+        b.className = "canvas-recall-opt" + (isSel ? " sel" : "");
+        const lbl = document.createElement("span"); lbl.className = "canvas-recall-opt-label"; lbl.textContent = opt.text;
+        const chk = document.createElement("span"); chk.className = "canvas-recall-opt-check"; chk.textContent = isSel ? "✓" : "";
+        b.appendChild(lbl); b.appendChild(chk);
+        b.onclick = (e) => {
+          e.stopPropagation();
+          mutate(TM().setRecall(text(), n.name, opt.id));
+        };
         pop.appendChild(b);
       });
       card.appendChild(pop);
@@ -739,8 +876,13 @@
         else window.renderDslEditor();
         return;
       }
-      _naming = { fromName, x: dropX, y: dropY };
-      window.renderDslEditor();
+      // click, or drag to empty space: create a generic connected question
+      // immediately and drop straight into an inline editor on it — no
+      // separate "type a name" popover step.
+      const uniq = TM().uniqueName(TM().parse(text()), "new question");
+      const res = TM().addConnectedChild(text(), fromName, uniq);
+      _editingName = uniq;
+      mutate(res.text, res);
     };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
@@ -786,13 +928,32 @@
   // links that question in instead (connectExisting).
   function buildGhostSlotEl(n) {
     const el = document.createElement("div");
-    el.className = "canvas-ghost-slot";
+    // only LEAF nodes show a persistent "+"; interior nodes' slots stay hidden
+    // until you hover the source card (see buildCardEl), keeping the canvas from
+    // filling up with low-leverage hypotheticals.
+    el.className = "canvas-ghost-slot" + (n.isLeaf ? "" : " interior");
+    if (n.name != null) el.dataset.ghostSlotFor = n.name;
     el.style.left = n.ghost.x + "px"; el.style.top = n.ghost.y + "px"; el.style.width = CARD_W + "px"; el.style.height = CARD_H + "px";
     const plus = document.createElement("button");
     plus.className = "canvas-ghost-plus";
     plus.title = "click or drag out to add a connected question, or drag onto another card to link it";
     plus.textContent = "+";
     plus.addEventListener("mousedown", (e) => startPlusDrag(e, n.name));
+    // hovering the "+" makes the dashed path to this hypothetical node turn
+    // solid and a little bolder, so you can see exactly where it would attach.
+    const ghostPath = () => {
+      const svg = document.querySelector(".canvas-content svg");
+      if (!svg) return null;
+      return Array.from(svg.querySelectorAll("path.ghost-edge")).find((p) => p.dataset.ghostFor === n.name) || null;
+    };
+    plus.addEventListener("mouseenter", () => {
+      const p = ghostPath();
+      if (p) { p.setAttribute("stroke", "var(--ink-dim)"); p.setAttribute("stroke-width", "2.2"); p.removeAttribute("stroke-dasharray"); }
+    });
+    plus.addEventListener("mouseleave", () => {
+      const p = ghostPath();
+      if (p) { p.setAttribute("stroke", "var(--line)"); p.setAttribute("stroke-width", "1.2"); p.setAttribute("stroke-dasharray", "1 5"); }
+    });
     el.appendChild(plus);
     return el;
   }
@@ -801,7 +962,6 @@
   // from the editor — nothing here touches the real draft, commitments, or
   // Firestore; it's a throwaway local walk so "does my tree actually work"
   // has an instant answer instead of waiting for tonight's notification. ──
-  let _preview = null; // { history: [{q, a}], currentName, mode: "question" | "done" }
 
   window.startPreview = function () {
     const parsed = TM().parse(text());
@@ -815,125 +975,6 @@
       openReflection();
     }
   };
-  function closePreview() {
-    _preview = null;
-    const el = document.getElementById("treePreviewModal");
-    if (el) el.remove();
-  }
-  function previewNode() {
-    return TM().resolveName(TM().parse(text()), _preview.currentName);
-  }
-  // mirrors app.js's computeNext, but reads the LIVE editor text (not
-  // whatever's currently persisted) and needs no draft.answers bookkeeping
-  function previewComputeNext(node, optIndex) {
-    const parsed = TM().parse(text());
-    if (node.type === "text") {
-      if (node.terminal || (node.next && node.next.isDone)) return null;
-      if (node.next) { const t = TM().resolveName(parsed, node.next.target); return t ? t.name : null; }
-      return null;
-    }
-    const opt = (node.options || [])[optIndex];
-    if (!opt || opt.isDone || !opt.target) return null;
-    const t = TM().resolveName(parsed, opt.target);
-    return t ? t.name : null;
-  }
-  function previewAdvance(nextName) {
-    if (!nextName) { _preview.mode = "done"; renderPreview(); return; }
-    _preview.currentName = nextName;
-    _preview.answer = "";
-    renderPreview();
-  }
-  function previewEscapeHtml(s) { return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
-
-  function renderPreview() {
-    let modal = document.getElementById("treePreviewModal");
-    if (!modal) {
-      modal = document.createElement("div");
-      modal.className = "tree-preview-modal"; modal.id = "treePreviewModal";
-      document.body.appendChild(modal);
-    }
-    if (!_preview) { modal.remove(); return; }
-    modal.innerHTML = "";
-    const card = document.createElement("div"); card.className = "tree-preview-card";
-    modal.appendChild(card);
-
-    const close = document.createElement("button");
-    close.className = "tree-preview-close"; close.textContent = "✕"; close.title = "exit preview";
-    close.onclick = closePreview;
-    card.appendChild(close);
-
-    const kicker = document.createElement("div");
-    kicker.className = "tree-preview-kicker";
-    kicker.textContent = "preview — nothing here is saved";
-    card.appendChild(kicker);
-
-    if (_preview.mode === "done") {
-      const msg = document.createElement("div");
-      msg.className = "tree-preview-done"; msg.textContent = "end of this path — this is where you'd commit to something tomorrow.";
-      card.appendChild(msg);
-      const again = document.createElement("button");
-      again.className = "btn-ghost"; again.textContent = "restart preview";
-      again.onclick = window.startPreview;
-      card.appendChild(again);
-      return;
-    }
-
-    const node = previewNode();
-    if (!node) { closePreview(); return; }
-
-    if (_preview.history.length) {
-      const past = document.createElement("div"); past.className = "tree-preview-history";
-      _preview.history.forEach((h) => {
-        const item = document.createElement("div"); item.className = "tree-preview-past";
-        item.innerHTML = '<div class="tree-preview-past-q">' + previewEscapeHtml(h.q) + '</div><div class="tree-preview-past-a">' + previewEscapeHtml(h.a) + "</div>";
-        past.appendChild(item);
-      });
-      card.appendChild(past);
-    }
-
-    const q = document.createElement("div");
-    q.className = "tree-preview-question" + (node.star ? " star" : "");
-    q.textContent = node.name;
-    card.appendChild(q);
-
-    if (node.recallTarget) {
-      const parsed = TM().parse(text());
-      const t = TM().resolveName(parsed, node.recallTarget);
-      let hist = [];
-      try { hist = JSON.parse(localStorage.getItem("rc_answer_hist_" + TM().norm(t ? t.name : node.recallTarget)) || "[]"); } catch (_) {}
-      const rc = document.createElement("div"); rc.className = "tree-preview-recall";
-      rc.textContent = hist.length ? ("past answer: " + hist[0].a) : "no past answers yet";
-      card.appendChild(rc);
-    }
-
-    if (node.type === "choice") {
-      const opts = document.createElement("div"); opts.className = "tree-preview-choices";
-      (node.options || []).forEach((opt, i) => {
-        const b = document.createElement("button");
-        b.className = "tree-preview-choice"; b.textContent = opt.label || ("option " + (i + 1));
-        b.onclick = () => {
-          _preview.history.push({ q: node.name, a: opt.label || "" });
-          previewAdvance(previewComputeNext(node, i));
-        };
-        opts.appendChild(b);
-      });
-      card.appendChild(opts);
-    } else {
-      const input = document.createElement("textarea");
-      input.className = "tree-preview-input"; input.placeholder = "type an answer…"; input.value = _preview.answer || "";
-      input.oninput = () => { _preview.answer = input.value; };
-      card.appendChild(input);
-      const next = document.createElement("button");
-      next.className = "btn-ghost"; next.textContent = "next";
-      next.onclick = () => {
-        _preview.history.push({ q: node.name, a: (_preview.answer || "").trim() });
-        previewAdvance(previewComputeNext(node, null));
-      };
-      card.appendChild(next);
-      setTimeout(() => input.focus(), 0);
-    }
-  }
-
   // first non-empty line of a snapshot, truncated — so the history list reads
   // as "what the tree actually said at that point" instead of a version number.
   function snapshotPreview(t) {

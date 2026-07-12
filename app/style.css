@@ -3,11 +3,36 @@
   --ink: #ededec;      /* primary text */
   --ink-dim: #8f8f8d;  /* secondary */
   --ink-faint: #5a5a58;
-  --line: #201f22;
+  --line: #2a2930;
   --gold: #c9a25e; --gold-dim: #8f7440;
-  --serif: ui-serif, Georgia, "Times New Roman", serif; /* system serif — no external font fetch */
-  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  /* (was purple) the "on"/selected accent is just a lighter grey now */
+  --purple: #c6c6cd; --purple-dim: #6b6b73;
+  /* dark-mode elevation: the background is the DARKEST; every raised surface is
+     LIGHTER than the one it sits on, so shadows read and depth is legible. */
+  --surface: #17171b;    /* panes (editor / canvas) */
+  --surface-2: #1f1f25;  /* cards */
+  --surface-3: #26262d;  /* pills, menus, popovers (highest) */
+  --serif: "Amiri", ui-serif, Georgia, "Times New Roman", serif;
+  --mono: "Amulya", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --syne: "Syne", var(--mono);
+  --elev: 0 6px 24px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.03);
+  --elev-sm: 0 2px 10px rgba(0,0,0,.5);
+  /* Apple continuous-corner exponent — LOWER = rounder/softer, higher = squarer.
+     ~2 reads as a plush round; tune to taste on-device. */
+  --corner-k: 2.2;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+/* Apple-style continuous ("squircle") corners where the browser supports them;
+   everywhere else these elements keep their (now generous) rounded corners.
+   Small circular controls stay perfectly round. */
+@supports (corner-shape: superellipse(2)) {
+  .dsl-editor-wrap, .canvas-card, .squircle-corner-tools,
+  .history-dropdown, .canvas-recall-popover, .canvas-naming input, .canvas-ghost-slot,
+  .user-menu-trigger, .settings-panel, .btn-ghost, .notify-countdown,
+  .home-clock-btn, .tree-preview-card, .install-gate, .landing-qr-img {
+    corner-shape: superellipse(var(--corner-k));
+  }
+  .squircle-corner-btn, .canvas-del-btn, .canvas-recall-btn { corner-shape: round; }
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; }
@@ -15,10 +40,11 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: var(--mono);
+  font-family: var(--serif);
   overflow: hidden;
-  /* faint vignette so the black reads as a surface, not a void */
-  background-image: radial-gradient(120% 90% at 50% 8%, #131315 0%, #0a0a0b 46%, #060607 100%);
+  /* dim charcoal base — darker than every raised surface so their shadows read.
+     Not pure black (that's the "black hole"), just clearly the darkest layer. */
+  background-image: radial-gradient(120% 90% at 50% 8%, #101014 0%, #0b0b0e 45%, #070709 100%);
 }
 /* subtle film grain overlay — kills dead-flat OLED black */
 body::after {
@@ -42,10 +68,10 @@ body::after {
 .auth-box, .landing-inner { text-align: center; padding: 0 28px; }
 .auth-logo { font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: .01em; margin-bottom: 26px; }
 .amp { color: var(--ink-faint); font-style: italic; }
-.landing-tag { font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin-bottom: 30px; max-width: 320px; margin-left: auto; margin-right: auto; line-height: 1.6; }
+.landing-tag { font-family: var(--serif); font-size: 13px; color: var(--ink-dim); margin-bottom: 30px; max-width: 320px; margin-left: auto; margin-right: auto; line-height: 1.6; }
 .btn-ghost {
   background: transparent; color: var(--ink); border: 1px solid var(--line);
-  padding: 13px 22px; border-radius: 999px; font-family: var(--mono); font-size: 14px; cursor: pointer;
+  padding: 13px 22px; border-radius: 999px; font-family: var(--serif); font-size: 14px; cursor: pointer;
   transition: border-color .3s var(--ease), background .3s var(--ease);
 }
 .btn-ghost:hover { border-color: #35343a; background: #101012; }
@@ -57,8 +83,8 @@ body::after {
 .other-device-avatar { width: 44px; height: 44px; border-radius: 50%; margin-bottom: 14px; border: 1px solid var(--line); }
 .install-gate-headline { font-family: var(--serif); font-size: 20px; color: var(--ink); max-width: 300px; line-height: 1.4; margin-bottom: 26px; }
 .landing-qr-img { width: 190px; height: 190px; border-radius: 10px; display: block; background: #fff; padding: 10px; margin-bottom: 18px; }
-.install-gate-url { font-family: var(--mono); font-size: 14px; color: var(--ink-dim); letter-spacing: .01em; }
-.install-gate-reload-hint { font-family: var(--mono); font-size: 12px; color: var(--ink-faint); margin-top: 18px; }
+.install-gate-url { font-family: var(--serif); font-size: 14px; color: var(--ink-dim); letter-spacing: .01em; }
+.install-gate-reload-hint { font-family: var(--serif); font-size: 12px; color: var(--ink-faint); margin-top: 18px; }
 
 /* ---------- home ---------- */
 .notify-time-group { position: relative; }
@@ -68,7 +94,7 @@ body::after {
 .notify-time-hidden { position: absolute; opacity: 0; width: 0; height: 0; border: none; pointer-events: none; }
 .notify-countdown {
   background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px;
-  font-family: var(--mono); font-size: 12px; color: var(--ink-dim); letter-spacing: .02em; cursor: pointer;
+  font-family: var(--serif); font-size: 12px; color: var(--ink-dim); letter-spacing: .02em; cursor: pointer;
   transition: color .3s, border-color .3s;
 }
 .notify-countdown:hover { color: var(--ink); border-color: #35343a; }
@@ -91,7 +117,7 @@ body::after {
   margin-bottom: 0;
 }
 
-.btn-quiet { background: none; border: none; color: var(--ink-faint); font-family: var(--mono); font-size: 12px; cursor: pointer; }
+.btn-quiet { background: none; border: none; color: var(--ink-faint); font-family: var(--serif); font-size: 12px; cursor: pointer; }
 .btn-quiet:hover { color: var(--ink-dim); }
 
 .home-body {
@@ -115,7 +141,7 @@ body::after {
 }
 .user-menu-trigger:hover { border-color: var(--ink-dim); }
 .user-menu-avatar { width: 26px; height: 26px; border-radius: 50%; display: block; }
-.user-menu-name { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-menu-name { font-family: var(--serif); font-size: 12px; color: var(--ink-dim); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .settings-panel {
   position: fixed; top: calc(60px + env(safe-area-inset-top)); right: 16px; z-index: 44; display: none;
@@ -125,7 +151,7 @@ body::after {
 .settings-panel-inner { display: flex; flex-direction: column; gap: 3px; }
 .settings-menu-item {
   display: block; width: 100%; text-align: left; background: none; border: none; color: var(--ink);
-  font-family: var(--mono); font-size: 13px; padding: 9px 10px; cursor: pointer; border-radius: 7px;
+  font-family: var(--serif); font-size: 13px; padding: 9px 10px; cursor: pointer; border-radius: 7px;
 }
 .settings-menu-item:hover { background: #17171a; }
 
@@ -140,7 +166,7 @@ body::after {
 }
 .home-clock-btn:hover { border-color: var(--ink-dim); color: var(--ink); }
 .home-clock-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
-.home-clock-btn .notify-countdown { background: none; border: none; padding: 0; font-family: var(--mono); font-size: 12px; color: inherit; cursor: pointer; }
+.home-clock-btn .notify-countdown { background: none; border: none; padding: 0; font-family: var(--serif); font-size: 12px; color: inherit; cursor: pointer; }
 
 /* ---------- dsl editor + node canvas ----------
    The DSL text (js/tree-model.js) IS the tree — this replaces the old
@@ -149,7 +175,7 @@ body::after {
 .dsl-home { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .dsl-warning {
   display: none; margin-top: 8px; padding: 0; border: none; background: none;
-  font-family: var(--mono); font-size: 11px; color: #e0937a; text-decoration: underline; text-decoration-color: #6b3a2a;
+  font-family: var(--serif); font-size: 11px; color: #e0937a; text-decoration: underline; text-decoration-color: #6b3a2a;
   text-underline-offset: 3px; flex-shrink: 0;
 }
 .mobile-edit-notice {
@@ -162,44 +188,61 @@ body::after {
    two would otherwise sit exactly on top of each other on mobile */
 .access-editor-anyway-btn {
   position: fixed; left: 16px; bottom: calc(76px + env(safe-area-inset-bottom));
-  background: none; border: none; color: var(--ink-faint); font-family: var(--mono); font-size: 11px;
+  background: none; border: none; color: var(--ink-faint); font-family: var(--serif); font-size: 11px;
   letter-spacing: .02em; cursor: pointer; padding: 8px 4px; z-index: 40;
 }
 .access-editor-anyway-btn:hover { color: var(--ink-dim); }
 .dsl-pane-switch { display: none; justify-content: center; gap: 6px; margin-bottom: 12px; }
 .dsl-pane-btn {
   background: none; border: 1px solid var(--line); border-radius: 999px; color: var(--ink-faint);
-  font-family: var(--mono); font-size: 11px; padding: 6px 12px; cursor: pointer; transition: color .2s, border-color .2s;
+  font-family: var(--serif); font-size: 11px; padding: 6px 12px; cursor: pointer; transition: color .2s, border-color .2s;
 }
 .dsl-pane-btn.on { color: var(--ink); border-color: var(--ink-dim); }
 
-.dsl-split { display: flex; gap: 14px; flex: 1; min-height: 320px; }
+.dsl-split { display: flex; gap: 14px; flex: 1; min-height: 320px; position: relative; }
 .dsl-split.mobile { flex-direction: column; }
 .dsl-pane, .canvas-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; flex: 1; }
-/* no titles, no divider between them — each squircle (dsl-editor-wrap /
-   canvas-viewport) just takes up its full half of the space. */
-.dsl-pane { flex: 0 0 42%; }
-/* on mobile only ONE pane is shown at a time (the pane switcher toggles the
-   other to display:none), so the visible pane must fill the screen — without
-   this the dsl pane kept its 42% flex-basis and the editor only covered the
-   top ~40% of the phone. */
-.dsl-split.mobile .dsl-pane, .dsl-split.mobile .canvas-pane { flex: 1 1 auto; }
+
+/* DESKTOP: the whole app IS the node canvas (its background is the app
+   background — no box around it), and the DSL editor floats as a raised panel
+   on a layer ABOVE the canvas, along with the pills and the nodes. */
+.dsl-split:not(.mobile) .canvas-pane { position: absolute; inset: 0; z-index: 0; }
+/* bottom-anchored, auto-growing editor: only as tall as its text (+ toolbar),
+   pinned to the bottom-left, growing UPWARD as you add lines, capped so it never
+   exceeds the canvas. */
+.dsl-split:not(.mobile) .dsl-pane {
+  position: absolute; top: auto; left: 10px; bottom: 10px; width: 60%; z-index: 5;
+  flex: none; display: flex; max-height: 45%;
+}
+
+/* MOBILE keeps the one-pane-at-a-time switcher for now (read-only mobile is a
+   later step); the pane the switcher shows fills the screen. */
+.dsl-split.mobile .dsl-pane, .dsl-split.mobile .canvas-pane { flex: 1 1 auto; position: static; }
 
 /* corner tools — a small overlay tucked in the squircle's top-right corner
    instead of a header row above it, so the squircle itself gets that space.
    Sits in dsl-editor-wrap (not dsl-editor-scroll) so it stays fixed in view
    regardless of how far down the question list is scrolled. */
-.squircle-corner-tools { position: absolute; top: 8px; right: 8px; z-index: 6; display: flex; gap: 6px; }
-.squircle-corner-btn {
-  width: 24px; height: 24px; border-radius: 50%; background: #131315; border: 1px solid var(--line);
-  color: var(--ink-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
-  transition: color .2s, border-color .2s, background .2s;
+/* a single rounded pill holding the editor's controls (preview · copy ·
+   history · delete-all) */
+/* the toolbar now lives at the BOTTOM-LEFT of the editor, in flow below the
+   text, seamless (no pill) — the buttons just float on the editor surface. */
+.squircle-corner-tools {
+  order: 2; align-self: flex-start; z-index: 6; display: flex; align-items: center; gap: 2px;
+  padding: 5px 6px;
 }
-.squircle-corner-btn:hover, .squircle-corner-btn.on { color: var(--ink); border-color: var(--gold-dim); }
-.squircle-corner-btn.copied { color: #7bbf7b; border-color: #4a6b4a; }
+.squircle-corner-btn {
+  width: 24px; height: 24px; border-radius: 50%; background: none; border: none;
+  color: var(--ink-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
+  transition: color .2s, background .2s;
+}
+/* wireframe buttons just light up (brighter ink), no background fill */
+.squircle-corner-btn:hover, .squircle-corner-btn.on { color: var(--ink); background: none; }
+.squircle-corner-btn.copied { color: #7bbf7b; }
+.squircle-corner-btn.danger:hover { color: #e0937a; background: none; }
 .history-dropdown {
-  display: none; position: absolute; top: 38px; right: 8px; z-index: 6; width: 262px; max-width: calc(100% - 16px);
-  background: #101012; border: 1px solid #35343a; border-radius: 10px; padding: 8px;
+  display: none; position: absolute; bottom: 46px; left: 8px; top: auto; right: auto; z-index: 7; width: 262px; max-width: calc(100% - 16px);
+  background: var(--surface-3); border: 1px solid var(--line); border-radius: 18px; padding: 8px; box-shadow: var(--elev);
 }
 .history-dropdown.on { display: block; }
 
@@ -207,14 +250,15 @@ body::after {
    and history dropdown can extend past its edge without being clipped —
    the ACTUAL scroll clipping (and matching rounded corners) lives one level
    in, on dsl-editor-scroll, which is the thing that actually scrolls. */
-.dsl-editor-wrap { flex: 1; border: 1px solid var(--line); border-radius: 12px; position: relative; }
-.dsl-editor-scroll { position: absolute; inset: 0; overflow: auto; border-radius: 12px; scrollbar-width: none; }
+.dsl-editor-wrap { flex: 1; border: 1px solid var(--line); border-radius: 34px; position: relative; background: var(--surface); box-shadow: var(--elev); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.dsl-editor-scroll { position: relative; order: 1; flex: 0 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
 .dsl-editor-scroll::-webkit-scrollbar { display: none; }
 .dsl-inner { position: relative; width: 100%; }
 .dsl-textarea {
   position: absolute; left: 0; top: 0; width: 100%; height: 100%; box-sizing: border-box;
-  background: none; border: none; outline: none; resize: none; overflow-x: auto; overflow-y: hidden;
-  color: var(--ink); font-family: var(--mono); font-size: 13px; line-height: 21px; padding: 8px 34px 8px 12px; white-space: pre;
+  background: none; border: none; outline: none; resize: none; overflow-x: hidden; overflow-y: hidden;
+  color: var(--ink); font-family: var(--mono); font-size: 13px; line-height: 21px; padding: 14px;
+  white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;
   scrollbar-width: none; /* firefox — still scrolls (e.g. trackpad), just no visible bar */
 }
 .dsl-textarea::-webkit-scrollbar { display: none; }
@@ -227,53 +271,67 @@ body::after {
    the textarea's) — hence matching font-family/font-size here too, rather
    than the button's actual (smaller) glyph size. */
 .dsl-gutter-btn {
-  position: absolute; left: calc(12px + 2ch); width: 20px; height: 21px; background: none; border: 1px solid var(--line); border-radius: 50%;
+  position: absolute; left: calc(14px + 1ch); width: 20px; height: 21px; background: none; border: 1px solid var(--line); border-radius: 50%;
   color: var(--ink-faint); font-family: var(--mono); font-size: 13px; cursor: pointer; z-index: 3; padding: 0; line-height: 1; transition: color .2s, border-color .2s;
 }
 .dsl-gutter-btn:hover { color: var(--ink-dim); border-color: #35343a; }
 
 /* same split as dsl-editor-wrap/dsl-editor-scroll above: canvas-viewport
    stays put, canvas-scroll is what actually scrolls/pans. */
-.canvas-viewport { flex: 1; position: relative; border: 1px solid var(--line); border-radius: 12px; }
-.canvas-scroll { position: absolute; inset: 0; overflow: auto; border-radius: 12px; scrollbar-width: none; }
+/* the canvas is the base layer: same background as the app, no box, no shadow —
+   the nodes, the DSL panel and the pills are what float above it. */
+.canvas-viewport { flex: 1; position: relative; border: none; border-radius: 0; background: transparent; box-shadow: none; }
+/* center the tree in the canvas (vertically and horizontally); margin:auto on a
+   flex child keeps it centered when it fits and fully scrollable when it doesn't. */
+/* plain scrollable box (both axes); the tree is centered by JS-set margins on
+   .canvas-content so nothing clips the scrollable area. Grab to pan. */
+.canvas-scroll { position: absolute; inset: 0; overflow: auto; scrollbar-width: none; cursor: grab; }
+.canvas-scroll.grabbing { cursor: grabbing; }
 .canvas-scroll::-webkit-scrollbar { display: none; }
 .canvas-content { position: relative; }
+/* interior ghost PATHS hide with their "+", revealed together on card hover */
+.ghost-edge.interior { opacity: 0; transition: opacity .15s var(--ease); }
+.ghost-edge.interior.reveal { opacity: 1; }
+/* the DSL highlight overlay is built in a later step — inert for now */
+.dsl-highlight { display: none; }
 
 .canvas-card {
-  position: absolute; box-sizing: border-box; background: #111113; border: 1px solid var(--line); border-radius: 10px;
-  padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; gap: 2px; font-family: var(--mono);
+  position: absolute; box-sizing: border-box; background: var(--surface-2); border: 1px solid var(--line); border-radius: 26px;
+  padding: 12px; display: flex; flex-direction: column; justify-content: center; gap: 2px; font-family: var(--serif);
+  box-shadow: var(--elev-sm);
 }
-.canvas-card.terminal { background: transparent; border-color: #35343a; }
-.canvas-card.choice { border-color: #35343a; }
-.canvas-card.star { border-color: var(--gold-dim); }
+.canvas-card.terminal { background: transparent; border-color: var(--line); box-shadow: none; }
+.canvas-card.choice { border-color: #3a3944; }
 .canvas-card.duplicate { border-color: #6b3a2a; }
 .canvas-card-text {
-  font-size: 11.5px; color: var(--ink); line-height: 1.3; overflow: hidden;
+  font-family: var(--serif); font-size: 12.5px; color: var(--ink); line-height: 1.3; overflow: hidden;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
 .canvas-card.terminal .canvas-card-text { color: var(--ink-faint); }
 .canvas-card-text.editable { cursor: text; }
 .canvas-card-text.editable:hover { color: var(--ink); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 2px; }
+/* the inline node editor must be visually identical to the rendered node text —
+   same serif, same size, same line-height, same (even) box — so clicking to
+   edit doesn't jump fonts or reflow. padding:0 means it inherits the card's even
+   padding exactly like the display text does. */
 .canvas-card-text-input {
-  width: 100%; height: 100%; resize: none; background: none; border: none; outline: none;
-  color: var(--ink); font-family: var(--mono); font-size: 11.5px; line-height: 1.3; padding: 0;
+  width: 100%; height: 100%; resize: none; background: none; border: 0; outline: none; margin: 0;
+  box-sizing: border-box; overflow: hidden; display: block;
+  color: var(--ink); font-family: var(--serif); font-size: 12.5px; line-height: 1.3; padding: 0;
 }
-.canvas-card-tag { font-size: 9px; color: var(--ink-faint); letter-spacing: .04em; text-transform: uppercase; }
+.canvas-card-tag { font-family: var(--mono); font-size: 9px; color: var(--ink-faint); letter-spacing: .04em; text-transform: uppercase; }
 .canvas-card-tag.dup { color: #e0937a; text-transform: none; }
-.canvas-star-badge {
-  position: absolute; left: -8px; top: -8px; width: 18px; height: 18px; background: #1a1a1c; border: 1px solid var(--line);
-  border-radius: 50%; color: var(--gold); font-size: 10px; display: flex; align-items: center; justify-content: center; pointer-events: none;
-}
+/* x sits at the bottom-right of the node, recall at the middle-right */
 .canvas-del-btn {
-  position: absolute; top: -8px; right: -8px; width: 19px; height: 19px; border-radius: 50%; background: #1a1a1c;
+  position: absolute; bottom: -9px; right: -9px; width: 19px; height: 19px; border-radius: 50%; background: #1a1a1c;
   border: 1px solid var(--line); color: var(--ink-dim); font-size: 10px; line-height: 1; cursor: pointer; padding: 0; z-index: 2;
 }
 .canvas-del-btn:hover { color: #e0937a; }
 .canvas-recall-btn {
-  position: absolute; top: 15px; right: -8px; width: 19px; height: 19px; border-radius: 50%; background: #131315;
+  position: absolute; top: 50%; right: -9px; transform: translateY(-50%); width: 19px; height: 19px; border-radius: 50%; background: var(--surface-2);
   border: 1px solid var(--line); color: var(--ink-faint); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; z-index: 2;
 }
-.canvas-recall-btn.on { color: var(--gold-dim); }
+.canvas-recall-btn.on { color: var(--purple); border-color: var(--purple-dim); }
 .canvas-plus-btn {
   position: absolute; bottom: -11px; right: -11px; width: 22px; height: 22px; border-radius: 50%; background: var(--ink);
   color: #0a0a0b; border: none; font-size: 14px; line-height: 1; cursor: grab; display: flex; align-items: center; justify-content: center;
@@ -281,32 +339,40 @@ body::after {
 }
 .canvas-naming { position: absolute; z-index: 5; }
 .canvas-naming input {
-  background: #101012; border: 1px solid #35343a; border-radius: 6px; color: var(--ink); font-family: var(--mono);
+  background: var(--surface-3); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font-family: var(--serif);
   font-size: 13px; padding: 7px 10px; outline: none; width: 180px;
 }
 .canvas-recall-popover {
-  position: absolute; top: calc(100% + 10px); left: 0; z-index: 9; width: 220px; background: #101012; border: 1px solid #35343a; border-radius: 8px; padding: 6px;
+  position: absolute; top: calc(100% + 10px); left: 0; z-index: 9; width: 220px; background: var(--surface-3); border: 1px solid var(--line); border-radius: 18px; padding: 8px; box-shadow: var(--elev);
 }
-.canvas-recall-popover-hdr { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); padding: 4px 6px 6px; }
+.canvas-recall-popover-hdr { font-family: var(--serif); font-size: 10px; color: var(--ink-faint); padding: 4px 6px 6px; }
 .canvas-recall-opt {
-  display: block; width: 100%; text-align: left; background: none; border: none; color: var(--ink); font-family: var(--mono);
-  font-size: 12px; padding: 6px; cursor: pointer; border-radius: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; text-align: left;
+  background: none; border: none; color: var(--ink-dim); font-family: var(--serif);
+  font-size: 12px; padding: 7px 8px; cursor: pointer; border-radius: 5px;
 }
 .canvas-recall-opt:hover { background: #17171a; }
-.canvas-recall-opt.none { color: var(--ink-faint); }
+.canvas-recall-opt.sel { color: var(--ink); }
+.canvas-recall-opt-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.canvas-recall-opt-check { flex: none; color: var(--purple); font-size: 12px; }
 
 /* the "+" drawn at the spot the next question would actually land — click
    or drag out to type a new question, or drag onto another card to link it */
 .canvas-ghost-slot {
-  position: absolute; box-sizing: border-box; border: 1px dashed var(--line); border-radius: 10px;
+  position: absolute; box-sizing: border-box; border: 1px dashed var(--line); border-radius: 22px;
   display: flex; align-items: center; justify-content: center;
 }
+/* interior (non-leaf) slots stay out of sight until you hover their source card
+   or the slot itself — only leaf nodes advertise a persistent "+". */
+.canvas-ghost-slot.interior { opacity: 0; pointer-events: none; transition: opacity .15s var(--ease); }
+.canvas-ghost-slot.interior.reveal, .canvas-ghost-slot.interior:hover { opacity: 1; pointer-events: auto; }
 .canvas-ghost-plus {
   width: 26px; height: 26px; border-radius: 50%; background: none; border: 1px solid var(--line);
   color: var(--ink-faint); font-size: 14px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center;
   padding: 0; font-weight: 600; transition: color .2s, border-color .2s, background .2s;
 }
-.canvas-ghost-plus:hover { color: var(--ink); border-color: var(--ink-dim); background: #131315; }
+.canvas-ghost-plus:hover { color: var(--ink); border-color: var(--ink-dim); background: none; }
+.canvas-ghost-slot.suppressed { opacity: 0 !important; pointer-events: none !important; }
 
 /* preview: a throwaway walk through the tree, entirely local — see
    startPreview in dsl-editor.js. Deliberately closer to the real reflection
@@ -326,31 +392,31 @@ body::after {
 }
 .tree-preview-close:hover { color: var(--ink); }
 .tree-preview-kicker {
-  font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+  font-family: var(--serif); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
   color: var(--gold-dim); margin-bottom: 18px;
 }
 .tree-preview-history { max-height: 140px; overflow-y: auto; margin-bottom: 14px; }
 .tree-preview-past { opacity: .45; margin-bottom: 10px; }
 .tree-preview-past-q { font-family: var(--serif); font-size: 14px; color: var(--ink-dim); margin-bottom: 3px; }
-.tree-preview-past-a { font-family: var(--mono); font-size: 13px; color: var(--ink); }
+.tree-preview-past-a { font-family: var(--serif); font-size: 13px; color: var(--ink); }
 .tree-preview-question {
   font-family: var(--serif); font-size: 21px; line-height: 1.35; color: var(--ink); margin-bottom: 18px;
 }
 .tree-preview-question.star::before { content: "★ "; color: var(--gold); }
 .tree-preview-recall {
-  font-family: var(--mono); font-size: 12px; color: var(--ink-faint); margin-bottom: 14px;
+  font-family: var(--serif); font-size: 12px; color: var(--ink-faint); margin-bottom: 14px;
   border-left: 2px solid var(--line); padding-left: 10px;
 }
 .tree-preview-input {
   width: 100%; min-height: 70px; resize: vertical; background: #0d0d0e; border: 1px solid var(--line);
-  border-radius: 8px; color: var(--ink); font-family: var(--mono); font-size: 14px; line-height: 1.5;
+  border-radius: 8px; color: var(--ink); font-family: var(--serif); font-size: 14px; line-height: 1.5;
   padding: 10px 12px; outline: none; margin-bottom: 14px;
 }
 .tree-preview-input:focus { border-color: #35343a; }
 .tree-preview-choices { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
 .tree-preview-choice {
   text-align: left; background: none; border: 1px solid var(--line); border-radius: 8px; color: var(--ink);
-  font-family: var(--mono); font-size: 13px; padding: 10px 14px; cursor: pointer; transition: border-color .2s, background .2s;
+  font-family: var(--serif); font-size: 13px; padding: 10px 14px; cursor: pointer; transition: border-color .2s, background .2s;
 }
 .tree-preview-choice:hover { border-color: #35343a; background: #131315; }
 .tree-preview-done { font-family: var(--serif); font-size: 16px; color: var(--ink-dim); line-height: 1.5; margin-bottom: 18px; }
@@ -359,7 +425,7 @@ body::after {
 .history-snapshot {
   display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; text-align: left;
   background: none; border: 1px solid var(--line); border-radius: 7px; color: var(--ink-dim);
-  font-family: var(--mono); font-size: 11px; padding: 7px 9px; cursor: pointer;
+  font-family: var(--serif); font-size: 11px; padding: 7px 9px; cursor: pointer;
   transition: color .2s, border-color .2s, background .2s;
 }
 .history-snapshot:hover { color: var(--ink); border-color: #35343a; }
@@ -381,7 +447,7 @@ body::after {
   border: none; color: var(--ink-faint); font-size: 20px; cursor: pointer; z-index: 6; opacity: .55; display: flex; }
 .reflect-back:hover { opacity: 1; color: var(--ink-dim); }
 .reflect-collapse { position: absolute; top: calc(env(safe-area-inset-top) + 18px); left: 50%; transform: translateX(-50%);
-  background: none; border: none; color: var(--ink-faint); font-family: var(--mono); font-size: 11px; letter-spacing: .06em;
+  background: none; border: none; color: var(--ink-faint); font-family: var(--serif); font-size: 11px; letter-spacing: .06em;
   text-transform: uppercase; cursor: pointer; z-index: 6; }
 .reflect-collapse:hover { color: var(--ink-dim); }
 
@@ -400,14 +466,14 @@ body::after {
 .chat-item.past { opacity: .4; }
 .chat-q { font-family: var(--serif); font-size: 16px; line-height: 1.4; color: var(--ink-dim); margin-bottom: 6px; }
 .chat-q.big { font-size: 25px; line-height: 1.34; color: var(--ink); margin-bottom: 0; }
-.chat-a { font-family: var(--mono); font-weight: 300; font-size: 15px; line-height: 1.55; color: var(--ink); white-space: pre-wrap; }
+.chat-a { font-family: var(--serif); font-weight: 300; font-size: 15px; line-height: 1.55; color: var(--ink); white-space: pre-wrap; }
 
 /* composer pinned to the bottom (thumb zone) */
 .composer { padding: 10px 20px calc(env(safe-area-inset-bottom) + 14px); border-top: 1px solid var(--line); }
 .composer-bar { display: flex; align-items: flex-end; gap: 8px; }
 .composer-input {
   flex: 1; min-width: 0; background: #111113; border: 1px solid var(--line); border-radius: 18px;
-  padding: 11px 14px; color: var(--ink); font-family: var(--mono); font-weight: 300; font-size: 15px; line-height: 1.5;
+  padding: 11px 14px; color: var(--ink); font-family: var(--serif); font-weight: 300; font-size: 15px; line-height: 1.5;
   resize: none; outline: none; max-height: 132px; overflow-y: auto; caret-color: var(--ink);
 }
 .composer-input:focus { border-color: #35343a; }
@@ -423,14 +489,14 @@ body::after {
 @keyframes micpulse { 0%,100% { box-shadow: 0 0 0 0 rgba(237,237,236,.18); } 50% { box-shadow: 0 0 0 5px rgba(237,237,236,0); } }
 
 .continue-desktop { display: block; margin: 12px auto 2px; background: none; border: none; color: var(--ink-faint);
-  font-family: var(--mono); font-size: 11px; letter-spacing: .03em; cursor: pointer; }
+  font-family: var(--serif); font-size: 11px; letter-spacing: .03em; cursor: pointer; }
 .continue-desktop:hover { color: var(--ink-dim); }
 
 /* choice question chips inside the composer area */
 .chat-choices { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
 .q-choice {
   text-align: left; background: transparent; border: 1px solid var(--line); border-radius: 12px;
-  padding: 14px 16px; color: var(--ink); font-family: var(--mono); font-weight: 300; font-size: 15px;
+  padding: 14px 16px; color: var(--ink); font-family: var(--serif); font-weight: 300; font-size: 15px;
   cursor: pointer; transition: border-color .25s var(--ease), background .25s var(--ease), transform .1s var(--ease);
 }
 .q-choice:hover { border-color: #35343a; background: #101012; }
@@ -438,31 +504,31 @@ body::after {
 .q-choice.chosen { border-color: var(--ink); background: #141416; }
 
 /* recall inside the composer */
-.chat-recall { background: none; border: none; color: var(--ink-faint); font-family: var(--mono); font-size: 11px;
+.chat-recall { background: none; border: none; color: var(--ink-faint); font-family: var(--serif); font-size: 11px;
   cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 2px 0 8px; }
 .chat-recall:hover { color: var(--ink-dim); }
 .chat-recall .chev { display: inline-block; transition: transform .3s var(--ease); }
 .chat-recall.open .chev { transform: rotate(90deg); }
 .chat-recall-list { max-height: 0; overflow: hidden; transition: max-height .4s var(--ease); }
 .chat-recall-list.open { max-height: 180px; overflow-y: auto; margin-bottom: 10px; }
-.recall-item { font-family: var(--mono); font-size: 13px; font-weight: 300; color: var(--ink-dim); padding: 8px 0; border-top: 1px solid var(--line); line-height: 1.5; }
+.recall-item { font-family: var(--serif); font-size: 13px; font-weight: 300; color: var(--ink-dim); padding: 8px 0; border-top: 1px solid var(--line); line-height: 1.5; }
 .recall-date { display: block; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 3px; }
-.recall-empty { font-family: var(--mono); font-size: 12px; color: var(--ink-faint); padding: 10px 0; }
+.recall-empty { font-family: var(--serif); font-size: 12px; color: var(--ink-faint); padding: 10px 0; }
 
 /* ---------- check-in / commit shared ---------- */
-.checkin-kicker, .commit-kicker { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 16px; }
+.checkin-kicker, .commit-kicker { font-family: var(--serif); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 16px; }
 .checkin-text { font-family: var(--serif); font-size: 25px; line-height: 1.35; margin-bottom: 34px; }
 .commit-field {
   width: 100%; background: transparent; border: none; outline: none; resize: none; overflow: hidden;
-  color: var(--ink); font-family: var(--mono); font-weight: 300; font-size: 22px; line-height: 1.5;
+  color: var(--ink); font-family: var(--serif); font-weight: 300; font-size: 22px; line-height: 1.5;
   caret-color: var(--ink); padding: 0; margin-bottom: 14px;
 }
 .commit-field::placeholder { color: var(--ink-faint); }
 .commit-due-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 34px; }
-.commit-due-label { font-family: var(--mono); font-size: 12px; color: var(--ink-faint); }
+.commit-due-label { font-family: var(--serif); font-size: 12px; color: var(--ink-faint); }
 .commit-due-select {
   background: transparent; border: 1px solid var(--line); border-radius: 7px; color: var(--ink-dim);
-  font-family: var(--mono); font-size: 12px; padding: 5px 8px; cursor: pointer; outline: none; color-scheme: dark;
+  font-family: var(--serif); font-size: 12px; padding: 5px 8px; cursor: pointer; outline: none; color-scheme: dark;
 }
 .commit-due-select:hover { border-color: #35343a; color: var(--ink); }
 
@@ -474,11 +540,11 @@ body::after {
 .hold-fill { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round;
   stroke-dasharray: 207.3; stroke-dashoffset: 207.3; transition: stroke-dashoffset .05s linear;
   filter: drop-shadow(0 0 5px rgba(237,237,236,.4)); }
-.hold-label { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); letter-spacing: .04em; }
+.hold-label { font-family: var(--serif); font-size: 12px; color: var(--ink-dim); letter-spacing: .04em; }
 .hold.done .hold-label { color: var(--ink); }
 
 .btn-shapeless { display: block; margin: 10px auto 0; background: none; border: none; color: var(--ink-faint);
-  font-family: var(--mono); font-size: 12px; cursor: pointer; }
+  font-family: var(--serif); font-size: 12px; cursor: pointer; }
 .btn-shapeless:hover { color: var(--ink-dim); }
 
 /* phases that are centered stacks */
@@ -495,7 +561,7 @@ body::after {
 #phaseParked { text-align: center; }
 .parked-mark { font-size: 26px; color: var(--ink-faint); margin-bottom: 14px; animation: pop .5s var(--ease); }
 .parked-title { font-family: var(--serif); font-size: 22px; color: var(--ink); margin-bottom: 10px; }
-.parked-sub { font-family: var(--mono); font-size: 13px; color: var(--ink-dim); line-height: 1.6; max-width: 300px; margin: 0 auto 28px; }
+.parked-sub { font-family: var(--serif); font-size: 13px; color: var(--ink-dim); line-height: 1.6; max-width: 300px; margin: 0 auto 28px; }
 .parked-sub b { color: var(--ink); font-weight: 400; word-break: break-all; }
 
 /* device exclusivity shade — covers everything on a device that isn't the
@@ -507,7 +573,7 @@ body::after {
 }
 .device-shade.on { display: flex; }
 .device-shade-inner { text-align: center; }
-.device-shade-title { font-family: var(--mono); font-size: 13px; letter-spacing: .02em; color: var(--ink-dim); margin-bottom: 18px; }
+.device-shade-title { font-family: var(--serif); font-size: 13px; letter-spacing: .02em; color: var(--ink-dim); margin-bottom: 18px; }
 
 /* full-screen hard-gate overlay — used by #otherDeviceGate (cross-device
    pairing block); its content styling lives under .install-gate above */
@@ -531,6 +597,6 @@ body::after {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .installing-label {
-  font-family: var(--mono); font-size: 12px; color: var(--ink-faint);
+  font-family: var(--serif); font-size: 12px; color: var(--ink-faint);
   letter-spacing: .04em;
 }

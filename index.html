@@ -151,29 +151,66 @@
 
         <!-- HOME — settings + edit questions -->
         <div class="screen" id="homeScreen">
+            <!-- home header row: a full-width strip that is ITSELF invisible
+           (no background/border of its own) — it just reserves space at the
+           top and pushes .home-body below it. Its only visible children are
+           the commitment pill (centered) and a standalone play circle to
+           its right. Was: .home-pill position:fixed top-right, floating
+           OVER the canvas — now normal flow, so the canvas genuinely starts
+           below it. -->
+            <div class="home-header-row" id="homeHeaderRow">
+                <!-- standalone circle, no longer nested inside the pill. Comes
+             FIRST in the row — order is play, then the pill — and the whole
+             group sits flush right (was centered). -->
+                <button class="home-pill-play" id="homePillPlay" onclick="startPreview()" title="walk your tree now">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8 5v14l11-7z" /></svg>
+                </button>
+                <div class="home-pill" id="homePill">
+                    <!-- no longer clickable itself, no chevron — the lightbulb
+                 below is the expand/collapse trigger now. -->
+                    <div class="home-pill-commit" id="homePillCommit">
+                        <span class="home-pill-commit-text" id="homePillCommitText"></span>
+                    </div>
+                    <!-- nothing else in the middle: the want→done rate and
+                 per-commitment time deltas now live inside the dropdown
+                 (built by renderCommitDrop in app.js) instead of cluttering
+                 this always-visible row. -->
+                    <button class="home-pill-streak" id="homePillStreak" onclick="toggleCommitPill()" title="ideas executed — click to see past ones">
+                        <svg class="bulb" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2z"/><rect x="9" y="19" width="6" height="1.6" rx="0.8"/><rect x="10" y="21.4" width="4" height="1.6" rx="0.8"/></svg>
+                        <span class="home-pill-streak-count" id="homePillStreakCount">0</span>
+                    </button>
+                    <!-- account menu trigger — nested inside the pill now (was
+                 a separate screen-level element) so mobile, where the whole
+                 editor is hidden, still has a way to reach settings/sign-out
+                 from the one thing that's always shown. Avatar only, no name
+                 text. -->
+                    <button
+                        class="user-menu-trigger"
+                        id="userMenuTrigger"
+                        onclick="toggleSettingsPanel()"
+                        title="account menu"
+                    >
+                        <img
+                            id="userMenuAvatar"
+                            class="user-menu-avatar"
+                            style="display: none"
+                            alt=""
+                        />
+                    </button>
+                </div>
+            </div>
+            <div class="home-pill-drop" id="homePillDrop"></div>
+
+            <!-- mobile-only: big centered play + "edit on desktop" note -->
+            <button class="mobile-play-big" id="mobilePlayBig" onclick="startPreview()" title="reflect now">
+                <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M8 5v14l11-7z" /></svg>
+            </button>
+            <div class="mobile-edit-note" id="mobileEditNote">you edit your tree on desktop</div>
+
             <div class="home-body">
                 <div id="dslHome" class="dsl-home"></div>
             </div>
 
-            <!-- account menu trigger — screen-level (not embedded in the
-           canvas squircle) so mobile, where the whole editor is hidden,
-           still has a way to reach settings/sign-out. Visually it still
-           reads as "tucked in the corner" once the squircles expand to
-           fill the screen, since there's nothing else up there. -->
-            <button
-                class="user-menu-trigger"
-                id="userMenuTrigger"
-                onclick="toggleSettingsPanel()"
-                title="account menu"
-            >
-                <img
-                    id="userMenuAvatar"
-                    class="user-menu-avatar"
-                    style="display: none"
-                    alt=""
-                />
-                <span class="user-menu-name" id="userMenuName"></span>
-            </button>
             <div class="settings-panel" id="settingsPanel">
                 <div class="settings-panel-inner">
                     <button
@@ -363,51 +400,55 @@
                             autocomplete="off"
                             placeholder="type your answer…"
                         ></textarea>
-                        <button
-                            class="composer-mic"
-                            id="micBtn"
-                            onclick="toggleMic()"
-                            title="dictate"
-                        >
-                            <svg
-                                viewBox="0 0 24 24"
-                                width="17"
-                                height="17"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="1.7"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
+                        <!-- §3h: seamless toolbar strip below the text, not a row
+                             beside it — voice floats (bare icon), send stays filled. -->
+                        <div class="composer-toolbar">
+                            <button
+                                class="composer-mic"
+                                id="micBtn"
+                                onclick="toggleMic()"
+                                title="dictate"
                             >
-                                <rect
-                                    x="9"
-                                    y="3"
-                                    width="6"
-                                    height="12"
-                                    rx="3"
-                                />
-                                <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-                            </svg>
-                        </button>
-                        <button
-                            class="composer-send"
-                            id="sendBtn"
-                            onclick="composerSend()"
-                            title="send"
-                        >
-                            <svg
-                                viewBox="0 0 24 24"
-                                width="17"
-                                height="17"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="1.8"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    width="17"
+                                    height="17"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="1.7"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <rect
+                                        x="9"
+                                        y="3"
+                                        width="6"
+                                        height="12"
+                                        rx="3"
+                                    />
+                                    <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+                                </svg>
+                            </button>
+                            <button
+                                class="composer-send"
+                                id="sendBtn"
+                                onclick="composerSend()"
+                                title="send"
                             >
-                                <path d="M5 12h14M13 6l6 6-6 6" />
-                            </svg>
-                        </button>
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    width="17"
+                                    height="17"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="1.8"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path d="M5 12h14M13 6l6 6-6 6" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                     <button
                         class="continue-desktop"
@@ -465,7 +506,7 @@
             <div class="phase" id="phaseDone">
                 <div class="done-mark">✓</div>
                 <div class="done-text" id="doneText">
-                    committed. see you tomorrow.
+                    done. see you tomorrow.
                 </div>
                 <button
                     class="btn-shapeless"
@@ -505,6 +546,12 @@
 
         <script type="module" src="app/firebase-init.js?v=22"></script>
         <script src="app/js/tree-model.js?v=22"></script>
+        <!-- was only ever added to app-index.html (the mobile build) — the
+             web build silently never had window.META_TREE/
+             compileQuestionsToTree defined at all, so maybeCompileMetaWalk()
+             would fail on web with no visible error. Found while wiring the
+             first-tree auto-trigger, which depends on this being loaded. -->
+        <script src="app/js/meta-tree.js?v=22"></script>
         <script src="app/js/dsl-editor.js?v=22"></script>
         <script src="app/js/app.js?v=22"></script>
     </body>

@@ -22,11 +22,26 @@
   let _pane = "dsl"; // mobile-only pane switcher
   let _recallOpenFor = null; // block name whose recall popover is open
   let _plusDrag = null; // { fromName, x, y } — canvas-local coords
-  let _naming = null; // { fromName, x, y } — "type a new question" popover, opened by clicking OR dragging a "+" to empty space
   let _dragFromLine = null; // textarea native drag-reorder source line
   let _historyOpen = false;
   let _cardDrag = null; // { name, x, y } — dragging an existing card onto another to link it
-  let _editingName = null; // block name currently being renamed inline on the canvas
+  // 2D canvas pan offset — applied as a CSS transform on #canvasContent, on
+  // TOP of its auto-centering margins. Previously panning worked by setting
+  // .canvas-scroll's native scrollLeft/scrollTop, which only has any visible
+  // effect when the tree's actual content is BIGGER than the viewport (i.e.
+  // there's real scrollable overflow to move within) — for any small/
+  // medium tree that already fits on screen, scrollWidth/scrollHeight are
+  // ~equal to clientWidth/clientHeight, so dragging did nothing visible at
+  // all. That was the "still can't 2D drag" bug. A transform-based offset
+  // has no such ceiling — it can move any amount in any direction
+  // regardless of content size.
+  let _canvasPan = { x: 0, y: 0 };
+  function applyCanvasPan() {
+    const content = document.getElementById("canvasContent");
+    if (content) content.style.transform = "translate(" + _canvasPan.x + "px, " + _canvasPan.y + "px)";
+  }
+  let _editingName = null; // block name currently being renamed inline on the canvas (only reachable via "+" creating a brand-new node now — see §3d/§3e)
+  let _selectedCard = null; // block name whose metadata panel (kind + recall status) is showing, toggled by a plain click on the card
   // Renaming a declaration OR any reference always cascades to every other
   // occurrence of that title, so the two views never drift out of sync.
 
@@ -54,25 +69,27 @@
       "</div>" +
       '<div class="dsl-split" id="dslSplit">' +
         '<div class="dsl-pane" id="dslPane">' +
+          '<div class="dsl-pane-label">your questions</div>' +
           '<div class="dsl-editor-wrap">' +
-            '<div class="squircle-corner-tools">' +
-              '<button class="squircle-corner-btn" id="copyDslBtn" title="copy the tree text">' +
-                '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>' +
-              '</button>' +
-              '<button class="squircle-corner-btn" id="historyToggleBtn" title="version history">' +
-                '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /><path d="M12 8v4l3 2" /></svg>' +
-              '</button>' +
-              '<button class="squircle-corner-btn danger" id="deleteAllBtn" title="delete the entire tree">' +
-                '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>' +
-              '</button>' +
-            '</div>' +
-            '<div class="history-dropdown" id="historyDropdown">' +
-              '<div class="history-snapshots" id="historySnapshots"></div>' +
-            "</div>" +
             '<div class="dsl-editor-scroll">' +
               '<div class="dsl-inner" id="dslInner">' +
                 '<div class="dsl-highlight" id="dslHighlight" aria-hidden="true"></div>' +
                 '<textarea id="dslTextarea" class="dsl-textarea" spellcheck="false" wrap="soft" placeholder="write your first question…"></textarea>' +
+                '<div class="dsl-ref-controls" id="dslRefControls" aria-hidden="true"></div>' +
+              "</div>" +
+            "</div>" +
+            // copy/delete-all toolbar removed entirely per later ask — the
+            // only remaining control on the editor itself is history, below.
+            //
+            // history control: lives at the bottom, shifted in a bit from
+            // the left edge, below the editor's bottom edge, invisible until
+            // you hover that strip (see .dsl-history-zone in style.css).
+            '<div class="dsl-history-zone" id="dslHistoryZone">' +
+              '<button class="squircle-corner-btn dsl-history-btn" id="historyToggleBtn" title="version history">' +
+                '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /><path d="M12 8v4l3 2" /></svg>' +
+              '</button>' +
+              '<div class="history-dropdown" id="historyDropdown">' +
+                '<div class="history-snapshots" id="historySnapshots"></div>' +
               "</div>" +
             "</div>" +
           "</div>" +
@@ -82,6 +99,14 @@
             '<div class="canvas-scroll">' +
               '<div class="canvas-content" id="canvasContent"></div>' +
             "</div>" +
+            // §3c: canvas dissolves near the screen's right edge only,
+            // aligned to the DSL editor's own top/bottom box — every other
+            // edge is a hard cutoff via .canvas-scroll's overflow:hidden,
+            // no gradient needed there. See the .canvas-fade rules in
+            // style.css for why this is a gradient overlay, not mask-image.
+            // Fixed in the viewport (sibling of canvas-scroll, not
+            // canvas-content), so it doesn't pan with the tree.
+            '<div class="canvas-fade canvas-fade-right"></div>' +
           "</div>" +
           '<div class="dsl-warning" id="dslWarning"></div>' +
         "</div>" +
@@ -90,10 +115,6 @@
     document.getElementById("paneBtnDsl").onclick = () => setPane("dsl");
     document.getElementById("paneBtnCanvas").onclick = () => setPane("canvas");
     document.getElementById("historyToggleBtn").onclick = toggleHistory;
-    const copyBtn = document.getElementById("copyDslBtn");
-    if (copyBtn) copyBtn.onclick = copyDslText;
-    const delBtn = document.getElementById("deleteAllBtn");
-    if (delBtn) delBtn.onclick = deleteAllText;
 
     const el = ta();
     el.addEventListener("input", (e) => {
@@ -143,6 +164,23 @@
       return idx;
     };
     el.addEventListener("mousedown", (e) => {
+      // Only arm line-drag when the press starts near the LEFT EDGE of a line
+      // (declaration column or the 2ch body-indent column) — this is the same
+      // zone the gutter "+" buttons live in. A mousedown anywhere else in the
+      // line is normal text-selection/caret placement and must be left alone.
+      // Previously this armed on every mousedown in the textarea, so any
+      // vertical drag-select of multiple lines (a completely normal text
+      // selection) got reinterpreted as "move this line" on mouseup —
+      // silently discarding the selection and reordering DSL text. That was
+      // the "canvas and selection is broken" bug.
+      // Vertical dragging still works in BOTH senses: dragging near the left
+      // edge still moves/reorders the line (this listener), and dragging
+      // ANYWHERE else — including a vertical multi-line drag — still does
+      // normal browser text selection, because outside this 32px zone we
+      // never touch the event at all.
+      const rect = el.getBoundingClientRect();
+      const nearLineStart = (e.clientX - rect.left) <= 32; // padding(14px) + ~2ch indent
+      if (!nearLineStart) { _lineDrag = null; return; }
       _lineDrag = { y0: e.clientY, from: yToLine(e.clientY), active: false };
     });
     window.addEventListener("mousemove", (e) => {
@@ -175,22 +213,35 @@
 
     // drag anywhere on empty canvas to PAN it (left/right and up/down) — the
     // scroll container persists across re-renders so this is wired once here.
+    // Transform-based (see _canvasPan/applyCanvasPan above), NOT native
+    // scrollLeft/scrollTop — the old scroll-based approach only visibly
+    // moved when the tree was bigger than the viewport.
     const scroll = document.querySelector(".canvas-scroll");
     if (scroll) {
       let pan = null;
       scroll.addEventListener("mousedown", (e) => {
-        if (e.target.closest("[data-canvas-card], .canvas-ghost-slot, .canvas-recall-popover, .canvas-naming, button, textarea, input")) return;
-        pan = { x: e.clientX, y: e.clientY, sl: scroll.scrollLeft, st: scroll.scrollTop };
+        if (e.target.closest("[data-canvas-card], .canvas-ghost-slot, .canvas-recall-popover, button, textarea, input")) return;
+        pan = { x: e.clientX, y: e.clientY, px: _canvasPan.x, py: _canvasPan.y };
         scroll.classList.add("grabbing");
         e.preventDefault();
       });
       window.addEventListener("mousemove", (e) => {
         if (!pan) return;
-        // drag pans the canvas in BOTH dimensions
-        scroll.scrollLeft = pan.sl - (e.clientX - pan.x);
-        scroll.scrollTop = pan.st - (e.clientY - pan.y);
+        // drag pans the canvas in BOTH dimensions, unbounded
+        _canvasPan.x = pan.px + (e.clientX - pan.x);
+        _canvasPan.y = pan.py + (e.clientY - pan.y);
+        applyCanvasPan();
       });
       window.addEventListener("mouseup", () => { if (pan) { pan = null; scroll.classList.remove("grabbing"); } });
+
+      // The ONLY way to move the canvas is 2D drag — .canvas-scroll is
+      // `overflow: hidden` now (was `auto`), so native
+      // wheel/trackpad/scrollbar/touch scrolling is structurally impossible,
+      // not just prevented. These listeners are a defensive backstop in
+      // case any browser still tries to scroll a hidden-overflow box (rare,
+      // but cheap to guard against).
+      scroll.addEventListener("wheel", (e) => { e.preventDefault(); }, { passive: false });
+      scroll.addEventListener("touchmove", (e) => { if (pan) e.preventDefault(); }, { passive: false });
     }
   };
 
@@ -270,47 +321,10 @@
     window.renderDslEditor();
   }
 
-  // ── copy the whole tree text to the clipboard, with a brief confirmation
-  // and an execCommand fallback for browsers without the async clipboard API
-  // (or where it's blocked). This is what the corner "copy" button does. ──
-  function copyDslText() {
-    const t = text();
-    const btn = document.getElementById("copyDslBtn");
-    const flash = () => {
-      if (!btn) return;
-      btn.classList.add("copied");
-      btn.title = "copied";
-      clearTimeout(btn._copyTimer);
-      btn._copyTimer = setTimeout(() => { btn.classList.remove("copied"); btn.title = "copy the tree text"; }, 1200);
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(t).then(flash).catch(() => fallbackCopy(t, flash));
-    } else {
-      fallbackCopy(t, flash);
-    }
-  }
-  function fallbackCopy(t, done) {
-    try {
-      const scratch = document.createElement("textarea");
-      scratch.value = t;
-      scratch.style.position = "fixed";
-      scratch.style.left = "-9999px";
-      document.body.appendChild(scratch);
-      scratch.focus();
-      scratch.select();
-      const ok = document.execCommand && document.execCommand("copy");
-      document.body.removeChild(scratch);
-      if (ok) done && done();
-    } catch (_) {}
-  }
-  // ── delete the ENTIRE tree text (the "x" in the editor pill). Confirmed,
-  // since it wipes everything — version history still holds prior snapshots
-  // to scrub back to. ──
-  function deleteAllText() {
-    if (!text().trim()) return;
-    if (!confirm("Delete the entire tree? You can scrub back through version history.")) return;
-    mutate("");
-  }
+  // copyDslText/fallbackCopy/deleteAllText removed along with the
+  // copy/delete-all toolbar buttons — deletion still works from the DSL
+  // text itself (select + delete), version history still holds prior
+  // snapshots to scrub back to.
   function scrubTo(i) {
     const snap = _snapshots[i];
     if (!snap) return;
@@ -475,16 +489,80 @@
     // isn't laid out yet (clientWidth 0, e.g. hidden mobile pane).
     const m = el.clientWidth ? measureLineTops(t, el) : null;
     const lineCount = (t.match(/\n/g) || []).length + 1;
-    // size to content (the editor grows upward from the bottom, so it never
+    // size to content (the editor grows DOWNWARD from the top now, so it never
     // takes more room than the text needs); a small floor keeps an empty editor
     // tappable.
     inner.style.height = Math.max(LINE_H + 16, m ? m.total : (lineCount + 1) * LINE_H) + "px";
+
+    const parsed = TM().parse(t);
+
+    // §3e: one highlight band per block, spanning its declaration line AND
+    // every reference/recall line under it as a SINGLE encapsulating shape —
+    // a node and everything that points back to it read as one thing, not
+    // two different shades. Painted BEHIND the (transparent-background)
+    // textarea via #dslHighlight, pointer-events:none throughout, so the
+    // real text stays fully editable/selectable on top and nothing here
+    // ever intercepts a click. True per-line font-size/truncation for
+    // references isn't achievable in a plain <textarea> (it only ever
+    // renders one uniform font for its whole value) — this single-band
+    // grouping is the closest encapsulation available without moving to a
+    // contenteditable-based editor, which would be a bigger, separately-
+    // decided rewrite.
+    const hl = document.getElementById("dslHighlight");
+    if (hl) {
+      hl.innerHTML = "";
+      if (m) {
+        parsed.blocks.forEach((b) => {
+          if (b.rawLine >= m.tops.length) return;
+          const lastLine = Math.min(b.bodyEndRawLine - 1, m.tops.length - 1);
+          if (lastLine < b.rawLine) return;
+          const band = document.createElement("div");
+          band.className = "dsl-hl-band";
+          band.style.top = m.tops[b.rawLine] + "px";
+          band.style.height = (m.bottoms[lastLine] - m.tops[b.rawLine]) + "px";
+          hl.appendChild(band);
+        });
+      }
+    }
+
+    // hover-× to detach a single reference line, without touching the
+    // target block or any other reference to it. Lives ABOVE the textarea
+    // (unlike the highlight bands behind it) so it's actually clickable —
+    // pointer-events:none on the container keeps every other pixel
+    // click-through to the textarea beneath; only the small per-row hover
+    // zone near the right edge (not the whole row — that would block
+    // clicking into the reference text itself) opts back in.
+    const refCtl = document.getElementById("dslRefControls");
+    if (refCtl) {
+      refCtl.innerHTML = "";
+      if (m) {
+        parsed.blocks.forEach((b) => {
+          for (let r = b.rawLine + 1; r < b.bodyEndRawLine && r < m.tops.length; r++) {
+            const info = TM().sourceInfoAt(t, r);
+            if (!info || info.kind === "header") continue;
+            const zone = document.createElement("div");
+            zone.className = "dsl-ref-x-zone";
+            zone.style.top = m.tops[r] + "px";
+            zone.style.height = (m.bottoms[r] - m.tops[r]) + "px";
+            const x = document.createElement("button");
+            x.className = "dsl-ref-x";
+            x.title = "remove this reference";
+            x.textContent = "✕";
+            x.onclick = ((rawLine) => (e) => {
+              e.stopPropagation();
+              mutate(TM().detachReference(text(), rawLine));
+            })(r);
+            zone.appendChild(x);
+            refCtl.appendChild(zone);
+          }
+        });
+      }
+    }
 
     // gutter "+" — one per empty leaf line (a text question with nowhere to
     // go yet), sitting on the line right below the question where the next
     // reference would be typed.
     inner.querySelectorAll(".dsl-gutter-btn").forEach((n) => n.remove());
-    const parsed = TM().parse(t);
     parsed.blocks.forEach((b) => {
       const empty = b.type === "text" && !b.next && !b.terminal;
       if (!empty) return;
@@ -507,6 +585,26 @@
       };
       inner.appendChild(btn);
     });
+
+    // the ONE other visible "+": at the very bottom of the whole document,
+    // to start a new disconnected/next top-level thought. Clicking it
+    // inserts relative to the CURRENT CURSOR position, not always the
+    // physical end of a (possibly long) document — see
+    // insertNewBlockAfter's comment in tree-model.js.
+    const endBtn = document.createElement("button");
+    endBtn.className = "dsl-gutter-btn dsl-gutter-btn-end";
+    endBtn.title = "start a new question";
+    endBtn.textContent = "+";
+    endBtn.style.top = (m ? m.total : lineCount * LINE_H) + "px";
+    endBtn.onclick = () => {
+      const caret = el.selectionStart != null ? el.selectionStart : text().length;
+      const before = text().slice(0, caret);
+      const atRawLine = (before.match(/\n/g) || []).length;
+      const uniq = TM().uniqueName(parsed, "new question");
+      const res = TM().insertNewBlockAfter(text(), atRawLine, uniq);
+      mutate(res.text, res);
+    };
+    inner.appendChild(endBtn);
   }
 
   // ── canvas ───────────────────────────────────────────────────────────
@@ -674,6 +772,13 @@
       // leftmost node clears it; you can still drag/scroll it left under the editor.
       content.style.marginLeft = (editorW + Math.max(0, ((vw - editorW) - canvas.w) / 2)) + "px";
     }
+    // reapply the persisted pan offset on top of the margins above — the
+    // margins set the DEFAULT (0,0-pan) position, the transform is
+    // whatever the user has dragged to since. innerHTML below only clears
+    // children, not this element's own inline transform, but setting it
+    // explicitly here keeps pan correct even if something else ever resets
+    // canvasContent's style.
+    applyCanvasPan();
     content.innerHTML = "";
 
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -724,49 +829,24 @@
     canvas.nodes.forEach((n) => content.appendChild(buildCardEl(n, canvas.recallOptions)));
 
     canvas.nodes.filter((n) => n.ghost).forEach((n) => content.appendChild(buildGhostSlotEl(n)));
-
-    if (_naming) {
-      const wrap = document.createElement("div");
-      wrap.className = "canvas-naming"; wrap.style.left = _naming.x + "px"; wrap.style.top = _naming.y + "px";
-      const input = document.createElement("input");
-      input.type = "text"; input.placeholder = "new question…"; input.autofocus = true;
-      wrap.appendChild(input);
-      content.appendChild(wrap);
-      setTimeout(() => input.focus(), 0);
-      let done = false;
-      const commit = () => {
-        if (done) return; done = true;
-        const val = input.value.trim();
-        const fromName = _naming.fromName;
-        _naming = null;
-        if (val) {
-          const res = TM().addConnectedChild(text(), fromName, val);
-          mutate(res.text, res);
-        } else window.renderDslEditor();
-      };
-      const cancel = () => { if (done) return; done = true; _naming = null; window.renderDslEditor(); };
-      input.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") { e.preventDefault(); commit(); }
-        else if (e.key === "Escape") { e.preventDefault(); cancel(); }
-      });
-      input.addEventListener("blur", commit);
-    }
   }
 
   function buildCardEl(n, recallOptions) {
     const isTerm = n.isTerminal;
     const card = document.createElement("div");
-    card.className = "canvas-card" + (isTerm ? " terminal" : "") + (n.isDuplicate ? " duplicate" : "") + (n.isChoice ? " choice" : "");
+    card.className = "canvas-card" + (isTerm ? " terminal" : "") + (n.isDuplicate ? " duplicate" : "") + (n.isChoice ? " choice" : "") + (_selectedCard === n.name && !isTerm ? " selected" : "");
     card.style.left = n.x + "px"; card.style.top = n.y + "px"; card.style.width = n.w + "px"; card.style.height = n.h + "px";
     card.dataset.canvasCard = n.name || "";
 
+    // §3d: the canvas is view-only now — no more click-a-card's-text-to-
+    // rename. All real authoring happens in the DSL editor. Clicking a card
+    // (below) toggles a metadata readout above it instead (kind + recall
+    // status). The _editingName inline-textarea branch right below is KEPT
+    // — it's still how a brand-new node (created via "+") gets its first
+    // name typed in, which is a separate, still-valid flow (see §3e for
+    // where "+" moves next; not touched by this pass).
     const label = document.createElement("div");
     label.className = "canvas-card-text";
-    if (!isTerm && n.name && _editingName !== n.name && !mobile()) {
-      label.classList.add("editable");
-      label.title = "click to rename — updates everywhere this question is used";
-      label.onclick = (e) => { e.stopPropagation(); _editingName = n.name; window.renderDslEditor(); };
-    }
     if (_editingName === n.name && !isTerm) {
       label.classList.add("editing"); // un-clamps the label so the input gets the whole card, not one line
       const input = document.createElement("textarea");
@@ -820,28 +900,24 @@
       card.appendChild(tag);
     }
 
-    if (!isTerm && !mobile()) { // mobile is read-only: no delete/recall/drag/hover affordances
-      const del = document.createElement("button");
-      del.className = "canvas-del-btn"; del.title = "delete"; del.textContent = "✕";
-      del.onclick = (e) => { e.stopPropagation(); mutate(TM().deleteBlock(text(), n.name)); };
-      card.appendChild(del);
+    // §3d node metadata — ALWAYS visible now (was gated behind clicking the
+    // card to "select" it). Two independent floating labels rather than one
+    // panel: the kind reads above the card at all times; the memory/recall
+    // status sits beside its own toggle button below, since that's the
+    // thing it's actually describing. Both read-only — the recall STATE is
+    // changed via the dedicated bottom-left button, not from here.
+    if (!isTerm && !mobile()) {
+      const kind = document.createElement("div");
+      kind.className = "canvas-card-kind";
+      kind.textContent = n.isChoice ? "multiple choice" : "text response";
+      card.appendChild(kind);
+    }
 
-      // Right-click to delete (desktop), long-press to delete (mobile/touch)
-      let _holdTimer = null;
-      card.addEventListener("contextmenu", (e) => {
-        e.preventDefault();
-        if (confirm('Delete "' + n.name + '"?')) mutate(TM().deleteBlock(text(), n.name));
-      });
-      card.addEventListener("touchstart", (e) => {
-        _holdTimer = setTimeout(() => {
-          _holdTimer = null;
-          if (confirm('Delete "' + n.name + '"?')) mutate(TM().deleteBlock(text(), n.name));
-        }, 700);
-      }, { passive: true });
-      card.addEventListener("touchend", () => { clearTimeout(_holdTimer); _holdTimer = null; }, { passive: true });
-      card.addEventListener("touchmove", () => { clearTimeout(_holdTimer); _holdTimer = null; }, { passive: true });
-
+    if (!isTerm && !mobile()) { // mobile is read-only: no recall/drag/hover affordances, no delete at all (deletion happens in the DSL editor now)
       const recall = document.createElement("button");
+      // bottom-LEFT now (was middle-right) — still its own independently
+      // clickable toggle, separate from the whole-card click that shows/
+      // hides the metadata panel above.
       recall.className = "canvas-recall-btn" + (n.recallTarget ? " on" : "");
       recall.title = "recall past answers (from this question, or another)";
       recall.innerHTML = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></svg>';
@@ -861,12 +937,22 @@
       };
       card.appendChild(recall);
 
+      // memory status — ALWAYS visible now (was hidden inside the metadata
+      // panel that only showed on click), sitting directly beside its own
+      // button rather than floating disconnected above the card.
+      const recallStatus = document.createElement("div");
+      recallStatus.className = "canvas-card-recall-status" + (n.recallTarget ? " on" : "");
+      recallStatus.textContent = n.recallTarget ? "memory enabled" : "memory disabled";
+      card.appendChild(recallStatus);
+
       // the "+" itself lives at the ghost slot (see buildGhostSlotEl), drawn
       // at the actual spot the next question would land, not pinned to the
       // card corner — the card body itself is the drag handle for linking
-      // this question in elsewhere.
+      // this question in elsewhere, AND (on a plain click with no drag
+      // movement) toggles a selection border — see the `!moved` branch in
+      // startCardDrag's mouseup handler.
       card.addEventListener("mousedown", (e) => {
-        if (e.target.closest(".canvas-card-text, .canvas-del-btn, .canvas-recall-btn, .canvas-recall-popover, textarea, input")) return;
+        if (e.target.closest(".canvas-card-text, .canvas-recall-btn, .canvas-recall-popover, textarea, input")) return;
         startCardDrag(e, n.name);
       });
 
@@ -928,6 +1014,13 @@
     if (_recallOpenFor === n.name) {
       const pop = document.createElement("div");
       pop.className = "canvas-recall-popover";
+      // header — .canvas-recall-popover-hdr already existed in style.css but
+      // nothing ever created the element, so this menu was rendering as a
+      // bare option list with no label at all. Filling that gap in.
+      const hdr = document.createElement("div");
+      hdr.className = "canvas-recall-popover-hdr";
+      hdr.textContent = "recall answers from:";
+      pop.appendChild(hdr);
       // single-select menu, checkmark on the current target. Picking an option
       // just changes which question's answers are recalled and keeps the menu
       // open (close by clicking off, or toggle the whole thing off via the
@@ -1016,7 +1109,9 @@
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
       _cardDrag = null;
-      if (!moved) { window.renderDslEditor(); return; }
+      // a plain click (no drag movement) toggles the metadata panel — §3d:
+      // clicking a node shows/hides its kind + recall status above it.
+      if (!moved) { _selectedCard = _selectedCard === name ? null : name; window.renderDslEditor(); return; }
       const el = document.elementFromPoint(ev.clientX, ev.clientY);
       const cardEl = el && el.closest ? el.closest("[data-canvas-card]") : null;
       const targetName = cardEl && cardEl.dataset.canvasCard;
@@ -1029,8 +1124,11 @@
 
   // ghost slot: the "+" now lives where the next question would actually be
   // drawn (see buildCanvas's ghostColRow) instead of pinned to the card
-  // corner. Both a click and a drag-to-empty-space open the same "type a
-  // new question" popover (_naming); dragging it onto an existing card
+  // corner. Both a click and a drag-to-empty-space create the new question
+  // immediately and drop straight into an inline rename on the card itself
+  // (_editingName, see startPlusDrag's onUp) — no separate "type a name"
+  // popover step anymore (that was `_naming`, removed as dead code: nothing
+  // ever set it to a truthy value). Dragging the "+" onto an existing card
   // links that question in instead (connectExisting).
   function buildGhostSlotEl(n) {
     const el = document.createElement("div");

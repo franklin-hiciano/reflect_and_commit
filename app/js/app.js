@@ -104,8 +104,26 @@ window.setDslText = function (newText, selRange, snapshotWeight) {
 
 // ---------- firestore hooks ----------
 let lastRenderedTree = null;
+// first-tree auto-trigger: a brand-new signed-in user with a genuinely empty
+// tree gets seeded with the onboarding META_TREE (js/meta-tree.js) instead of
+// landing on a blank DSL editor with nothing to walk. Gated on a one-time
+// local flag (same pattern as rc_seen_intro/rc_mobile_unveiled elsewhere) so
+// a RETURNING user who deliberately empties their tree later doesn't get
+// silently re-seeded every time _onTreeUpdated fires on an empty doc.
+function maybeSeedFirstTree(text) {
+  try { if (localStorage.getItem("rc_metatree_seeded") === "1") return false; } catch (_) {}
+  const TM = window.TreeModel;
+  if (!TM || !window.META_TREE) return false;
+  let blockCount = 0;
+  try { blockCount = (TM.parse(text || "").blocks || []).length; } catch (_) { return false; }
+  if (blockCount > 0) return false;
+  try { localStorage.setItem("rc_metatree_seeded", "1"); } catch (_) {}
+  window.setDslText(window.META_TREE);
+  return true;
+}
 window._onTreeUpdated = () => {
   if (typeof window._tree === "string") {
+    if (maybeSeedFirstTree(window._tree)) return; // setDslText above already re-renders + persists
     dslText = window._tree;
     saveLocalTree();
     // skip the rebuild entirely while the editor textarea is focused — a
@@ -129,11 +147,13 @@ window._onSettingsUpdated = () => {
 };
 window._onCommitmentsUpdated = () => { commitments = window._commitments || []; renderHomePill(); };
 
-// ---------- home pill: play · commitment · streak · pfp ----------
-// streak = CUMULATIVE commitments kept (can't be broken — measures follow-through,
-// not attendance). The pill text is the most recent live commitment; the dropdown
-// shows hold-to-resolve buttons for it plus the resolved history (green ✓ / gray ✕),
-// newest first. Gray "not done yet" entries don't pile up — only resolved ones stay.
+// ---------- home pill: play · commitment · streak (ideas executed) · pfp ----------
+// streak = CUMULATIVE ideas executed (can't be broken — measures follow-through,
+// not attendance), shown as a lightbulb (gray at 0, lit once >0). The pill text
+// is the most recent live commitment; the dropdown shows hold-to-resolve
+// buttons for it plus the resolved history (time delta for done, ✕ for
+// missed), newest first. Gray "not done yet" entries don't pile up — only
+// resolved ones stay.
 let _commitPillOpen = false;
 function _pillSorted() {
   return (commitments || []).slice().sort((a, b) => new Date(b.dueDate || b.createdAt || 0) - new Date(a.dueDate || a.createdAt || 0));
@@ -149,13 +169,16 @@ function renderHomePill() {
   const streak = document.getElementById("homePillStreak");
   const count = document.getElementById("homePillStreakCount");
   if (count) count.textContent = String(kept);
-  if (streak) streak.classList.toggle("lit", kept > 0);
-  renderPillMetric();
+  if (streak) streak.classList.toggle("lit", kept > 0); // lightbulb: gray at 0, lit once >0
+  // opening the pill (0D → the "open" class) reveals the truncated commit
+  // text AND the dropdown TOGETHER — there's no separate horizontal-only
+  // intermediate stage, both are driven by the same _commitPillOpen flag.
   pill.classList.toggle("open", _commitPillOpen);
   renderCommitDrop(sorted, active);
 }
-// want→done: median mention→done latency (stopwatch) + conversion rate (glass).
-// Opening the app can't move either number — only doing things can.
+// want→done: per-item time delta (shown next to each completed entry) +
+// overall conversion rate (the bottom bar in the dropdown). Opening the app
+// can't move either number — only doing things can.
 function _tsMs(v) {
   if (!v) return null;
   if (typeof v.toMillis === "function") return v.toMillis();
@@ -163,24 +186,9 @@ function _tsMs(v) {
   const t = new Date(v).getTime();
   return isNaN(t) ? null : t;
 }
-function renderPillMetric() {
-  const box = document.getElementById("homePillMetric");
-  if (!box) return;
-  const resolved = (commitments || []).filter((c) => c.status === "done" || c.status === "missed");
-  if (!resolved.length) { box.style.display = "none"; return; }
-  box.style.display = "flex";
-  const done = resolved.filter((c) => c.status === "done");
-  const fill = document.getElementById("pillGlassFill");
-  if (fill) fill.style.height = Math.round((done.length / resolved.length) * 100) + "%";
-  const lat = done.map((c) => { const a = _tsMs(c.createdAt), b = _tsMs(c.resolvedAt); return a && b && b > a ? b - a : null; }).filter(Boolean).sort((x, y) => x - y);
-  const sp = document.getElementById("pillSpeed");
-  if (sp) {
-    if (!lat.length) sp.textContent = "";
-    else {
-      const med = lat[Math.floor(lat.length / 2)] / 86400000;
-      sp.textContent = med >= 1 ? med.toFixed(1) + "d" : Math.max(1, Math.round(med * 24)) + "h";
-    }
-  }
+function _fmtDelta(ms) {
+  const d = ms / 86400000;
+  return d >= 1 ? d.toFixed(1) + "d" : Math.max(1, Math.round(d * 24)) + "h";
 }
 function renderCommitDrop(sorted, active) {
   const drop = document.getElementById("homePillDrop");
@@ -193,10 +201,14 @@ function renderCommitDrop(sorted, active) {
     q.className = "home-pill-drop-active";
     q.textContent = active.text;
     drop.appendChild(q);
+    const label = document.createElement("div");
+    label.className = "home-pill-drop-question";
+    label.textContent = "done?";
+    drop.appendChild(label);
     const row = document.createElement("div");
     row.className = "home-pill-drop-btns";
-    row.appendChild(_holdBtn("I did", "yes", () => _resolvePill(active.id, "done")));
-    row.appendChild(_holdBtn("I didn't", "no", () => _resolvePill(active.id, "missed")));
+    row.appendChild(_holdBtn("yes", "yes", () => _resolvePill(active.id, "done")));
+    row.appendChild(_holdBtn("no", "no", () => _resolvePill(active.id, "missed")));
     drop.appendChild(row);
   }
   const past = sorted.filter((c) => c.status === "done" || c.status === "missed");
@@ -212,11 +224,42 @@ function renderCommitDrop(sorted, active) {
     const item = document.createElement("div");
     item.className = "home-pill-past-item";
     const t = document.createElement("span"); t.textContent = c.text;
-    const m = document.createElement("span"); m.className = "mark " + c.status; m.textContent = c.status === "done" ? "✓" : "✕";
-    item.appendChild(t); item.appendChild(m);
+    item.appendChild(t);
+    if (c.status === "done") {
+      // time delta on the right, instead of a checkmark — how long it took.
+      const a = _tsMs(c.createdAt), b = _tsMs(c.resolvedAt);
+      const ms = a && b && b > a ? b - a : null;
+      const d = document.createElement("span");
+      d.className = "delta";
+      d.textContent = ms ? _fmtDelta(ms) : "";
+      item.appendChild(d);
+    } else {
+      const m = document.createElement("span"); m.className = "mark missed"; m.textContent = "✕";
+      item.appendChild(m);
+    }
     list.appendChild(item);
   });
   drop.appendChild(list);
+  // completion-rate bar — bottom of the dropdown, a clear "x% done" readout.
+  if (past.length) {
+    const doneCount = past.filter((c) => c.status === "done").length;
+    const pct = Math.round((doneCount / past.length) * 100);
+    const rate = document.createElement("div");
+    rate.className = "home-pill-rate";
+    rate.title = "want → done: conversion rate";
+    const bar = document.createElement("div");
+    bar.className = "home-pill-rate-bar";
+    const barFill = document.createElement("div");
+    barFill.className = "home-pill-rate-fill";
+    barFill.style.width = pct + "%";
+    bar.appendChild(barFill);
+    const pctLabel = document.createElement("span");
+    pctLabel.className = "home-pill-rate-pct";
+    pctLabel.textContent = pct + "% done";
+    rate.appendChild(bar);
+    rate.appendChild(pctLabel);
+    drop.appendChild(rate);
+  }
 }
 // hold-to-fill: press and keep holding ~600ms to resolve — a tap does nothing,
 // same contract as the reflection's hold rings.
@@ -254,7 +297,14 @@ window._onSignedIn = () => {
   if (!isPhone() && isStandalone() && !mobileOnboarded()) sendPairingPushToPhone();
 };
 function deviceKind() { return isPhone() ? "mobile" : "desktop"; }
-function isNotifValidated() { return !!(window._deviceData && window._deviceData.notifValidatedAt); }
+// hard, once-only gate: validated means the user set a time AND granted
+// permission, recorded BOTH remotely and locally — the local flag makes the
+// gate immune to the async race where _deviceData hasn't loaded yet (the
+// "let me in first launch, nagged every launch after" bug).
+function isNotifValidated() {
+  try { if (localStorage.getItem("rc_notif_validated") === "1") return true; } catch (_) {}
+  return !!(window._deviceData && window._deviceData.notifValidatedAt);
+}
 function isIOS() { return /iPhone|iPad|iPod/i.test(navigator.userAgent); }
 function isAndroid() { return /Android/i.test(navigator.userAgent); }
 function isChrome() { return /Chrome/.test(navigator.userAgent) && !/Edge|OPR/.test(navigator.userAgent); }
@@ -438,16 +488,14 @@ window.useHereInstead = () => {
   if (shade) shade.classList.remove("on");
   takeOverDevice();
 };
-// account menu trigger (top right) — avatar + name from the signed-in
-// Google account, same source as the cross-device gate's avatar.
+// account menu trigger (inside the home pill) — avatar only, no name text
+// (the name span was removed from both index.html files).
 function renderUserMenu() {
   const avatar = document.getElementById("userMenuAvatar");
-  const name = document.getElementById("userMenuName");
   if (avatar) {
     if (window._userPhoto) { avatar.src = window._userPhoto; avatar.style.display = "block"; }
     else avatar.style.display = "none";
   }
-  if (name) name.textContent = window._userName || "";
 }
 function goHome() { stopVoice(); if (isStandalone()) { enterHome(); } else { showScreen("landingScreen"); resetLandingToIntro(); } }
 // install is required on every device before use — phone AND desktop each
@@ -455,6 +503,20 @@ function goHome() { stopVoice(); if (isStandalone()) { enterHome(); } else { sho
 // Mobile follows a strict linear flow: install → notifications → time → done.
 // Desktop: install, then gate until mobile onboarding is complete (first time only).
 function routeAfterAuth() {
+  // §3g fix: a live reflection must never be interrupted by a routing
+  // re-check. This gets called from several re-entry points beyond initial
+  // sign-in — a focus listener (maybeRecheckStandalone) re-invokes it on
+  // EVERY window refocus with no guard at all, which is what was silently
+  // kicking desktop back to the home/editor screen mid-reflection (the
+  // "switches back to editing mode on its own" bug). Reuses the exact same
+  // "is this draft still today's" staleness check resumePhase() already
+  // relies on elsewhere — a genuinely stale (not-today, or already-done)
+  // draft is still safe to route past.
+  if (
+    document.getElementById("reflectScreen").classList.contains("on") &&
+    draft.active && draft.phase && draft.phase !== "done" && draft.day === todayKey()
+  ) return;
+
   // First thing on first entry: a single-action "Got it" intro screen. One tap
   // and it's never shown again (rc_seen_intro). The user owns the copy.
   if (!hasSeenIntro()) { showScreen("landingScreen"); showGotIt(); return; }
@@ -475,8 +537,10 @@ function routeAfterAuth() {
     // notifications → home. Reflection time defaults to 20:00 and is changed
     // later from the home clock, so it's no longer its own onboarding step.
     if (!isNotifValidated()) {
+      // time FIRST, then permission — the two-step onboarding, exactly once
       showScreen("landingScreen");
-      goToNotifPermission();
+      hideAllLandingPanes();
+      window.goToNotifySetup();
       return;
     }
     completeMobileOnboarding();
@@ -1320,7 +1384,7 @@ window.skipCommit = () => { draft.committed = false; enterDone(false); };
 // -- done --
 function enterDone(committed) {
   stopVoice(); draft.phase = "done"; saveDraft(); setPhase("phaseDone"); setBackVisible(true); setCollapseVisible(false);
-  document.getElementById("doneText").textContent = committed ? "committed. see you tomorrow." : "logged. see you tomorrow.";
+  document.getElementById("doneText").textContent = committed ? "done. see you tomorrow." : "logged. see you tomorrow.";
   const kg = document.getElementById("keepGoingBtn"); kg.style.display = draft.resumeName ? "block" : "none";
 }
 window.keepReflecting = () => { draft.mode = "full"; draft.commitText = ""; draft.history = []; draft.currentName = draft.resumeName; draft.phase = "question"; saveDraft(); renderChat(); };

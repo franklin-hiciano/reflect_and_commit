@@ -296,6 +296,12 @@ window._registerPush = function (kind) {
 
 window._markNotifValidated = async function () {
   if (!uid) return;
+  // Local-first: set the local gate flag immediately, before the remote write
+  // even lands. isNotifValidated() (app.js) reads this first specifically so
+  // the gate can't re-nag while waiting on _deviceData to (re)hydrate from
+  // Firestore — this function only ever runs because validation just
+  // happened, so there's nothing to wait on here.
+  try { localStorage.setItem("rc_notif_validated", "1"); } catch (_) {}
   try {
     await setDoc(uDoc("devices", deviceId()), { notifValidatedAt: serverTimestamp() }, { merge: true });
     // Atomic mobile-completion marker: notifications validated + time pickable

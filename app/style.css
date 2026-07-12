@@ -15,8 +15,10 @@
   --serif: "Amiri", ui-serif, Georgia, "Times New Roman", serif;
   --mono: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --syne: "Syne", var(--mono);
-  --elev: 0 6px 24px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.03);
-  --elev-sm: 0 2px 10px rgba(0,0,0,.5);
+  /* blur radius trimmed down (was 24px/10px — read as way too heavy/diffuse
+     once more elements started using these shadow tokens this session) */
+  --elev: 0 4px 14px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.03);
+  --elev-sm: 0 2px 6px rgba(0,0,0,.45);
   /* Apple continuous-corner exponent — LOWER = rounder/softer, higher = squarer.
      ~2 reads as a plush round; tune to taste on-device. */
   --corner-k: 2.2;
@@ -26,13 +28,13 @@
    everywhere else these elements keep their (now generous) rounded corners.
    Small circular controls stay perfectly round. */
 @supports (corner-shape: superellipse(2)) {
-  .dsl-editor-wrap, .canvas-card, .squircle-corner-tools,
-  .history-dropdown, .canvas-recall-popover, .canvas-naming input, .canvas-ghost-slot,
+  .dsl-editor-wrap, .canvas-card,
+  .history-dropdown, .canvas-recall-popover, .canvas-ghost-slot,
   .user-menu-trigger, .settings-panel, .btn-ghost, .notify-countdown,
   .home-clock-btn, .tree-preview-card, .install-gate, .landing-qr-img {
     corner-shape: superellipse(var(--corner-k));
   }
-  .squircle-corner-btn, .canvas-del-btn, .canvas-recall-btn { corner-shape: round; }
+  .squircle-corner-btn, .canvas-recall-btn { corner-shape: round; }
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; }
@@ -121,13 +123,12 @@ body::after {
 .btn-quiet:hover { color: var(--ink-dim); }
 
 .home-body {
-  /* top padding is just breathing room under .home-topbar (a normal-flow
-     sibling that already reserves its own space) — it used to be 74px, a
-     leftover from an earlier layout where the topbar was absolutely
-     positioned over this area; that padding was pure dead space once it
-     became a sibling instead, and it was the main reason the editor never
-     visually reached "as tall as the screen." */
-  flex: 1; overflow-y: auto; padding: 16px 24px 20px; max-width: 1400px; width: 100%; margin: 0 auto;
+  /* top padding trimmed to near-zero: .home-header-row is now a real
+     normal-flow sibling above this that already reserves its own space
+     (plus its own bottom padding) — the old 16px here was leftover
+     breathing room from before that row existed and was the main reason
+     everything read as pushed too far down. */
+  flex: 1; overflow-y: auto; padding: 2px 24px 20px; max-width: 1400px; width: 100%; margin: 0 auto;
   display: flex; flex-direction: column;
 }
 
@@ -141,42 +142,82 @@ body::after {
 }
 .user-menu-trigger:hover { border-color: var(--ink-dim); }
 
-/* ---------- the home pill: play · commitment · streak · pfp (top-right) ---------- */
+/* ---------- home header row: a full-width strip that is itself invisible
+   (no background/border) — it just reserves a row at the top of the screen
+   and pushes .home-body below it. Its only visible children sit flush RIGHT
+   (was centered): the play circle, then the commitment pill, in that order —
+   nothing else in the row. Normal document flow now (was position:fixed on
+   .home-pill directly, floating over the canvas) so the canvas genuinely
+   starts below it rather than being covered by it. ---------- */
+.home-header-row {
+  position: relative; /* anchors .home-pill-drop below */
+  z-index: 30; display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  /* only as tall as the pill plus a little padding — was 12px/6px
+     (asymmetric, plus .home-body's own leftover top padding on top of
+     it), which read as way too much dead space before .home-body starts. */
+  width: 100%; padding: 8px 16px; flex: none;
+  /* explicit page-bg fill (not literally "no background" as the old comment
+     said) — the canvas is a full-bleed layer underneath everything and can
+     pan anywhere, including up under this row; without a real background
+     here (this row has no blur/backdrop-filter of its own) panned nodes
+     would show straight through the empty space to the left of the pill.
+     Same color as the page, so visually it still reads as "invisible." */
+  background: var(--bg);
+}
+/* ---------- the home pill: commitment text · streak · pfp (avatar only —
+   no name text). The want→done rate and per-item time deltas live in the
+   dropdown now, not in this always-visible row — nothing sits "in the
+   middle" between the commit text and the streak. ---------- */
 .home-pill {
-  position: fixed; top: 12px; right: 12px; z-index: 30; display: flex; align-items: center; gap: 6px;
+  z-index: 30; display: flex; align-items: center; gap: 6px;
   background: var(--surface-3); border: 1px solid var(--line); border-radius: 999px; padding: 5px 6px;
   box-shadow: var(--elev-sm); font-family: var(--serif);
 }
 .home-pill .user-menu-trigger { position: static; background: none; border: none; padding: 0 2px; box-shadow: none; }
+/* standalone circle, sibling of .home-pill inside .home-header-row — no
+   longer nested inside the pill itself. */
 .home-pill-play {
   width: 28px; height: 28px; border-radius: 50%; background: none; border: 1.6px solid #3fa66b;
   color: #3fa66b; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
-  transition: color .2s, border-color .2s;
+  transition: color .2s, border-color .2s; flex: none;
 }
 .home-pill-play:hover { color: #5ecb8b; border-color: #5ecb8b; }
+/* no longer clickable — a plain readout now, the lightbulb below is the
+   expand/collapse trigger (was the chevron on this element). */
 .home-pill-commit {
-  display: flex; align-items: center; gap: 6px; background: none; border: none; color: var(--ink-dim);
-  font-family: var(--serif); font-size: 12.5px; cursor: pointer; padding: 4px 4px; max-width: 260px;
+  display: flex; align-items: center; gap: 6px; color: var(--ink-dim);
+  font-family: var(--serif); font-size: 12.5px; padding: 4px 4px; max-width: 260px;
 }
-.home-pill-commit:hover { color: var(--ink); }
-.home-pill-commit .chev { color: var(--ink-faint); font-size: 14px; }
+/* closed state: hide the WHOLE container, not just the text span inside it —
+   the span alone going display:none still left this div's own padding
+   (4px/4px) taking up real width, which read as a fat, unexplained left
+   margin next to the lightbulb when the pill was collapsed. */
+.home-pill-commit { display: none; }
+.home-pill.open .home-pill-commit { display: flex; }
 .home-pill-commit-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: none; }
 .home-pill.open .home-pill-commit-text { display: inline; }
+/* the lightbulb is a real button now — click to expand/collapse the idea
+   menu (was the chevron/text button above). */
 .home-pill-streak {
   display: flex; align-items: center; gap: 4px; padding: 2px 8px 2px 4px; border: 1px solid var(--line);
-  border-radius: 999px; color: var(--ink-faint);
+  border-radius: 999px; color: var(--ink-faint); background: none; cursor: pointer; font-family: inherit;
+  transition: border-color .2s, color .2s;
 }
-.home-pill-streak .flame { width: 13px; height: 13px; }
+.home-pill-streak:hover { border-color: #35343a; }
+.home-pill-streak .bulb { width: 13px; height: 13px; }
 .home-pill-streak.lit { color: #e08a3c; border-color: #6b4a2a; }
 .home-pill-streak-count { font-family: var(--syne); font-size: 12px; font-weight: 700; color: var(--ink-dim); }
 .home-pill-streak.lit .home-pill-streak-count { color: var(--ink); }
 .home-pill-drop {
-  display: none; position: fixed; top: 52px; right: 12px; z-index: 30; width: 300px;
+  display: none; position: absolute; top: 100%; right: 16px; left: auto; transform: none;
+  margin-top: 4px; z-index: 30; width: 300px;
   background: var(--surface-3); border: 1px solid var(--line); border-radius: 20px; padding: 10px;
   box-shadow: var(--elev); font-family: var(--serif);
 }
 .home-pill-drop.on { display: block; }
 .home-pill-drop-active { font-size: 13px; color: var(--ink); line-height: 1.4; margin: 2px 4px 10px; }
+/* small "done?" label above the yes/no hold buttons */
+.home-pill-drop-question { font-size: 11px; color: var(--ink-faint); margin: 0 4px 6px; }
 .home-pill-drop-btns { display: flex; gap: 8px; margin-bottom: 10px; }
 .home-pill-hold {
   flex: 1; border-radius: 999px; padding: 9px 0; font-family: var(--serif); font-size: 12.5px; cursor: pointer;
@@ -192,15 +233,19 @@ body::after {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   font-size: 12px; color: var(--ink-dim); padding: 6px 4px; border-top: 1px solid var(--line);
 }
-.home-pill-past-item .mark.done { color: #3fa66b; }
 .home-pill-past-item .mark.missed { color: var(--ink-faint); }
+/* time delta on the right of each COMPLETED item (replaces the old ✓ mark —
+   missed items keep the ✕ mark, done items show how long it took instead). */
+.home-pill-past-item .delta { font-family: var(--syne); font-size: 11px; color: #3fa66b; flex: none; }
 .home-pill-empty { font-size: 12px; color: var(--ink-faint); padding: 4px; }
-/* want→done metric: stopwatch (median days) + a little glass filled to the
-   conversion rate. Only real action moves either number. */
-.home-pill-metric { display: flex; align-items: center; gap: 5px; color: var(--ink-faint); padding: 0 2px; }
-.home-pill-metric .speed { font-family: var(--syne); font-size: 11px; color: var(--ink-dim); }
-.home-pill-metric .glass { position: relative; width: 9px; height: 14px; border: 1px solid var(--ink-faint); border-radius: 2px 2px 4px 4px; overflow: hidden; }
-.home-pill-metric .glass-fill { position: absolute; left: 0; right: 0; bottom: 0; background: var(--ink-dim); }
+/* want→done completion rate — a small bar + a clear "x% done" label, at the
+   BOTTOM of the dropdown. Only real action moves this number. Replaces the
+   old always-visible stopwatch+glass metric that used to sit inside the
+   main pill row. */
+.home-pill-rate { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 6px 4px 2px; border-top: 1px solid var(--line); }
+.home-pill-rate-bar { flex: 1; height: 5px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.home-pill-rate-fill { height: 100%; background: #3fa66b; border-radius: 999px; transition: width .4s var(--ease); }
+.home-pill-rate-pct { font-family: var(--syne); font-size: 11px; font-weight: 700; color: var(--ink-dim); flex: none; white-space: nowrap; }
 
 /* line-drag inside the DSL editor */
 .dsl-textarea.line-dragging { cursor: grabbing; caret-color: transparent; }
@@ -214,18 +259,24 @@ body::after {
     width: 88px; height: 88px; border-radius: 50%; background: none; border: 2px solid #3fa66b;
     color: #3fa66b; align-items: center; justify-content: center; cursor: pointer; z-index: 25;
   }
+  /* the header row itself has nothing left to lay out on mobile — both its
+     children go back to fixed positioning below — so collapse it to avoid
+     reserving dead space at the top of the screen. */
+  .home-header-row { position: static; padding: 0; height: 0; min-height: 0; overflow: visible; }
   /* the pill sits at the bottom middle — pfp + streak share it; text always open */
-  .home-pill { top: auto; bottom: calc(14px + env(safe-area-inset-bottom)); left: 50%; right: auto; transform: translateX(-50%); max-width: calc(100% - 20px); }
+  .home-pill { position: fixed; top: auto; bottom: calc(14px + env(safe-area-inset-bottom)); left: 50%; right: auto; transform: translateX(-50%); max-width: calc(100% - 20px); }
+  /* mobile: text (and its container) always shows, regardless of the
+     open/closed toggle that desktop uses. */
+  .home-pill-commit { display: flex; }
   .home-pill-commit-text { display: inline; }
   .home-pill-play { display: none; }
-  .home-pill-drop { top: auto; bottom: calc(66px + env(safe-area-inset-bottom)); left: 12px; right: 12px; width: auto; }
+  .home-pill-drop { position: fixed; top: auto; bottom: calc(66px + env(safe-area-inset-bottom)); left: 12px; right: 12px; transform: none; margin-top: 0; width: auto; }
   .mobile-edit-note {
     display: block; position: fixed; bottom: calc(64px + env(safe-area-inset-bottom));
     left: 0; right: 0; text-align: center; font-family: var(--serif); font-size: 11px; color: var(--ink-faint); z-index: 24;
   }
 }
 .user-menu-avatar { width: 26px; height: 26px; border-radius: 50%; display: block; }
-.user-menu-name { font-family: var(--serif); font-size: 12px; color: var(--ink-dim); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .settings-panel {
   position: fixed; top: calc(60px + env(safe-area-inset-top)); right: 16px; z-index: 44; display: none;
@@ -291,13 +342,15 @@ body::after {
    background — no box around it), and the DSL editor floats as a raised panel
    on a layer ABOVE the canvas, along with the pills and the nodes. */
 .dsl-split:not(.mobile) .canvas-pane { position: absolute; inset: 0; z-index: 0; }
-/* bottom-anchored, auto-growing editor: only as tall as its text (+ toolbar),
-   pinned to the bottom-left, growing UPWARD as you add lines, capped so it never
-   exceeds the canvas. */
+/* top-anchored, auto-growing editor: only as tall as its text (+ toolbar),
+   pinned to the top-left (below the home header row), growing DOWNWARD as you
+   add lines, capped so it never exceeds the canvas. Same total footprint as
+   the old bottom-anchored/grow-upward layout — just flipped which edge is
+   fixed. */
 .dsl-split:not(.mobile) .dsl-pane {
-  position: absolute; top: auto; left: 10px; bottom: 10px; width: 45%; z-index: 5;
-  /* cap: the editor may grow up to the tree's vertical center line (center sits
-     at 38% from the top → editor tops out at 62% of the screen) */
+  position: absolute; top: 10px; left: 10px; bottom: auto; width: 45%; z-index: 5;
+  /* cap: the editor may grow down to the tree's vertical center line (same
+     62%-of-screen ceiling as before, just measured from the top now) */
   flex: none; display: flex; max-height: 62%;
 }
 
@@ -305,18 +358,11 @@ body::after {
    later step); the pane the switcher shows fills the screen. */
 .dsl-split.mobile .dsl-pane, .dsl-split.mobile .canvas-pane { flex: 1 1 auto; position: static; }
 
-/* corner tools — a small overlay tucked in the squircle's top-right corner
-   instead of a header row above it, so the squircle itself gets that space.
-   Sits in dsl-editor-wrap (not dsl-editor-scroll) so it stays fixed in view
-   regardless of how far down the question list is scrolled. */
-/* a single rounded pill holding the editor's controls (preview · copy ·
-   history · delete-all) */
-/* the toolbar now lives at the BOTTOM-LEFT of the editor, in flow below the
-   text, seamless (no pill) — the buttons just float on the editor surface. */
-.squircle-corner-tools {
-  order: 2; align-self: flex-start; z-index: 6; display: flex; align-items: center; gap: 2px;
-  padding: 5px 6px;
-}
+/* small gray label above the DSL editor box */
+.dsl-pane-label { flex: none; font-family: var(--serif); font-size: 11px; color: var(--ink-faint); padding: 0 6px 6px; }
+/* copy/delete-all toolbar (.squircle-corner-tools) removed entirely per a
+   later ask — .squircle-corner-btn base styles stay, still used by the
+   history button below. */
 .squircle-corner-btn {
   width: 24px; height: 24px; border-radius: 50%; background: none; border: none;
   color: var(--ink-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
@@ -324,24 +370,39 @@ body::after {
 }
 /* wireframe buttons just light up (brighter ink), no background fill */
 .squircle-corner-btn:hover, .squircle-corner-btn.on { color: var(--ink); background: none; }
-.squircle-corner-btn.copied { color: #7bbf7b; }
-.squircle-corner-btn.danger:hover { color: #e0937a; background: none; }
+/* history control: lives BELOW the editor's bottom edge, shifted in a bit
+   from the left corner (was flush left:0), invisible until you hover that
+   strip — no longer a persistent toolbar button. Absolutely positioned off
+   dsl-editor-wrap (top:100%) so it doesn't affect the editor's own flex
+   sizing; the dropdown then hangs off THIS zone, opening downward below the
+   revealed button. */
+.dsl-history-zone {
+  position: absolute; left: 20px; top: 100%; z-index: 6;
+  width: 40px; height: 28px;
+}
+.dsl-history-zone .dsl-history-btn { opacity: 0; pointer-events: none; transition: opacity .2s; }
+.dsl-history-zone:hover .dsl-history-btn,
+.dsl-history-zone:focus-within .dsl-history-btn { opacity: 1; pointer-events: auto; }
 .history-dropdown {
-  display: none; position: absolute; bottom: 46px; left: 8px; top: auto; right: auto; z-index: 7; width: 262px; max-width: calc(100% - 16px);
+  display: none; position: absolute; top: 100%; left: 0; margin-top: 4px; z-index: 7; width: 262px; max-width: calc(100% - 16px);
   background: var(--surface-3); border: 1px solid var(--line); border-radius: 18px; padding: 8px; box-shadow: var(--elev);
 }
 .history-dropdown.on { display: block; }
 
 /* overflow stays visible on the outer wrap (not hidden) so the corner tools
-   and history dropdown can extend past its edge without being clipped —
-   the ACTUAL scroll clipping (and matching rounded corners) lives one level
-   in, on dsl-editor-scroll, which is the thing that actually scrolls. */
-.dsl-editor-wrap { flex: 1; border: 1px solid var(--line); border-radius: 34px; position: relative; background: var(--surface); box-shadow: var(--elev); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-.dsl-editor-scroll { position: relative; order: 1; flex: 0 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+   and the history hover-zone/dropdown (both now positioned partly or fully
+   outside the wrap's own box) can extend past its edge without being
+   clipped — the ACTUAL scroll clipping (and matching rounded top corners)
+   lives one level in, on dsl-editor-scroll, which is the thing that
+   actually scrolls. (This used to say overflow:hidden on the wrap, which
+   clipped the history zone into invisibility — fixed alongside moving that
+   control below the editor.) */
+.dsl-editor-wrap { flex: 1; border: 1px solid var(--line); border-radius: 34px; position: relative; background: var(--surface); box-shadow: var(--elev); display: flex; flex-direction: column; min-height: 0; overflow: visible; }
+.dsl-editor-scroll { position: relative; flex: 0 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; border-radius: 34px 34px 0 0; scrollbar-width: none; }
 .dsl-editor-scroll::-webkit-scrollbar { display: none; }
 .dsl-inner { position: relative; width: 100%; }
 .dsl-textarea {
-  position: absolute; left: 0; top: 0; width: 100%; height: 100%; box-sizing: border-box;
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; box-sizing: border-box; z-index: 1;
   background: none; border: none; outline: none; resize: none; overflow-x: hidden; overflow-y: hidden;
   color: var(--ink); font-family: var(--mono); font-size: 13px; line-height: 21px; padding: 14px;
   white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;
@@ -359,6 +420,10 @@ body::after {
 .dsl-gutter-btn {
   position: absolute; left: calc(14px + 1ch); width: 20px; height: 21px; background: none; border: 1px solid var(--line); border-radius: 50%;
   color: var(--ink-faint); font-family: var(--mono); font-size: 13px; cursor: pointer; z-index: 3; padding: 0; line-height: 1; transition: color .2s, border-color .2s;
+  /* §3f: the "+" glyph was vertically off-center — line-height:1 alone
+     doesn't reliably center a glyph against its own font metrics across
+     fonts/browsers; flex centering does. */
+  display: flex; align-items: center; justify-content: center;
 }
 .dsl-gutter-btn:hover { color: var(--ink-dim); border-color: #35343a; }
 
@@ -371,40 +436,88 @@ body::after {
    flex child keeps it centered when it fits and fully scrollable when it doesn't. */
 /* plain scrollable box (both axes); the tree is centered by JS-set margins on
    .canvas-content so nothing clips the scrollable area. Grab to pan. */
-.canvas-scroll { position: absolute; inset: 0; overflow: auto; scrollbar-width: none; cursor: grab; }
+/* overflow:hidden (was auto) — panning is 100% transform-based now (see
+   _canvasPan/applyCanvasPan in dsl-editor.js), not native scrollLeft/
+   scrollTop, so there's no scrollable content for the browser to manage
+   here at all; hidden just clips content that's been panned off-screen. */
+.canvas-scroll { position: absolute; inset: 0; overflow: hidden; scrollbar-width: none; cursor: grab; }
 .canvas-scroll.grabbing { cursor: grabbing; }
 .canvas-scroll::-webkit-scrollbar { display: none; }
 .canvas-content { position: relative; }
+
+/* §3c: canvas fade edge — a single short fade on the RIGHT hand side only,
+   vertically aligned to the exact same box the DSL editor pane occupies
+   (top:10px, height:62% — see .dsl-split:not(.mobile) .dsl-pane below; if
+   that geometry changes, this needs to move with it). Every other edge is a
+   hard cutoff: .canvas-scroll already clips with overflow:hidden, so the
+   left/top/bottom edges just stop cold with no gradient — no separate
+   element needed for that. Gradient overlay (not mask-image) fading to the
+   page background color, a sibling of .canvas-scroll inside .canvas-viewport
+   so it stays fixed in the viewport, not panned with canvas content.
+   pointer-events:none so drag-to-pan and card clicks underneath are
+   unaffected. Desktop-only (canvas fades make no sense against mobile's
+   vertical read-only tree, which doesn't share this viewport). */
+.canvas-fade { position: absolute; z-index: 4; pointer-events: none; display: none; }
+.dsl-split:not(.mobile) .canvas-fade { display: block; }
+.canvas-fade-right {
+  top: 10px; height: 62%; right: 0; width: 26px;
+  background: linear-gradient(to left, var(--bg), transparent);
+}
 /* interior ghost PATHS hide with their "+", revealed together on card hover */
 .ghost-edge.interior { opacity: 0; transition: opacity .15s var(--ease); }
 .ghost-edge.interior.reveal { opacity: 1; }
 /* a hovered node's hypothetical takes priority: anything overlapping it is
    suppressed (slot + its path) until the hover ends */
 .ghost-edge.suppressed { opacity: 0 !important; }
-/* the DSL highlight overlay is built in a later step — inert for now */
-.dsl-highlight { display: none; }
+/* §3e: DSL line highlight overlay — sits BEHIND the (transparent-
+   background) textarea, in the same coordinate space (both fill
+   #dslInner). Bands are positioned in JS (renderDslPane) using the same
+   measureLineTops() data the line-drag feature already relies on.
+   pointer-events:none throughout — this layer never intercepts a click,
+   the textarea on top of it stays fully interactive. */
+.dsl-highlight { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+/* one band per block, spanning its declaration line AND every reference line
+   under it as a single encapsulating shape — there used to be two shades
+   (a brighter one for the declaration, a fainter one for references) but
+   that read as two different things instead of one node; now it's a single
+   gray the whole block sits inside. */
+.dsl-hl-band { position: absolute; left: 0; right: 0; background: rgba(255, 255, 255, 0.05); border-radius: 5px; }
+/* hover-× to detach a single reference line — sits ABOVE the textarea
+   (unlike the highlight bands behind it) so it's actually clickable.
+   pointer-events:none on the container keeps every pixel that ISN'T one of
+   these small per-row zones click-through to the textarea beneath. */
+.dsl-ref-controls { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.dsl-ref-x-zone { position: absolute; right: 4px; width: 30px; pointer-events: auto; }
+.dsl-ref-x {
+  opacity: 0; pointer-events: none; position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  width: 17px; height: 17px; border-radius: 50%; background: var(--surface-3); border: 1px solid var(--line);
+  color: var(--ink-faint); font-size: 8px; line-height: 1; cursor: pointer; padding: 0; transition: opacity .15s, color .2s;
+}
+.dsl-ref-x-zone:hover .dsl-ref-x { opacity: 1; pointer-events: auto; }
+.dsl-ref-x:hover { color: #e0937a; }
 
 .canvas-card {
   position: absolute; box-sizing: border-box; background: var(--surface-2); border: 1px solid var(--line); border-radius: 26px;
   padding: 12px; display: flex; flex-direction: column; justify-content: center; gap: 2px; font-family: var(--serif);
-  box-shadow: var(--elev-sm);
+  box-shadow: var(--elev-sm); cursor: pointer; /* §3d: the whole card is now a click target (toggles the metadata panel) */
 }
-.canvas-card.terminal { background: transparent; border-color: var(--line); box-shadow: none; }
+.canvas-card.terminal { background: transparent; border-color: var(--line); box-shadow: none; cursor: default; }
 .canvas-card.choice { border-color: #3a3944; }
 .canvas-card.duplicate { border-color: #6b3a2a; }
+/* selected = its metadata panel (kind + recall status) is showing above it */
+.canvas-card.selected { border-color: var(--ink-dim); }
 .canvas-card-text {
   font-family: var(--serif); font-size: 12.5px; color: var(--ink); line-height: 1.3; overflow: hidden;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
 /* while editing, the label must NOT clamp — the inline textarea needs the whole
-   card, or it renders one visible line and scrolls the rest (the bug). */
+   card, or it renders one visible line and scrolls the rest (the bug). Still
+   used for the "+"-creates-a-brand-new-node inline-naming flow. */
 .canvas-card-text.editing {
   display: block; -webkit-line-clamp: unset; -webkit-box-orient: unset;
   overflow: visible; flex: 1; height: 100%;
 }
 .canvas-card.terminal .canvas-card-text { color: var(--ink-faint); }
-.canvas-card-text.editable { cursor: text; }
-.canvas-card-text.editable:hover { color: var(--ink); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 2px; }
 /* the inline node editor must be visually identical to the rendered node text —
    same serif, same size, same line-height, same (even) box — so clicking to
    edit doesn't jump fonts or reflow. padding:0 means it inherits the card's even
@@ -416,26 +529,34 @@ body::after {
 }
 .canvas-card-tag { font-family: var(--mono); font-size: 9px; color: var(--ink-faint); letter-spacing: .04em; text-transform: uppercase; }
 .canvas-card-tag.dup { color: #e0937a; text-transform: none; }
-/* x sits at the bottom-right of the node, recall at the middle-right */
-.canvas-del-btn {
-  position: absolute; bottom: -9px; right: -9px; width: 19px; height: 19px; border-radius: 50%; background: #1a1a1c;
-  border: 1px solid var(--line); color: var(--ink-dim); font-size: 10px; line-height: 1; cursor: pointer; padding: 0; z-index: 2;
+/* kind label — floats ABOVE the card, ALWAYS on (not gated by selection
+   anymore — every node shows what kind of response it is at all times). */
+.canvas-card-kind {
+  position: absolute; bottom: 100%; left: 0; margin-bottom: 6px; z-index: 3;
+  padding: 4px 9px; background: var(--surface-3); border: 1px solid var(--line); border-radius: 10px;
+  font-family: var(--serif); font-size: 9px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .04em;
+  white-space: nowrap; box-shadow: var(--elev-sm);
 }
-.canvas-del-btn:hover { color: #e0937a; }
+/* recall now sits bottom-LEFT (was middle-right) — its own independently
+   clickable toggle, separate from the whole-card click above. Deletion no
+   longer has a canvas affordance at all — it happens in the DSL editor. */
 .canvas-recall-btn {
-  position: absolute; top: 50%; right: -9px; transform: translateY(-50%); width: 19px; height: 19px; border-radius: 50%; background: var(--surface-2);
+  position: absolute; bottom: -9px; left: -9px; width: 19px; height: 19px; border-radius: 50%; background: var(--surface-2);
   border: 1px solid var(--line); color: var(--ink-faint); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; z-index: 2;
 }
 .canvas-recall-btn.on { color: var(--purple); border-color: var(--purple-dim); }
+/* memory status — floats directly to the right of the recall button,
+   vertically centered on it, ALWAYS on (not just on hover) so a node's
+   memory state is readable at a glance without touching it. */
+.canvas-card-recall-status {
+  position: absolute; bottom: -13px; left: 15px; z-index: 2;
+  font-family: var(--serif); font-size: 9px; color: var(--ink-faint); white-space: nowrap;
+}
+.canvas-card-recall-status.on { color: var(--purple); }
 .canvas-plus-btn {
   position: absolute; bottom: -11px; right: -11px; width: 22px; height: 22px; border-radius: 50%; background: var(--ink);
   color: #0a0a0b; border: none; font-size: 14px; line-height: 1; cursor: grab; display: flex; align-items: center; justify-content: center;
   padding: 0; font-weight: 600;
-}
-.canvas-naming { position: absolute; z-index: 5; }
-.canvas-naming input {
-  background: var(--surface-3); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font-family: var(--serif);
-  font-size: 13px; padding: 7px 10px; outline: none; width: 180px;
 }
 .canvas-recall-popover {
   position: absolute; top: calc(100% + 10px); left: 0; z-index: 9; width: 220px; background: var(--surface-3); border: 1px solid var(--line); border-radius: 18px; padding: 8px; box-shadow: var(--elev);
@@ -565,22 +686,42 @@ body::after {
 
 /* composer pinned to the bottom (thumb zone) */
 .composer { padding: 10px 20px calc(env(safe-area-inset-bottom) + 14px); border-top: 1px solid var(--line); }
-.composer-bar { display: flex; align-items: flex-end; gap: 8px; }
+/* §3h: one seamless rounded box (like the DSL editor panel) — text on top,
+   a slim toolbar strip below it holding voice + send, no visible seam
+   between them. Was a bare flex ROW of three separate elements (input, mic
+   circle, send circle) sitting side by side; now the box itself carries the
+   background/border and the two children stack inside it. */
+.composer-bar {
+  display: flex; flex-direction: column; background: #111113; border: 1px solid var(--line); border-radius: 20px;
+  transition: border-color .2s;
+}
+.composer-bar:focus-within { border-color: #35343a; }
 .composer-input {
-  flex: 1; min-width: 0; background: #111113; border: 1px solid var(--line); border-radius: 18px;
-  padding: 11px 14px; color: var(--ink); font-family: var(--serif); font-weight: 300; font-size: 15px; line-height: 1.5;
+  flex: none; min-width: 0; background: none; border: none; border-radius: 0;
+  padding: 12px 14px 4px; color: var(--ink);
+  /* §3g: sans, not the serif body font — var(--mono) is actually the
+     Geist sans-serif token despite its name (see the :root definitions). */
+  font-family: var(--mono); font-weight: 300; font-size: 15px; line-height: 1.5;
   resize: none; outline: none; max-height: 132px; overflow-y: auto; caret-color: var(--ink);
 }
-.composer-input:focus { border-color: #35343a; }
 .composer-input::placeholder { color: var(--ink-faint); }
-.composer-mic, .composer-send {
-  flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line);
-  background: transparent; color: var(--ink-dim); cursor: pointer; display: flex; align-items: center; justify-content: center;
-  transition: color .25s, border-color .25s, background .25s;
+.composer-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 2px 8px 8px; }
+/* voice floats — no chrome at all, just the bare icon (same treatment as
+   .squircle-corner-btn elsewhere). Unlike send, this one stays wireframe. */
+.composer-mic {
+  flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; border: none; background: none;
+  color: var(--ink-dim); cursor: pointer; display: flex; align-items: center; justify-content: center;
+  padding: 0; transition: color .25s;
 }
-.composer-send { background: var(--ink); color: #0a0a0b; border-color: var(--ink); }
-.composer-mic:hover { color: var(--ink); border-color: #35343a; }
-.composer-mic.active { color: var(--ink); border-color: var(--ink); animation: micpulse 1.6s var(--ease) infinite; }
+.composer-mic:hover { color: var(--ink); }
+.composer-mic.active { color: var(--ink); animation: micpulse 1.6s var(--ease) infinite; }
+/* send stays filled (solid background) — the one piece of chrome that's
+   deliberately NOT wireframed here, so it still reads as the primary action. */
+.composer-send {
+  flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; border: none;
+  background: var(--ink); color: #0a0a0b; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  padding: 0; transition: background .25s;
+}
 @keyframes micpulse { 0%,100% { box-shadow: 0 0 0 0 rgba(237,237,236,.18); } 50% { box-shadow: 0 0 0 5px rgba(237,237,236,0); } }
 
 .continue-desktop { display: block; margin: 12px auto 2px; background: none; border: none; color: var(--ink-faint);

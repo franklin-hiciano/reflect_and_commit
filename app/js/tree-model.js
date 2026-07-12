@@ -190,6 +190,31 @@ function appendNewBlock(text, name) {
   return { text: newText, rawLine, selStart: start, selEnd: start + name.length };
 }
 
+// §3e: insert a new top-level block declaration immediately after the
+// current cursor position (by rawLine) instead of always at the very end of
+// the document — this is what the single bottom-of-editor "+" uses now. If
+// the given rawLine sits inside an existing block's body, the insertion
+// point moves to right after that block's whole body span, so the new
+// declaration always lands as a genuine new top-level thought, never
+// spliced into the middle of another question's reference list.
+function insertNewBlockAfter(text, atRawLine, name) {
+  const parsed = parse(text);
+  const lines = linesOf(text);
+  let insertAt = atRawLine + 1;
+  for (const b of parsed.blocks) {
+    if (atRawLine >= b.rawLine && atRawLine < b.bodyEndRawLine) { insertAt = b.bodyEndRawLine; break; }
+  }
+  if (insertAt > lines.length) insertAt = lines.length;
+  if (insertAt < 0) insertAt = 0;
+  const needsBlank = insertAt > 0 && (lines[insertAt - 1] || "").trim() !== "";
+  const toInsert = needsBlank ? ["", name] : [name];
+  lines.splice(insertAt, 0, ...toInsert);
+  const rawLine = insertAt + toInsert.length - 1;
+  const newText = joinLines(lines);
+  const start = charOffsetOfLine(newText, rawLine);
+  return { text: newText, rawLine, selStart: start, selEnd: start + name.length };
+}
+
 // insert a bare reference (or brand-new block + reference) as fromName's
 // next body line. If fromName already has exactly one real body line, the
 // new line becomes a second option (auto-promoting it to a choice — no
@@ -433,9 +458,30 @@ function sourceInfoAt(text, rawLine) {
   return { kind: "reference", name: targetText.trim() };
 }
 
+// §3e: detach a single reference/recall line WITHOUT touching the target
+// block itself or any other reference to it — just removes this one pointer
+// line from the DSL text. Used by the DSL editor's hover-× on a reference
+// line. No-op if rawLine isn't actually a reference/recall line (e.g. it's
+// a declaration — declarations are removed via deleteBlock, not this).
+function detachReference(text, rawLine) {
+  const info = sourceInfoAt(text, rawLine);
+  if (!info || info.kind === "header") return text;
+  const lines = linesOf(text);
+  if (rawLine < 0 || rawLine >= lines.length) return text;
+  lines.splice(rawLine, 1);
+  return joinLines(lines);
+}
+
 function dropContext(text, rawLine) {
   const parsed = parse(text);
-  for (const b of parsed.blocks) { if (rawLine === b.rawLine) return { mode: "declaration", beforeName: b.name }; }
+  // `onHeader: true` marks a drop that landed EXACTLY on a declaration
+  // line, as opposed to the fallback case below (dropped on a blank
+  // separator line, resolved to "whichever block comes next") — moveLine
+  // uses this distinction to decide whether a dragged declaration should be
+  // read as "connect this in as an option of the block I landed on" rather
+  // than a plain reorder. Only an exact landing counts; the fallback case
+  // never really means "this specific block," just "somewhere near here."
+  for (const b of parsed.blocks) { if (rawLine === b.rawLine) return { mode: "declaration", beforeName: b.name, onHeader: true }; }
   for (const b of parsed.blocks) { if (rawLine > b.rawLine && rawLine < b.bodyEndRawLine) return { mode: "reference", enclosingName: b.name }; }
   // an empty-bodied leaf has no "inside" row yet — dropping on the row
   // immediately below its header still means "make this its first step"
@@ -454,11 +500,26 @@ function moveLine(text, fromRawLine, toRawLine) {
   const ctx = dropContext(text, toRawLine);
 
   if (src.kind === "header") {
-    if (ctx.mode === "reference") {
+    // §3e drag-to-add-options: dropping an EMPTY leaf declaration exactly
+    // onto another block's declaration line also means "connect this in as
+    // a new option of that block" — not just dropping it inside an
+    // existing body row (the `ctx.mode === "reference"` case below, already
+    // supported). A block that already has real content (blockHasBody)
+    // keeps behaving as a plain reorder when dropped on another header —
+    // reordering fully-built standalone questions is a separate, still-
+    // valid feature and must not be swallowed by this. `onHeader` (only set
+    // for an EXACT landing on a declaration line, see dropContext) keeps
+    // this from also firing on the fallback "dropped near here" case, which
+    // was never really "onto" any specific block.
+    const wantsConnect =
+      ctx.mode === "reference" ||
+      (ctx.mode === "declaration" && ctx.onHeader && ctx.beforeName && norm(ctx.beforeName) !== norm(src.name));
+    if (wantsConnect) {
       const block = resolveName(parse(text), src.name);
       if (blockHasBody(block)) return text; // refuse to demote a real declaration and lose its body
+      const targetName = ctx.mode === "reference" ? ctx.enclosingName : ctx.beforeName;
       const stripped = deleteBlock(text, src.name);
-      return connectExisting(stripped, ctx.enclosingName, src.name);
+      return connectExisting(stripped, targetName, src.name);
     }
     return reorderBlock(text, src.name, ctx.beforeName);
   }
@@ -479,10 +540,10 @@ function moveLine(text, fromRawLine, toRawLine) {
 
 const TreeModel = {
   parse, resolveName, buildGraph,
-  appendNewBlock, addConnectedChild, connectExisting, deleteBlock,
+  appendNewBlock, insertNewBlockAfter, addConnectedChild, connectExisting, deleteBlock,
   setStar, setRecall, reorderBlock, insertBodyLine, renameReferences, renameBlockTitle, referenceTargetOf,
   findDuplicateTitles, findMultipleRoots, uniqueName,
-  sourceInfoAt, dropContext, moveLine,
+  sourceInfoAt, dropContext, moveLine, detachReference,
   isDoneText, norm,
 };
 

@@ -127,10 +127,119 @@ window._onSettingsUpdated = () => {
     }
   }
 };
-window._onCommitmentsUpdated = () => { commitments = window._commitments || []; };
+window._onCommitmentsUpdated = () => { commitments = window._commitments || []; renderHomePill(); };
+
+// ---------- home pill: play · commitment · streak · pfp ----------
+// streak = CUMULATIVE commitments kept (can't be broken — measures follow-through,
+// not attendance). The pill text is the most recent live commitment; the dropdown
+// shows hold-to-resolve buttons for it plus the resolved history (green ✓ / gray ✕),
+// newest first. Gray "not done yet" entries don't pile up — only resolved ones stay.
+let _commitPillOpen = false;
+function _pillSorted() {
+  return (commitments || []).slice().sort((a, b) => new Date(b.dueDate || b.createdAt || 0) - new Date(a.dueDate || a.createdAt || 0));
+}
+function renderHomePill() {
+  const pill = document.getElementById("homePill");
+  if (!pill) return;
+  const sorted = _pillSorted();
+  const active = sorted.find((c) => c.status === "active");
+  const kept = (commitments || []).filter((c) => c.status === "done").length;
+  const txt = document.getElementById("homePillCommitText");
+  if (txt) txt.textContent = active ? active.text : "no commitments to show";
+  const streak = document.getElementById("homePillStreak");
+  const count = document.getElementById("homePillStreakCount");
+  if (count) count.textContent = String(kept);
+  if (streak) streak.classList.toggle("lit", kept > 0);
+  renderPillMetric();
+  pill.classList.toggle("open", _commitPillOpen);
+  renderCommitDrop(sorted, active);
+}
+// want→done: median mention→done latency (stopwatch) + conversion rate (glass).
+// Opening the app can't move either number — only doing things can.
+function _tsMs(v) {
+  if (!v) return null;
+  if (typeof v.toMillis === "function") return v.toMillis();
+  if (v.seconds != null) return v.seconds * 1000;
+  const t = new Date(v).getTime();
+  return isNaN(t) ? null : t;
+}
+function renderPillMetric() {
+  const box = document.getElementById("homePillMetric");
+  if (!box) return;
+  const resolved = (commitments || []).filter((c) => c.status === "done" || c.status === "missed");
+  if (!resolved.length) { box.style.display = "none"; return; }
+  box.style.display = "flex";
+  const done = resolved.filter((c) => c.status === "done");
+  const fill = document.getElementById("pillGlassFill");
+  if (fill) fill.style.height = Math.round((done.length / resolved.length) * 100) + "%";
+  const lat = done.map((c) => { const a = _tsMs(c.createdAt), b = _tsMs(c.resolvedAt); return a && b && b > a ? b - a : null; }).filter(Boolean).sort((x, y) => x - y);
+  const sp = document.getElementById("pillSpeed");
+  if (sp) {
+    if (!lat.length) sp.textContent = "";
+    else {
+      const med = lat[Math.floor(lat.length / 2)] / 86400000;
+      sp.textContent = med >= 1 ? med.toFixed(1) + "d" : Math.max(1, Math.round(med * 24)) + "h";
+    }
+  }
+}
+function renderCommitDrop(sorted, active) {
+  const drop = document.getElementById("homePillDrop");
+  if (!drop) return;
+  drop.classList.toggle("on", _commitPillOpen);
+  if (!_commitPillOpen) return;
+  drop.innerHTML = "";
+  if (active) {
+    const q = document.createElement("div");
+    q.className = "home-pill-drop-active";
+    q.textContent = active.text;
+    drop.appendChild(q);
+    const row = document.createElement("div");
+    row.className = "home-pill-drop-btns";
+    row.appendChild(_holdBtn("I did", "yes", () => _resolvePill(active.id, "done")));
+    row.appendChild(_holdBtn("I didn't", "no", () => _resolvePill(active.id, "missed")));
+    drop.appendChild(row);
+  }
+  const past = sorted.filter((c) => c.status === "done" || c.status === "missed");
+  const list = document.createElement("div");
+  list.className = "home-pill-past";
+  if (!past.length && !active) {
+    const e = document.createElement("div");
+    e.className = "home-pill-empty";
+    e.textContent = "no commitments to show";
+    list.appendChild(e);
+  }
+  past.forEach((c) => {
+    const item = document.createElement("div");
+    item.className = "home-pill-past-item";
+    const t = document.createElement("span"); t.textContent = c.text;
+    const m = document.createElement("span"); m.className = "mark " + c.status; m.textContent = c.status === "done" ? "✓" : "✕";
+    item.appendChild(t); item.appendChild(m);
+    list.appendChild(item);
+  });
+  drop.appendChild(list);
+}
+// hold-to-fill: press and keep holding ~600ms to resolve — a tap does nothing,
+// same contract as the reflection's hold rings.
+function _holdBtn(label, kind, onHold) {
+  const b = document.createElement("button");
+  b.className = "home-pill-hold " + kind;
+  b.textContent = label;
+  let timer = null;
+  const start = (e) => { e.preventDefault(); b.classList.add("holding"); timer = setTimeout(() => { b.classList.remove("holding"); onHold(); }, 600); };
+  const stop = () => { b.classList.remove("holding"); clearTimeout(timer); timer = null; };
+  b.addEventListener("mousedown", start); b.addEventListener("touchstart", start, { passive: false });
+  ["mouseup", "mouseleave", "touchend", "touchcancel"].forEach((ev) => b.addEventListener(ev, stop));
+  return b;
+}
+function _resolvePill(id, status) {
+  window._resolveCommitment && window._resolveCommitment(id, status);
+  _commitPillOpen = false;
+  renderHomePill();
+}
+window.toggleCommitPill = () => { _commitPillOpen = !_commitPillOpen; renderHomePill(); };
 window._onDraftUpdated = () => { const rd = window._remoteDraft; if (rd && rd.active && !draft.active) { draft = { ...blankDraft(), ...rd }; localStorage.setItem(LS_DRAFT, JSON.stringify(draft)); } };
 window._onSignedIn = () => {
-  window.renderDslEditor(); renderSettings();
+  window.renderDslEditor(); renderSettings(); renderHomePill();
   // notifications are a phone-only concern — desktop is purely for growing the
   // tree, so it neither runs the local reflection-reminder loop nor registers
   // for push. (Sending a pairing ping TO the phone still works — that uses the
@@ -1137,39 +1246,73 @@ window.goBackPhase = () => {
   else if (draft.phase === "done") { enterCommit(); }
 };
 
-// -- commit --
+// -- convergence capture (the commit card is GONE) --
+// The reflection just ends; one LLM call reads the transcript for the LAST
+// concrete thing you said you'd do — or even mentioned doing — and stores it as
+// the commitment. Capture at peak, not ceremony after it. Closing the loop is
+// the passive layup in the home pill (hold "I did"/"I didn't"), never a push.
+const LLM_ENDPOINT = "http://34.26.134.74:3001/v1/chat/completions";
+const LLM_KEY = "sk-bf-6a54c177-3684-411e-8b0a-1bb4e11102e9";
+function reflectionTranscript() {
+  const ans = draft.answers || {};
+  const seen = new Set();
+  const parts = [];
+  const push = (q) => { if (q && ans[q] != null && !seen.has(q)) { seen.add(q); parts.push("Q: " + q + "\nA: " + ans[q]); } };
+  (draft.history || []).forEach(push);
+  push(draft.lastQuestionName); push(draft.currentName);
+  if (!parts.length) Object.keys(ans).forEach(push);
+  return parts.join("\n\n");
+}
+async function captureConvergence() {
+  const transcript = reflectionTranscript();
+  if (!transcript.trim()) return;
+  try {
+    const res = await fetch(LLM_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + LLM_KEY },
+      body: JSON.stringify({
+        model: "free-agent-pool",
+        temperature: 0,
+        messages: [
+          { role: "system", content: "From this reflection transcript, extract the LAST concrete thing the person said they would do, or even just mentioned doing — the most recent actionable intention, however lightly stated. Reply with ONE short imperative line only. If there is none, reply exactly NONE." },
+          { role: "user", content: transcript },
+        ],
+      }),
+    });
+    const data = await res.json();
+    const out = (((data.choices || [])[0] || {}).message || {}).content || "";
+    const line = out.trim().split("\n")[0].trim();
+    if (!line || /^none$/i.test(line)) return;
+    const d = new Date(); d.setDate(d.getDate() + 1);
+    window._addCommitment && window._addCommitment({ text: line, dueDate: d.toISOString().slice(0, 10) });
+  } catch (_) { /* endpoint unreachable — nothing captured, nothing broken */ }
+}
+// first-tree: if what was just walked is the onboarding META_TREE, the starred
+// answer names their nightly questions — compile them into their first real
+// tree, deterministically (no model).
+function maybeCompileMetaWalk() {
+  if (!window.META_TREE || !window.compileQuestionsToTree) return false;
+  const metaRoot = window.META_TREE.split("\n")[0].trim();
+  const parsed = getParsed();
+  if (!parsed.blocks.length || parsed.blocks[0].name !== metaRoot) return false;
+  const ans = draft.answers || {};
+  const starName = "for each behavior, what could you ask yourself every night to stay on it?";
+  const raw = ans[starName] || "";
+  const questions = raw.split(/\n|(?<=\?)\s+/).map((s) => s.trim()).filter(Boolean);
+  const compiled = window.compileQuestionsToTree(questions);
+  if (!compiled) return false;
+  window.setDslText && window.setDslText(compiled);
+  return true;
+}
 function enterCommit() {
-  stopVoice(); draft.phase = "commit"; saveDraft(); setPhase("phaseCommit"); setBackVisible(true); setCollapseVisible(false);
-  const field = document.getElementById("commitField");
-  field.value = draft.commitText || ""; autoGrow(field);
-  field.oninput = () => { draft.commitText = field.value; autoGrow(field); saveDraft(); };
-  field.onkeydown = (e) => { if (e.key === "Enter") e.preventDefault(); };
-  renderDueSelect();
-  wireHold("commitHold", "commitRingFill", doCommit);
-  setTimeout(() => field.focus(), 60);
-}
-function renderDueSelect() {
-  const sel = document.getElementById("commitDueSelect"); if (!sel) return;
-  sel.innerHTML = "";
-  for (let i = 1; i <= 7; i++) {
-    const d = new Date(); d.setDate(d.getDate() + i);
-    const opt = document.createElement("option"); opt.value = d.toISOString().slice(0, 10);
-    opt.textContent = i === 1 ? "tomorrow" : d.toLocaleDateString(undefined, { weekday: "long" }).toLowerCase();
-    sel.appendChild(opt);
+  stopVoice();
+  if (!draft.captured) {
+    draft.captured = true; saveDraft();
+    if (!maybeCompileMetaWalk()) captureConvergence();
   }
-  sel.value = draft.commitDue && sel.querySelector(`option[value="${draft.commitDue}"]`) ? draft.commitDue : sel.options[0].value;
-  draft.commitDue = sel.value; saveDraft();
-}
-window.onCommitDueChange = (v) => { draft.commitDue = v; saveDraft(); };
-function doCommit() {
-  const text = (draft.commitText || "").trim();
-  if (text) window._addCommitment && window._addCommitment({ text, dueDate: draft.commitDue });
   if (navigator.vibrate) navigator.vibrate(12);
   draft.committed = true;
   enterDone(true);
-  // right after a real commitment is a good moment to nudge toward pairing
-  // the other device, if that hasn't happened yet — no-ops once both
-  // devices are installed.
   window.maybeShowOtherDeviceGate && window.maybeShowOtherDeviceGate();
 }
 window.skipCommit = () => { draft.committed = false; enterDone(false); };
@@ -1183,7 +1326,16 @@ function enterDone(committed) {
 window.keepReflecting = () => { draft.mode = "full"; draft.commitText = ""; draft.history = []; draft.currentName = draft.resumeName; draft.phase = "question"; saveDraft(); renderChat(); };
 
 function finishSession() { window._saveSession && window._saveSession({ answers: draft.answers }); draft = blankDraft(); saveDraft(); window._clearDraft && window._clearDraft(); goHome(); }
-window.exitReflection = () => { stopVoice(); goHome(); };
+window.exitReflection = () => {
+  stopVoice();
+  // leaving mid-walk IS the signal — you stopped because something got escape
+  // energy. Capture what you went to go do.
+  if (draft.active && draft.phase === "question" && !draft.captured) {
+    draft.captured = true; saveDraft();
+    captureConvergence();
+  }
+  goHome();
+};
 
 // textareas grow vertically; the single-line answer input instead scrolls
 // horizontally so a long answer runs off the right edge (and fades) rather

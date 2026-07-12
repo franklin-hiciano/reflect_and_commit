@@ -56,9 +56,6 @@
         '<div class="dsl-pane" id="dslPane">' +
           '<div class="dsl-editor-wrap">' +
             '<div class="squircle-corner-tools">' +
-              '<button class="squircle-corner-btn" id="canvasPreviewBtn" title="preview — walk through this tree right now, nothing saved">' +
-                '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>' +
-              '</button>' +
               '<button class="squircle-corner-btn" id="copyDslBtn" title="copy the tree text">' +
                 '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>' +
               '</button>' +
@@ -93,7 +90,6 @@
     document.getElementById("paneBtnDsl").onclick = () => setPane("dsl");
     document.getElementById("paneBtnCanvas").onclick = () => setPane("canvas");
     document.getElementById("historyToggleBtn").onclick = toggleHistory;
-    document.getElementById("canvasPreviewBtn").onclick = startPreview;
     const copyBtn = document.getElementById("copyDslBtn");
     if (copyBtn) copyBtn.onclick = copyDslText;
     const delBtn = document.getElementById("deleteAllBtn");
@@ -133,6 +129,41 @@
     el.addEventListener("dragover", (e) => e.preventDefault());
     el.addEventListener("drop", onDslDrop);
 
+    // grab-a-line dragging inside the DSL editor: press on a line, move
+    // vertically past a small threshold, drop on the target line — no text
+    // selection needed (moveLine handles declaration vs reference semantics).
+    let _lineDrag = null;
+    const yToLine = (clientY) => {
+      const rect = el.getBoundingClientRect();
+      const y = clientY - rect.top + el.scrollTop - 14; // padding-top
+      const mm = el.clientWidth ? measureLineTops(el.value, el) : null;
+      if (!mm) return Math.max(0, Math.floor(y / LINE_H));
+      let idx = 0;
+      for (let i = 0; i < mm.tops.length; i++) if (mm.tops[i] <= y) idx = i;
+      return idx;
+    };
+    el.addEventListener("mousedown", (e) => {
+      _lineDrag = { y0: e.clientY, from: yToLine(e.clientY), active: false };
+    });
+    window.addEventListener("mousemove", (e) => {
+      if (!_lineDrag) return;
+      if (!_lineDrag.active && Math.abs(e.clientY - _lineDrag.y0) > 9) {
+        _lineDrag.active = true;
+        el.classList.add("line-dragging");
+      }
+    });
+    window.addEventListener("mouseup", (e) => {
+      if (!_lineDrag) return;
+      const d = _lineDrag; _lineDrag = null;
+      el.classList.remove("line-dragging");
+      if (!d.active) return; // plain click — caret behaves normally
+      const to = yToLine(e.clientY);
+      if (to === d.from) return;
+      const caret = el.selectionStart;
+      mutate(TM().moveLine(text(), d.from, to));
+      try { el.setSelectionRange(caret, caret); } catch (_) {}
+    });
+
     // clicking anywhere outside an open recall menu closes it (recall stays in
     // whatever on/off state it's in — the button, not the outside click, toggles).
     document.addEventListener("mousedown", (e) => {
@@ -155,6 +186,7 @@
       });
       window.addEventListener("mousemove", (e) => {
         if (!pan) return;
+        // drag pans the canvas in BOTH dimensions
         scroll.scrollLeft = pan.sl - (e.clientX - pan.x);
         scroll.scrollTop = pan.st - (e.clientY - pan.y);
       });
@@ -169,11 +201,43 @@
 
   // ── history (version snapshots) — kept here since it's part of the
   // editor's own UI; app.js just persists whatever setDslText hands it. ──
-  let _snapshots = [{ ts: Date.now(), text: "" }];
-  let _snapIndex = 0;
+  // history is stored as PER-TREE DIFFS, persisted permanently (localStorage):
+  // {base, patches:[{t, p, s, x}]} — p/s = common prefix/suffix lengths, x = the
+  // replaced middle. Snapshot texts are rebuilt by replaying patches from base.
+  const HIST_KEY = "rc_tree_history";
+  function computePatch(a, b) {
+    let i = 0; const n = Math.min(a.length, b.length);
+    while (i < n && a[i] === b[i]) i++;
+    let j = 0;
+    while (j < n - i && a[a.length - 1 - j] === b[b.length - 1 - j]) j++;
+    return { p: i, s: j, x: b.slice(i, b.length - j) };
+  }
+  function applyPatch(a, pt) { return a.slice(0, pt.p) + pt.x + a.slice(a.length - pt.s); }
+  function loadPersistedSnapshots() {
+    try {
+      const h = JSON.parse(localStorage.getItem(HIST_KEY) || "null");
+      if (!h || !Array.isArray(h.patches)) return [{ ts: 0, text: "" }];
+      const out = [{ ts: h.baseTs || 0, text: h.base || "" }];
+      let cur = h.base || "";
+      h.patches.forEach((pt) => { cur = applyPatch(cur, pt); out.push({ ts: pt.t, text: cur }); });
+      return out;
+    } catch (_) { return [{ ts: 0, text: "" }]; }
+  }
+  function persistSnapshot(prevText, newText, ts) {
+    try {
+      let h = JSON.parse(localStorage.getItem(HIST_KEY) || "null");
+      if (!h || !Array.isArray(h.patches)) h = { base: prevText, baseTs: 0, patches: [] };
+      h.patches.push({ t: ts, ...computePatch(prevText, newText) });
+      // cap: fold the oldest patches into the base so the store stays bounded
+      while (h.patches.length > 400) { h.base = applyPatch(h.base, h.patches[0]); h.baseTs = h.patches[0].t; h.patches.shift(); }
+      localStorage.setItem(HIST_KEY, JSON.stringify(h));
+    } catch (_) {}
+  }
+  let _snapshots = loadPersistedSnapshots();
+  let _snapIndex = _snapshots.length - 1;
   let _charAccum = 0;
   let _nextThreshold = pickThreshold();
-  function pickThreshold() { return 40 + Math.floor(Math.random() * 41); } // 40-80
+  function pickThreshold() { return 60; } // steady boundary — no randomness
   function diffSize(a, b) {
     let i = 0; const n = Math.min(a.length, b.length);
     while (i < n && a[i] === b[i]) i++;
@@ -192,10 +256,13 @@
     if (_snapIndex < _snapshots.length - 1) _snapshots = _snapshots.slice(0, _snapIndex + 1);
     _charAccum += delta;
     if (_charAccum >= _nextThreshold) {
-      _snapshots = _snapshots.concat([{ ts: Date.now(), text: newText }]);
+      const prev = _snapshots[_snapshots.length - 1] ? _snapshots[_snapshots.length - 1].text : "";
+      const ts = Date.now();
+      _snapshots = _snapshots.concat([{ ts, text: newText }]);
       _snapIndex = _snapshots.length - 1;
       _charAccum = 0;
       _nextThreshold = pickThreshold();
+      persistSnapshot(prev, newText, ts); // permanent, as a diff
     }
   };
   function toggleHistory() {
@@ -364,13 +431,13 @@
   function renderPaneSwitch() {
     const wrap = document.getElementById("dslPaneSwitch");
     const isMobile = mobile();
-    wrap.style.display = isMobile ? "flex" : "none";
-    document.getElementById("paneBtnDsl").classList.toggle("on", _pane === "dsl");
-    document.getElementById("paneBtnCanvas").classList.toggle("on", _pane === "canvas");
+    // mobile is READ-ONLY: no pane switcher, no DSL editor — just the tree,
+    // rendered vertically. You edit on desktop.
+    wrap.style.display = "none";
     const split = document.getElementById("dslSplit");
     split.classList.toggle("mobile", isMobile);
-    document.getElementById("dslPane").style.display = !isMobile || _pane === "dsl" ? "flex" : "none";
-    document.getElementById("canvasPane").style.display = !isMobile || _pane === "canvas" ? "flex" : "none";
+    document.getElementById("dslPane").style.display = isMobile ? "none" : "flex";
+    document.getElementById("canvasPane").style.display = "flex";
   }
 
   // measure the pixel top of each logical line as the textarea ACTUALLY renders
@@ -425,9 +492,13 @@
       btn.className = "dsl-gutter-btn";
       btn.title = "add what happens next";
       btn.textContent = "+";
+      // sit AFTER the whole body (a recall line is body, not a destination) —
+      // pinning to rawLine+1 put the "+" on top of the recall line and made
+      // finished-looking questions appear to sprout stray plus buttons.
+      const rowIdx = b.bodyEndRawLine;
       const belowTop = m
-        ? (b.rawLine + 1 < m.tops.length ? m.tops[b.rawLine + 1] : m.bottoms[b.rawLine])
-        : (b.rawLine + 1) * LINE_H + 9;
+        ? (rowIdx < m.tops.length ? m.tops[rowIdx] : m.bottoms[m.bottoms.length - 1])
+        : rowIdx * LINE_H + 9;
       btn.style.top = belowTop + "px";
       btn.onclick = () => {
         const uniq = TM().uniqueName(parsed, "new question");
@@ -504,14 +575,23 @@
     const maxCol = allCols.length ? Math.max(...allCols) : 0;
     const minRow = allRows.length ? Math.min(...allRows) : 0;
     const maxRow = allRows.length ? Math.max(...allRows) : 0;
-    const totalW = Math.max(360, PAD * 2 + (maxCol + 1) * COL_W);
-    const totalH = Math.max(240, PAD * 2 + (maxRow - minRow + 1) * ROW_H);
+    // mobile renders the tree VERTICALLY (depth flows downward, branches fan
+    // sideways); desktop keeps the horizontal left→right layout.
+    const V = mobile();
+    const V_COLW = CARD_W + 14, V_ROWH = CARD_H + 36;
+    const totalW = V
+      ? Math.max(320, PAD * 2 + (maxRow - minRow + 1) * V_COLW)
+      : Math.max(360, PAD * 2 + (maxCol + 1) * COL_W);
+    const totalH = V
+      ? Math.max(240, PAD * 2 + (maxCol + 1) * V_ROWH)
+      : Math.max(240, PAD * 2 + (maxRow - minRow + 1) * ROW_H);
 
     const xyByName = new Map();
     blocks.forEach((b) => {
       const col = graph.col.get(b.name) || 0;
       const row = (graph.row.get(b.name) || 0) - minRow;
-      const cx = PAD + col * COL_W + CARD_W / 2, cy = PAD + row * ROW_H + CARD_H / 2;
+      const cx = V ? PAD + row * V_COLW + CARD_W / 2 : PAD + col * COL_W + CARD_W / 2;
+      const cy = V ? PAD + col * V_ROWH + CARD_H / 2 : PAD + row * ROW_H + CARD_H / 2;
       xyByName.set(b.name, { x: cx - CARD_W / 2, y: cy - CARD_H / 2, cx, cy });
     });
     // a node is a LEAF (unfinished path) if nothing leads out of it — no next,
@@ -530,17 +610,23 @@
         id: b.name, name: b.name, text: b.name || "(untitled)", star: !!b.star, isChoice: b.type === "choice",
         isTerminal: false, isDuplicate: dupNames.has(t.norm(b.name)), recallTarget: b.recallTarget, isLeaf: !hasChild.has(b.name),
         children: childrenOf.get(b.name) || [],
-        x: p.x, y: p.y, w: CARD_W, h: CARD_H, ghost,
+        x: p.x, y: p.y, w: CARD_W, h: CARD_H, ghost: V ? null : ghost, // read-only mobile: no hypotheticals
       };
     });
     terminals.forEach((term) => {
       const col = term.col || 0, row = (term.row || 0) - minRow;
-      const cx = PAD + col * COL_W + CARD_W / 2, cy = PAD + row * ROW_H + CARD_H / 2;
+      const cx = V ? PAD + row * V_COLW + CARD_W / 2 : PAD + col * COL_W + CARD_W / 2;
+      const cy = V ? PAD + col * V_ROWH + CARD_H / 2 : PAD + row * ROW_H + CARD_H / 2;
       xyByName.set(term.id, { x: cx - CARD_W / 2, y: cy - CARD_H / 2, cx, cy });
       nodes.push({ id: term.id, name: null, text: "done", star: false, isChoice: false, isTerminal: true, isDuplicate: false, recallTarget: null, x: cx - CARD_W / 2, y: cy - CARD_H / 2, w: CARD_W, h: CARD_H });
     });
 
     function edgePath(a, b) {
+      if (V) {
+        const y1 = a.y + CARD_H, y2 = b.y;
+        const midY = y1 + (y2 - y1) / 2;
+        return "M " + a.cx + " " + y1 + " C " + a.cx + " " + midY + ", " + b.cx + " " + midY + ", " + b.cx + " " + y2;
+      }
       const x1 = a.x + CARD_W, x2 = b.x;
       const midX = x1 + (x2 - x1) / 2;
       return "M " + x1 + " " + a.cy + " C " + midX + " " + a.cy + ", " + midX + " " + b.cy + ", " + x2 + " " + b.cy;
@@ -579,10 +665,11 @@
     const scrollEl = document.querySelector(".canvas-scroll");
     if (scrollEl) {
       const vw = scrollEl.clientWidth, vh = scrollEl.clientHeight;
-      const editorW = mobile() ? 0 : vw * 0.6; // the DSL editor covers the left 60% on desktop
-      // vertically: center the tree in the band between the top of the screen and
-      // the 45% mark (i.e. its center sits at ~22.5% down).
-      content.style.marginTop = Math.max(0, vh * 0.225 - canvas.h / 2) + "px";
+      const editorW = mobile() ? 0 : vw * 0.45; // the DSL editor covers the left 45% on desktop
+      // vertically: tree center sits ~62% up from the bottom (38% from the top) —
+      // one tunable number.
+      const TREE_CENTER_FROM_TOP = 0.38;
+      content.style.marginTop = Math.max(0, vh * TREE_CENTER_FROM_TOP - canvas.h / 2) + "px";
       // horizontally: place it in the space to the RIGHT of the editor so the
       // leftmost node clears it; you can still drag/scroll it left under the editor.
       content.style.marginLeft = (editorW + Math.max(0, ((vw - editorW) - canvas.w) / 2)) + "px";
@@ -675,12 +762,13 @@
 
     const label = document.createElement("div");
     label.className = "canvas-card-text";
-    if (!isTerm && n.name && _editingName !== n.name) {
+    if (!isTerm && n.name && _editingName !== n.name && !mobile()) {
       label.classList.add("editable");
       label.title = "click to rename — updates everywhere this question is used";
       label.onclick = (e) => { e.stopPropagation(); _editingName = n.name; window.renderDslEditor(); };
     }
     if (_editingName === n.name && !isTerm) {
+      label.classList.add("editing"); // un-clamps the label so the input gets the whole card, not one line
       const input = document.createElement("textarea");
       input.className = "canvas-card-text-input"; input.value = n.name; input.rows = 1;
       label.appendChild(input);
@@ -726,18 +814,13 @@
     }
     card.appendChild(label);
 
-    if (n.isChoice) {
-      const tag = document.createElement("div");
-      tag.className = "canvas-card-tag"; tag.textContent = "choice";
-      card.appendChild(tag);
-    }
     if (n.isDuplicate) {
       const tag = document.createElement("div");
       tag.className = "canvas-card-tag dup"; tag.textContent = "duplicate title";
       card.appendChild(tag);
     }
 
-    if (!isTerm) {
+    if (!isTerm && !mobile()) { // mobile is read-only: no delete/recall/drag/hover affordances
       const del = document.createElement("button");
       del.className = "canvas-del-btn"; del.title = "delete"; del.textContent = "✕";
       del.onclick = (e) => { e.stopPropagation(); mutate(TM().deleteBlock(text(), n.name)); };
@@ -799,18 +882,41 @@
         return svg ? Array.from(svg.querySelectorAll("path.ghost-edge")).find((p) => p.dataset.ghostFor === n.name) : null;
       };
       let hideTimer = null;
+      let suppressed = [];
       const reveal = () => {
         clearTimeout(hideTimer);
         const s = slotFor(n.name); if (s) s.classList.add("reveal");
         const e2 = ghostEdgeEl(); if (e2) e2.classList.add("reveal");
-        (n.children || []).forEach((c) => { const cs = slotFor(c); if (cs) cs.classList.add("suppressed"); });
+        // the hovered node's hypothetical has PRIORITY: suppress every OTHER
+        // slot (and its path) that geometrically overlaps this one, whether it
+        // belongs to a child, sibling, or anything else.
+        if (n.ghost) {
+          const svg = document.querySelector(".canvas-content svg");
+          document.querySelectorAll(".canvas-ghost-slot").forEach((os) => {
+            const nm = os.dataset.ghostSlotFor;
+            if (!nm || nm === n.name) return;
+            const ox = parseFloat(os.style.left), oy = parseFloat(os.style.top);
+            if (Math.abs(ox - n.ghost.x) < CARD_W && Math.abs(oy - n.ghost.y) < CARD_H) {
+              os.classList.add("suppressed");
+              const oe = svg && Array.from(svg.querySelectorAll("path.ghost-edge")).find((p) => p.dataset.ghostFor === nm);
+              if (oe) oe.classList.add("suppressed");
+              suppressed.push(nm);
+            }
+          });
+        }
       };
       const hideSoon = () => {
         hideTimer = setTimeout(() => {
           const s = slotFor(n.name); if (s) s.classList.remove("reveal");
           const e2 = ghostEdgeEl(); if (e2) e2.classList.remove("reveal");
-          (n.children || []).forEach((c) => { const cs = slotFor(c); if (cs) cs.classList.remove("suppressed"); });
-        }, 160);
+          const svg = document.querySelector(".canvas-content svg");
+          suppressed.forEach((nm) => {
+            const os = slotFor(nm); if (os) os.classList.remove("suppressed");
+            const oe = svg && Array.from(svg.querySelectorAll("path.ghost-edge")).find((p) => p.dataset.ghostFor === nm);
+            if (oe) oe.classList.remove("suppressed");
+          });
+          suppressed = [];
+        }, 900); // generous — enough time to travel from the card to the "+"
       };
       card.addEventListener("mouseenter", reveal);
       card.addEventListener("mouseleave", hideSoon);

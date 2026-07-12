@@ -13,7 +13,7 @@
   --surface-2: #1f1f25;  /* cards */
   --surface-3: #26262d;  /* pills, menus, popovers (highest) */
   --serif: "Amiri", ui-serif, Georgia, "Times New Roman", serif;
-  --mono: "Amulya", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --mono: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --syne: "Syne", var(--mono);
   --elev: 0 6px 24px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.03);
   --elev-sm: 0 2px 10px rgba(0,0,0,.5);
@@ -140,6 +140,90 @@ body::after {
   border-radius: 999px; padding: 5px 14px 5px 5px; cursor: pointer; transition: border-color .2s;
 }
 .user-menu-trigger:hover { border-color: var(--ink-dim); }
+
+/* ---------- the home pill: play · commitment · streak · pfp (top-right) ---------- */
+.home-pill {
+  position: fixed; top: 12px; right: 12px; z-index: 30; display: flex; align-items: center; gap: 6px;
+  background: var(--surface-3); border: 1px solid var(--line); border-radius: 999px; padding: 5px 6px;
+  box-shadow: var(--elev-sm); font-family: var(--serif);
+}
+.home-pill .user-menu-trigger { position: static; background: none; border: none; padding: 0 2px; box-shadow: none; }
+.home-pill-play {
+  width: 28px; height: 28px; border-radius: 50%; background: none; border: 1.6px solid #3fa66b;
+  color: #3fa66b; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
+  transition: color .2s, border-color .2s;
+}
+.home-pill-play:hover { color: #5ecb8b; border-color: #5ecb8b; }
+.home-pill-commit {
+  display: flex; align-items: center; gap: 6px; background: none; border: none; color: var(--ink-dim);
+  font-family: var(--serif); font-size: 12.5px; cursor: pointer; padding: 4px 4px; max-width: 260px;
+}
+.home-pill-commit:hover { color: var(--ink); }
+.home-pill-commit .chev { color: var(--ink-faint); font-size: 14px; }
+.home-pill-commit-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: none; }
+.home-pill.open .home-pill-commit-text { display: inline; }
+.home-pill-streak {
+  display: flex; align-items: center; gap: 4px; padding: 2px 8px 2px 4px; border: 1px solid var(--line);
+  border-radius: 999px; color: var(--ink-faint);
+}
+.home-pill-streak .flame { width: 13px; height: 13px; }
+.home-pill-streak.lit { color: #e08a3c; border-color: #6b4a2a; }
+.home-pill-streak-count { font-family: var(--syne); font-size: 12px; font-weight: 700; color: var(--ink-dim); }
+.home-pill-streak.lit .home-pill-streak-count { color: var(--ink); }
+.home-pill-drop {
+  display: none; position: fixed; top: 52px; right: 12px; z-index: 30; width: 300px;
+  background: var(--surface-3); border: 1px solid var(--line); border-radius: 20px; padding: 10px;
+  box-shadow: var(--elev); font-family: var(--serif);
+}
+.home-pill-drop.on { display: block; }
+.home-pill-drop-active { font-size: 13px; color: var(--ink); line-height: 1.4; margin: 2px 4px 10px; }
+.home-pill-drop-btns { display: flex; gap: 8px; margin-bottom: 10px; }
+.home-pill-hold {
+  flex: 1; border-radius: 999px; padding: 9px 0; font-family: var(--serif); font-size: 12.5px; cursor: pointer;
+  background: none; transition: transform .5s var(--ease), background .5s var(--ease);
+}
+.home-pill-hold.yes { border: 1.4px solid #3fa66b; color: #3fa66b; }
+.home-pill-hold.no { border: 1.4px solid var(--ink-faint); color: var(--ink-dim); }
+.home-pill-hold.holding { transform: scale(.96); }
+.home-pill-hold.yes.holding { background: rgba(63,166,107,.18); }
+.home-pill-hold.no.holding { background: rgba(120,120,120,.15); }
+.home-pill-past { max-height: 220px; overflow-y: auto; }
+.home-pill-past-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 12px; color: var(--ink-dim); padding: 6px 4px; border-top: 1px solid var(--line);
+}
+.home-pill-past-item .mark.done { color: #3fa66b; }
+.home-pill-past-item .mark.missed { color: var(--ink-faint); }
+.home-pill-empty { font-size: 12px; color: var(--ink-faint); padding: 4px; }
+/* want→done metric: stopwatch (median days) + a little glass filled to the
+   conversion rate. Only real action moves either number. */
+.home-pill-metric { display: flex; align-items: center; gap: 5px; color: var(--ink-faint); padding: 0 2px; }
+.home-pill-metric .speed { font-family: var(--syne); font-size: 11px; color: var(--ink-dim); }
+.home-pill-metric .glass { position: relative; width: 9px; height: 14px; border: 1px solid var(--ink-faint); border-radius: 2px 2px 4px 4px; overflow: hidden; }
+.home-pill-metric .glass-fill { position: absolute; left: 0; right: 0; bottom: 0; background: var(--ink-dim); }
+
+/* line-drag inside the DSL editor */
+.dsl-textarea.line-dragging { cursor: grabbing; caret-color: transparent; }
+
+/* ---------- mobile: read-only home ---------- */
+.mobile-play-big, .mobile-edit-note { display: none; }
+@media (max-width: 819px) {
+  /* big centered play in the upper area */
+  .mobile-play-big {
+    display: flex; position: fixed; top: 15%; left: 50%; transform: translate(-50%, -50%);
+    width: 88px; height: 88px; border-radius: 50%; background: none; border: 2px solid #3fa66b;
+    color: #3fa66b; align-items: center; justify-content: center; cursor: pointer; z-index: 25;
+  }
+  /* the pill sits at the bottom middle — pfp + streak share it; text always open */
+  .home-pill { top: auto; bottom: calc(14px + env(safe-area-inset-bottom)); left: 50%; right: auto; transform: translateX(-50%); max-width: calc(100% - 20px); }
+  .home-pill-commit-text { display: inline; }
+  .home-pill-play { display: none; }
+  .home-pill-drop { top: auto; bottom: calc(66px + env(safe-area-inset-bottom)); left: 12px; right: 12px; width: auto; }
+  .mobile-edit-note {
+    display: block; position: fixed; bottom: calc(64px + env(safe-area-inset-bottom));
+    left: 0; right: 0; text-align: center; font-family: var(--serif); font-size: 11px; color: var(--ink-faint); z-index: 24;
+  }
+}
 .user-menu-avatar { width: 26px; height: 26px; border-radius: 50%; display: block; }
 .user-menu-name { font-family: var(--serif); font-size: 12px; color: var(--ink-dim); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -211,8 +295,10 @@ body::after {
    pinned to the bottom-left, growing UPWARD as you add lines, capped so it never
    exceeds the canvas. */
 .dsl-split:not(.mobile) .dsl-pane {
-  position: absolute; top: auto; left: 10px; bottom: 10px; width: 60%; z-index: 5;
-  flex: none; display: flex; max-height: 45%;
+  position: absolute; top: auto; left: 10px; bottom: 10px; width: 45%; z-index: 5;
+  /* cap: the editor may grow up to the tree's vertical center line (center sits
+     at 38% from the top → editor tops out at 62% of the screen) */
+  flex: none; display: flex; max-height: 62%;
 }
 
 /* MOBILE keeps the one-pane-at-a-time switcher for now (read-only mobile is a
@@ -292,6 +378,9 @@ body::after {
 /* interior ghost PATHS hide with their "+", revealed together on card hover */
 .ghost-edge.interior { opacity: 0; transition: opacity .15s var(--ease); }
 .ghost-edge.interior.reveal { opacity: 1; }
+/* a hovered node's hypothetical takes priority: anything overlapping it is
+   suppressed (slot + its path) until the hover ends */
+.ghost-edge.suppressed { opacity: 0 !important; }
 /* the DSL highlight overlay is built in a later step — inert for now */
 .dsl-highlight { display: none; }
 
@@ -306,6 +395,12 @@ body::after {
 .canvas-card-text {
   font-family: var(--serif); font-size: 12.5px; color: var(--ink); line-height: 1.3; overflow: hidden;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+/* while editing, the label must NOT clamp — the inline textarea needs the whole
+   card, or it renders one visible line and scrolls the rest (the bug). */
+.canvas-card-text.editing {
+  display: block; -webkit-line-clamp: unset; -webkit-box-orient: unset;
+  overflow: visible; flex: 1; height: 100%;
 }
 .canvas-card.terminal .canvas-card-text { color: var(--ink-faint); }
 .canvas-card-text.editable { cursor: text; }

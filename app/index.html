@@ -11,11 +11,7 @@
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link
             rel="stylesheet"
-            href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Syne:wght@600;700;800&display=swap"
-        />
-        <link
-            rel="stylesheet"
-            href="https://api.fontshare.com/v2/css?f[]=amulya@400,500,700&display=swap"
+            href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Geist:wght@400;500;600&family=Syne:wght@600;700;800&display=swap"
         />
         <link rel="stylesheet" href="style.css" />
         <link rel="manifest" href="manifest.json" />
@@ -250,20 +246,46 @@
            still has a way to reach settings/sign-out. Visually it still
            reads as "tucked in the corner" once the squircles expand to
            fill the screen, since there's nothing else up there. -->
-            <button
-                class="user-menu-trigger"
-                id="userMenuTrigger"
-                onclick="toggleSettingsPanel()"
-                title="account menu"
-            >
-                <img
-                    id="userMenuAvatar"
-                    class="user-menu-avatar"
-                    style="display: none"
-                    alt=""
-                />
-                <span class="user-menu-name" id="userMenuName"></span>
+            <!-- the home pill: play · commitment · streak · account -->
+            <div class="home-pill" id="homePill">
+                <button class="home-pill-play" id="homePillPlay" onclick="startPreview()" title="walk your tree now">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8 5v14l11-7z" /></svg>
+                </button>
+                <button class="home-pill-commit" id="homePillCommit" onclick="toggleCommitPill()">
+                    <span class="home-pill-commit-text" id="homePillCommitText"></span>
+                    <span class="chev">›</span>
+                </button>
+                <div class="home-pill-metric" id="homePillMetric" title="want → done: speed and success rate" style="display: none">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>
+                    <span class="speed" id="pillSpeed"></span>
+                    <span class="glass"><span class="glass-fill" id="pillGlassFill" style="height: 0%"></span></span>
+                </div>
+                <div class="home-pill-streak" id="homePillStreak" title="commitments kept">
+                    <svg class="flame" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c.7 3.2-.8 5-2.4 6.7C7.8 10.5 6 12.3 6 15.2 6 19 8.7 22 12 22s6-3 6-6.8c0-1.9-.8-3.4-1.8-4.9-.3 1-1 2-1.9 2.5.4-3.6-.9-8-2.3-10.8z"/></svg>
+                    <span class="home-pill-streak-count" id="homePillStreakCount">0</span>
+                </div>
+                <button
+                    class="user-menu-trigger"
+                    id="userMenuTrigger"
+                    onclick="toggleSettingsPanel()"
+                    title="account menu"
+                >
+                    <img
+                        id="userMenuAvatar"
+                        class="user-menu-avatar"
+                        style="display: none"
+                        alt=""
+                    />
+                    <span class="user-menu-name" id="userMenuName"></span>
+                </button>
+            </div>
+            <div class="home-pill-drop" id="homePillDrop"></div>
+
+            <!-- mobile-only: big centered play + "edit on desktop" note -->
+            <button class="mobile-play-big" id="mobilePlayBig" onclick="startPreview()" title="reflect now">
+                <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M8 5v14l11-7z" /></svg>
             </button>
+            <div class="mobile-edit-note" id="mobileEditNote">you edit your tree on desktop</div>
             <div class="settings-panel" id="settingsPanel">
                 <div class="settings-panel-inner">
                     <button
@@ -514,46 +536,8 @@
                 </div>
             </div>
 
-            <!-- COMMIT -->
-            <div class="phase" id="phaseCommit">
-                <div class="commit-kicker">one move</div>
-                <textarea
-                    id="commitField"
-                    class="answer-mono commit-field"
-                    rows="1"
-                    spellcheck="false"
-                    autocomplete="off"
-                    placeholder="I will…"
-                ></textarea>
-                <div class="commit-due-row">
-                    <span class="commit-due-label">by</span>
-                    <select
-                        class="commit-due-select"
-                        id="commitDueSelect"
-                        onchange="onCommitDueChange(this.value)"
-                    ></select>
-                </div>
-                <button
-                    class="hold"
-                    id="commitHold"
-                    data-label="hold to commit"
-                >
-                    <svg class="hold-ring" viewBox="0 0 72 72">
-                        <circle class="hold-track" cx="36" cy="36" r="33" />
-                        <circle
-                            class="hold-fill"
-                            id="commitRingFill"
-                            cx="36"
-                            cy="36"
-                            r="33"
-                        />
-                    </svg>
-                    <span class="hold-label">hold to commit</span>
-                </button>
-                <button class="btn-shapeless" onclick="skipCommit()">
-                    nevermind
-                </button>
-            </div>
+            <!-- COMMIT stage removed — the reflection ends and the LLM captures
+                 the last thing you said you'd do (see captureConvergence). -->
 
             <!-- DONE -->
             <div class="phase" id="phaseDone">
@@ -599,6 +583,7 @@
 
         <script type="module" src="firebase-init.js?v=22"></script>
         <script src="js/tree-model.js?v=22"></script>
+        <script src="js/meta-tree.js?v=22"></script>
         <script src="js/dsl-editor.js?v=22"></script>
         <script src="js/app.js?v=22"></script>
     </body>
